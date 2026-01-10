@@ -1,4 +1,9 @@
-﻿#include <windows.h>
+﻿// RegisterApp.cpp
+#define INITGUID
+#include <initguid.h>
+
+// RegisterApp.cpp
+#include <windows.h>
 #include <msctf.h>
 #include <combaseapi.h>
 #include <string>
@@ -7,14 +12,14 @@
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "uuid.lib")
 
-// --- Windows 11で必要なカテゴリ追加 ---
-// {5108324A-9635-4BB5-B2EF-3D4F37E30E09}
-// static const GUID GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT = { 0x5108324a, 0x9635, 0x4bb5, { 0xb2, 0xef, 0x3d, 0x4f, 0x37, 0xe3, 0x0e, 0x09 } };
-
 // --- COM(CLSID)を手動で登録する関数 ---
 HRESULT RegisterCLSID(const wchar_t* dllPath) {
-    std::wstring keyPath = L"Software\\Classes\\CLSID\\{86B8A5A1-9B5A-4B6E-A77E-6A2F2B1F7B12}";
     HKEY hKey;
+    wchar_t clsidStr[64] = {};
+
+    StringFromGUID2(CLSID_Hitomoji, clsidStr, _countof(clsidStr));
+    std::wstring keyPath =
+    std::wstring(L"Software\\Classes\\CLSID\\") + clsidStr;    
     
     // 1. CLSIDキーの作成
     if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, keyPath.c_str(), 0, NULL, 0, KEY_WRITE, NULL, &hKey, NULL) != ERROR_SUCCESS) return E_FAIL;
