@@ -140,6 +140,7 @@
     <ClInclude Include="Controller.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="DisplayAttribute.h" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="hitomoji.cpp" />
     <ClCompile Include="Controller.cpp" />

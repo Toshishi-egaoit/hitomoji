@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <initguid.h> // GUIDの実体定義用
 #include "Hitomoji.h"
+#include "DisplayAttribute.h"
 
 // --- EditSessionの実装 ---
 class CEditSession : public ITfEditSession , public ITfCompositionSink{
@@ -27,6 +28,8 @@ public:
     }
 
 //----- ITfEditSession の実装
+/*
+	// 最低限の処理だけを実装したシンプル版（参考用）
 	STDMETHODIMP DoEditSession_simple(TfEditCookie ec) {
 		ITfRange* pRange = nullptr;
 		if (*_ppComp == nullptr) { // 新規Composition開始
@@ -65,7 +68,9 @@ public:
 		}
 		return S_OK;
 	}
+*/
 
+	// 現状で使用している実用版のDoEditSession（ある程度の構造化をしてある）
 	STDMETHODIMP DoEditSession(TfEditCookie ec) {
 		OutputDebugString(L"[hitomoji] DoEditSession");
 		ITfRange* pRange = nullptr;
@@ -77,9 +82,13 @@ public:
 			// 2. 確定処理
 			_TerminateComposition(ec);
 		} else if (_ch != 0) {
+			ITfRange* AttrRange = nullptr;
+			LONG temp = 0;
+			HRESULT hr;
 			// 3. テキストセットと属性付与
 			pRange->Collapse(ec, TF_ANCHOR_END);
 			pRange->SetText(ec, 0, &_ch, 1);
+			pRange->ShiftStart(ec, -1, &temp, nullptr); // 直前の1文字分の範囲を取得
 			_ApplyDisplayAttribute(ec, pRange);
 		}
 
@@ -114,24 +123,38 @@ private:
 	}
 
     // 下線を引くための詳細実装を切り出す
-    void _ApplyDisplayAttribute(TfEditCookie ec, ITfRange* pRange) {
+    HRESULT _ApplyDisplayAttribute(TfEditCookie ec, ITfRange* pRange) {
 		OutputDebugString(L"[hitomoji] _ApplyDisplayAttribute");
         ITfProperty* pProp = nullptr;
-		OutputDebugString(L"[hitomoji] GetProperty");
-        if (SUCCEEDED(_pic->GetProperty(GUID_PROP_ATTRIBUTE, &pProp))) {
-            ITfCategoryMgr* pCategoryMgr = nullptr;
-            if (SUCCEEDED(CoCreateInstance(CLSID_TF_CategoryMgr, NULL, CLSCTX_INPROC_SERVER, IID_ITfCategoryMgr, (void**)&pCategoryMgr))) {
-                TfGuidAtom attrAtom = 0;
-                if (SUCCEEDED(pCategoryMgr->RegisterGUID(GUID_TFCAT_DISPLAYATTRIBUTE_TRACKING, &attrAtom))) {
-                    VARIANT var;
-                    var.vt = VT_I4;
-                    var.lVal = (LONG)attrAtom;
-                    pProp->SetValue(ec, pRange, &var);
-                }
-                pCategoryMgr->Release();
-            }
-            pProp->Release();
-        }
+		HRESULT hr;
+        hr = _pic->GetProperty(GUID_PROP_ATTRIBUTE, &pProp);
+
+		ITfCategoryMgr* pCategoryMgr = nullptr;
+		hr = CoCreateInstance(CLSID_TF_CategoryMgr, NULL, CLSCTX_INPROC_SERVER, IID_ITfCategoryMgr, (void**)&pCategoryMgr);
+		TfGuidAtom attrAtom = 0;
+		hr = pCategoryMgr->RegisterGUID(GUID_ATTR_INPUT, &attrAtom);
+		OUTPUT_HR_n_RETURN_ON_ERROR(L"RegisterGUID", hr);
+
+		ITfRange* pTempRange = nullptr;
+		BOOL bEmpty = FALSE;
+		(*_ppComp)->GetRange(&pTempRange);
+		pTempRange->IsEmpty(ec, &bEmpty);
+		if (bEmpty) {
+			OutputDebugString(L"IsEmpty = TRUE");
+		}
+
+		{
+			VARIANT var;
+			VariantInit(&var);
+			var.vt = VT_I4;
+			var.lVal = (LONG)attrAtom;
+			hr = pProp->SetValue(ec, pTempRange, &var);
+			OUTPUT_HR_n_RETURN_ON_ERROR(L"SetValue", hr);
+		}
+		pCategoryMgr->Release();
+		pProp->Release();
+
+		return S_OK;
     }
 
     void _TerminateComposition(TfEditCookie ec) {
@@ -163,6 +186,8 @@ STDMETHODIMP CHitomoji::QueryInterface(REFIID riid, void** ppvObj) {
 		*ppvObj = (ITfTextInputProcessor*)this;
 	} else if (IsEqualIID(riid, IID_ITfKeyEventSink)) {
 		*ppvObj = (ITfKeyEventSink*)this;
+	} else if (IsEqualIID(riid, IID_ITfDisplayAttributeProvider)) {
+		*ppvObj = (ITfDisplayAttributeProvider*)this;
 	}
 	if (*ppvObj) { AddRef(); return S_OK; }
 	return E_NOINTERFACE;
@@ -276,8 +301,30 @@ HRESULT CHitomoji::_InvokeEditSession(ITfContext* pic, WCHAR ch, BOOL fEnd) {
 	pES->Release();
 	return hrSession;
 }
+// ------
 
-// ----- debug support functions
+// ITfDisplayAttributeProvider
+STDMETHODIMP CHitomoji::GetDisplayAttributeInfo(REFGUID guid, ITfDisplayAttributeInfo **ppInfo) {
+	if (IsEqualGUID(guid, GUID_ATTR_INPUT)) {
+		*ppInfo = new CDisplayAttributeInfo(); // さっき作ったクラスを投げる
+		return S_OK;
+	}
+	return E_INVALIDARG;
+}
+
+STDMETHODIMP CHitomoji::EnumDisplayAttributeInfo(IEnumTfDisplayAttributeInfo **ppEnum) {
+    if (ppEnum == nullptr) return E_INVALIDARG;
+    *ppEnum = nullptr;
+    
+    // v0.1 では一旦「未実装」でOK。
+    // エディタは GetDisplayAttributeInfo さえ呼べれば描画できます。
+    return E_NOTIMPL; 
+}
+
+// ------
+
+
+// debug support functions
 void OutputDebugStringWithInt(wchar_t const* format, ULONG lvalue)
 {
     wchar_t buff[255];
