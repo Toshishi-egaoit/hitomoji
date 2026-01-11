@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <ole2.h>
 #include "Hitomoji.h"
+#include <cstdio>
 
 // --- グローバル変数 ---
 HINSTANCE g_hInst = NULL;
@@ -52,7 +53,7 @@ STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, void** ppv) {
         CHitomojiClassFactory* pCF = new CHitomojiClassFactory();
         if (!pCF) return E_OUTOFMEMORY;
         HRESULT hr = pCF->QueryInterface(riid, ppv);
-		OutputDebugString(L"   > QI(riid):");
+		OUTPUT_HR_ON_ERROR(L"pCF->QueryInterface",hr)
         return hr;
     }
     return CLASS_E_CLASSNOTAVAILABLE;
