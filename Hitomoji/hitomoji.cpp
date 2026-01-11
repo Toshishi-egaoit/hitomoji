@@ -84,7 +84,6 @@ public:
 		} else if (_ch != 0) {
 			ITfRange* AttrRange = nullptr;
 			LONG temp = 0;
-			HRESULT hr;
 			// 3. テキストセットと属性付与
 			pRange->Collapse(ec, TF_ANCHOR_END);
 			pRange->SetText(ec, 0, &_ch, 1);
@@ -125,33 +124,17 @@ private:
     // 下線を引くための詳細実装を切り出す
     HRESULT _ApplyDisplayAttribute(TfEditCookie ec, ITfRange* pRange) {
 		OutputDebugString(L"[hitomoji] _ApplyDisplayAttribute");
-        ITfProperty* pProp = nullptr;
+		ITfProperty* pProp = nullptr;
 		HRESULT hr;
         hr = _pic->GetProperty(GUID_PROP_ATTRIBUTE, &pProp);
+		OUTPUT_HR_n_RETURN_ON_ERROR(L"GetProperty", hr);
 
-		ITfCategoryMgr* pCategoryMgr = nullptr;
-		hr = CoCreateInstance(CLSID_TF_CategoryMgr, NULL, CLSCTX_INPROC_SERVER, IID_ITfCategoryMgr, (void**)&pCategoryMgr);
-		TfGuidAtom attrAtom = 0;
-		hr = pCategoryMgr->RegisterGUID(GUID_ATTR_INPUT, &attrAtom);
-		OUTPUT_HR_n_RETURN_ON_ERROR(L"RegisterGUID", hr);
-
-		ITfRange* pTempRange = nullptr;
-		BOOL bEmpty = FALSE;
-		(*_ppComp)->GetRange(&pTempRange);
-		pTempRange->IsEmpty(ec, &bEmpty);
-		if (bEmpty) {
-			OutputDebugString(L"IsEmpty = TRUE");
-		}
-
-		{
-			VARIANT var;
-			VariantInit(&var);
-			var.vt = VT_I4;
-			var.lVal = (LONG)attrAtom;
-			hr = pProp->SetValue(ec, pTempRange, &var);
-			OUTPUT_HR_n_RETURN_ON_ERROR(L"SetValue", hr);
-		}
-		pCategoryMgr->Release();
+		VARIANT var;
+		VariantInit(&var);
+		var.vt = VT_I4;
+		var.lVal = (LONG)CDisplayAttributeInfo::GetAtom();
+		hr = pProp->SetValue(ec, pRange, &var);
+		OUTPUT_HR_n_RETURN_ON_ERROR(L"SetValue", hr);
 		pProp->Release();
 
 		return S_OK;
@@ -206,6 +189,7 @@ STDMETHODIMP CHitomoji::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 
 	if (FAILED(_InitKeyEventSink())) return E_FAIL;
 	if (FAILED(_InitPreservedKey())) return E_FAIL;
+	if (FAILED(_InitDisplayAttributeInfo())) return E_FAIL;
 
 	return S_OK;
 }
@@ -293,6 +277,25 @@ void CHitomoji::_UninitPreservedKey() {
 	}
 }
 
+HRESULT CHitomoji::_InitDisplayAttributeInfo()
+{
+    ITfCategoryMgr* pCategoryMgr = nullptr;
+    HRESULT hr = CoCreateInstance(
+        CLSID_TF_CategoryMgr,
+        nullptr,
+        CLSCTX_INPROC_SERVER,
+        IID_ITfCategoryMgr,
+        (void**)&pCategoryMgr
+    );
+	OUTPUT_HR_n_RETURN_ON_ERROR("_InitDisplayAttributeInfo/CoCreateInstance",hr);
+
+    hr = CDisplayAttributeInfo::InitGuid(pCategoryMgr);
+    pCategoryMgr->Release();
+    return hr;
+}
+
+void CHitomoji::_UninitDisplayAttributeInfo() { return ; }
+
 HRESULT CHitomoji::_InvokeEditSession(ITfContext* pic, WCHAR ch, BOOL fEnd) {
 	CEditSession* pES = new CEditSession(pic, &_pComposition, _tfClientId, ch, fEnd);
 	if (!pES) return E_OUTOFMEMORY;
@@ -305,7 +308,7 @@ HRESULT CHitomoji::_InvokeEditSession(ITfContext* pic, WCHAR ch, BOOL fEnd) {
 
 // ITfDisplayAttributeProvider
 STDMETHODIMP CHitomoji::GetDisplayAttributeInfo(REFGUID guid, ITfDisplayAttributeInfo **ppInfo) {
-	if (IsEqualGUID(guid, GUID_ATTR_INPUT)) {
+	if (CDisplayAttributeInfo::IsMyGuid(guid)) {
 		*ppInfo = new CDisplayAttributeInfo(); // さっき作ったクラスを投げる
 		return S_OK;
 	}
@@ -316,11 +319,11 @@ STDMETHODIMP CHitomoji::EnumDisplayAttributeInfo(IEnumTfDisplayAttributeInfo **p
     if (ppEnum == nullptr) return E_INVALIDARG;
     *ppEnum = nullptr;
     
+	// TODO: 将来的に複数属性をサポートする場合はここを実装する。
     // v0.1 では一旦「未実装」でOK。
     // エディタは GetDisplayAttributeInfo さえ呼べれば描画できます。
     return E_NOTIMPL; 
 }
-
 // ------
 
 
@@ -344,3 +347,4 @@ void OutputDebugStringWithString(wchar_t const* format, wchar_t const* value)
     OutputDebugStringW(buff);
     return;
 }
+

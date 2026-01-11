@@ -25,7 +25,7 @@ public:
     }
 
     // --- ITfDisplayAttributeInfo é¿ëï ---
-    STDMETHODIMP GetGUID(GUID *pguid) { if (!pguid) return E_INVALIDARG; *pguid = GUID_ATTR_INPUT; return S_OK; }
+    STDMETHODIMP GetGUID(GUID *pguid) { if (!pguid) return E_INVALIDARG; *pguid = s_myGuid; return S_OK; }
     STDMETHODIMP GetDescription(BSTR *pbstr) { if (!pbstr) return E_INVALIDARG; *pbstr = SysAllocString(L"Hitomoji Attr"); return S_OK; }
     
     STDMETHODIMP GetAttributeInfo(TF_DISPLAYATTRIBUTE *pda) {
@@ -44,6 +44,13 @@ public:
     STDMETHODIMP SetAttributeInfo(const TF_DISPLAYATTRIBUTE *pda) { return E_NOTIMPL; }
     STDMETHODIMP Reset() { return S_OK; }
 
+	// CDisplayAttributeInfo ì∆é©èàóùÇÃé¿ëï
+    static HRESULT InitGuid(ITfCategoryMgr* pCategoryMgr) ;
+    static TfGuidAtom GetAtom() ;
+	static BOOL IsMyGuid(REFGUID guid) ;
+
 private:
     long _cRef;
+    static TfGuidAtom s_attrAtom;
+	static const GUID s_myGuid; // DisplayAttribute.cppÇ≈íËã`
 };
