@@ -3,15 +3,20 @@
 #include <windows.h>
 #include <msctf.h>
 #include <cstdio>
+#include <string>
 #include <initguid.h> // GUIDの実体定義用
 #include "Hitomoji.h"
 #include "DisplayAttribute.h"
+#include "ChmRomajiConverter.h"
+#include "ChmRawInputStore.h"
 
 // --- EditSessionの実装 ---
 class CEditSession : public ITfEditSession , public ITfCompositionSink{
 public:
-	CEditSession(ITfContext* pic, ITfComposition** ppComp, TfClientId tid, WCHAR ch, BOOL fEnd) 
-		: _pic(pic), _ppComp(ppComp), _tid(tid), _ch(ch), _fEnd(fEnd), _cRef(1) {}
+	CEditSession(ITfContext* pic, ITfComposition** ppComp, TfClientId tid, ChmRawInputStore *RawInput, WCHAR ch, BOOL fEnd) 
+		: _pic(pic), _ppComp(ppComp), _tid(tid), _pRawInput(RawInput), _ch(ch), _fEnd(fEnd), _cRef(1) {
+		_pRawInput->push(ch);
+	}
 
 	STDMETHODIMP QueryInterface(REFIID riid, void** ppv) {
 		if (IsEqualIID(riid, IID_IUnknown) || IsEqualIID(riid, IID_ITfEditSession)) {
@@ -82,12 +87,16 @@ public:
 			// 2. 確定処理
 			_TerminateComposition(ec);
 		} else if (_ch != 0) {
-			ITfRange* AttrRange = nullptr;
 			LONG temp = 0;
+			std::wstring converted ;
+			std::string pending ;
+			std::wstring display;
 			// 3. テキストセットと属性付与
-			pRange->Collapse(ec, TF_ANCHOR_END);
-			pRange->SetText(ec, 0, &_ch, 1);
-			pRange->ShiftStart(ec, -1, &temp, nullptr); // 直前の1文字分の範囲を取得
+			// pRange->Collapse(ec, TF_ANCHOR_END);
+			ChmRomajiConverter::convert(_pRawInput->get(), converted, pending);
+			display = converted + std::wstring(pending.begin(), pending.end());
+			pRange->SetText(ec, 0, display.c_str(), display.length());
+			// pRange->ShiftStart(ec, -1, &temp, nullptr); // 直前の1文字分の範囲を取得
 			_ApplyDisplayAttribute(ec, pRange);
 		}
 
@@ -108,6 +117,7 @@ private:
 				if (SUCCEEDED(_pic->QueryInterface(IID_ITfContextComposition, (void**)&pCtxComp))) {
 					hr = pCtxComp->StartComposition(ec, *ppRange, this, _ppComp);
 					OUTPUT_HR_n_RETURN_ON_ERROR(L"StartComposition",hr);
+					if (_pRawInput == nullptr ) _pRawInput = new ChmRawInputStore(); 
 					pCtxComp->Release(); // 目的の_ppCompは取得したので、ReleaseしてOK
 				}
 				pInsert->Release();
@@ -145,10 +155,13 @@ private:
             (*_ppComp)->EndComposition(ec);
             (*_ppComp)->Release();
             *_ppComp = nullptr;
+			delete _pRawInput;
+			_pRawInput = nullptr;
         }
     }
     // メンバ変数はそのまま
     ITfContext* _pic; ITfComposition** _ppComp; TfClientId _tid; WCHAR _ch; BOOL _fEnd; LONG _cRef;
+	ChmRawInputStore* _pRawInput = nullptr;
 };
 
 // --- CHitomoji クラスの実装 ---
@@ -297,7 +310,7 @@ HRESULT CHitomoji::_InitDisplayAttributeInfo()
 void CHitomoji::_UninitDisplayAttributeInfo() { return ; }
 
 HRESULT CHitomoji::_InvokeEditSession(ITfContext* pic, WCHAR ch, BOOL fEnd) {
-	CEditSession* pES = new CEditSession(pic, &_pComposition, _tfClientId, ch, fEnd);
+	CEditSession* pES = new CEditSession(pic, &_pComposition, _tfClientId, _pRawInput, ch, fEnd);
 	if (!pES) return E_OUTOFMEMORY;
 	HRESULT hr;
 	HRESULT hrSession = pic->RequestEditSession(_tfClientId, pES, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hr);

@@ -1,0 +1,69 @@
+// ChmRomajiConverter.h
+#pragma once
+#include <string>
+#include <unordered_map>
+
+// rawInput (ASCII) を走査して、ひらがなへ変換するクラス
+// v0.1.1: 最長一致（3→2→1）のみ実装
+class ChmRomajiConverter {
+public:
+    // コンストラクタ不要（static 初期化のみ）
+
+    // rawInput 全体を入力として処理する
+    // converted : かなに変換できた部分
+    // pending   : 変換できずに残った部分（未確定ローマ字）
+    static void convert(const std::string& rawInput,
+                 std::wstring& converted,
+                 std::string& pending) ;
+
+private:
+    static const std::unordered_map<std::string, std::wstring>& table();
+};
+
+// ---- implementation ----
+
+// static 初期化用テーブル
+inline const std::unordered_map<std::string, std::wstring>& ChmRomajiConverter::table() {
+    static const std::unordered_map<std::string, std::wstring> tbl = {
+        {"a", L"あ"}, {"i", L"い"}, {"u", L"う"}, {"e", L"え"}, {"o", L"お"},
+        {"ka", L"か"}, {"ki", L"き"}, {"ku", L"く"}, {"ke", L"け"}, {"ko", L"こ"},
+        {"na", L"な"}, {"ni", L"に"}, {"nu", L"ぬ"}, {"ne", L"ね"}, {"no", L"の"},
+        {"ra", L"ら"}, {"ri", L"り"}, {"ru", L"る"}, {"re", L"れ"}, {"ro", L"ろ"},
+        {"rya", L"りゃ"}, {"ryu", L"りゅ"}, {"ryo", L"りょ"},
+        {"nn", L"ん"}, {"n", L"ん"},
+        {"-", L"ー"}
+    };
+    return tbl;
+}
+
+void ChmRomajiConverter::convert(const std::string& rawInput,
+                                          std::wstring& converted,
+                                          std::string& pending) {
+    converted.clear();
+    pending.clear();
+
+    size_t i = 0;
+    while (i < rawInput.size()) {
+        bool matched = false;
+
+        // 最長一致: 3 → 2 → 1
+        for (int len = 3; len >= 1; --len) {
+            if (i + len > rawInput.size()) continue;
+
+            auto key = rawInput.substr(i, len);
+            auto it = table().find(key);
+            if (it != table().end()) {
+                converted += it->second;
+                i += len;
+                matched = true;
+                break;
+            }
+        }
+
+        if (!matched) break; // ここから先は pending
+    }
+
+    if (i < rawInput.size()) {
+        pending = rawInput.substr(i);
+    }
+}

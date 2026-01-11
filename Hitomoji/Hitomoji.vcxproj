@@ -136,10 +136,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="ChmRomajiConverter.h" />
     <ClInclude Include="hitomoji.h" />
     <ClInclude Include="Controller.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ChmRawInputStore.h" />
     <ClCompile Include="DisplayAttribute.cpp" />
     <ClCompile Include="DisplayAttribute.h" />
     <ClCompile Include="dllmain.cpp" />

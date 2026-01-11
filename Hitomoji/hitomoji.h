@@ -2,6 +2,7 @@
 #pragma once
 #include <msctf.h>
 #include "Controller.h"
+#include "ChmRawInputStore.h"
 
 // --- GUID Definitions ---
 // {86B8A5A1-9B5A-4B6E-A77E-6A2F2B1F7B12}
@@ -64,6 +65,8 @@ private:
 
     ITfComposition* _pComposition;
     CController* _pController; // ロジック担当
+
+	ChmRawInputStore *_pRawInput; // 未確定入力文字列保持
 };
 
 // --- debug support functions
