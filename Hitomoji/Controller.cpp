@@ -24,6 +24,7 @@ static const ChmKeyEvent::KeyDef g_keyTable[] = {
 bool ChmKeyEvent::IsKeyEaten(WPARAM wp)
 {
     if ((wp >= 'A' && wp <= 'Z') || (wp >= 'a' && wp <= 'z')) return true;
+	if (wp == VK_SHIFT || wp == VK_CONTROL || wp == VK_MENU) return false;
     for (auto& k : g_keyTable) {
         if (k.wp == wp) return true;
     }
@@ -33,7 +34,7 @@ bool ChmKeyEvent::IsKeyEaten(WPARAM wp)
 ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/)
     : _wp(wp)
 {
-    _shift = (GetKeyState(VK_SHIFT) & 0x7fff) != 0;
+    _shift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
     _TranslateByTable();
 }
 
