@@ -11,11 +11,18 @@
 #include "ChmRomajiConverter.h"
 #include "ChmRawInputStore.h"
 
-// --- EditSessionの実装 ---
 class CEditSession : public ITfEditSession , public ITfCompositionSink{
+
 public:
-	CEditSession(ITfContext* pic, ITfComposition** ppComp, TfClientId tid, ChmRawInputStore **RawInput, WCHAR ch, BOOL fEnd) 
-		: _pic(pic), _ppComp(ppComp), _tid(tid), _ppRawInput(RawInput), _ch(ch), _fEnd(fEnd), _cRef(1) {
+	CEditSession(
+		ITfContext* pic, 
+		ITfComposition** ppComp, 
+		TfClientId tid, 
+		ChmRawInputStore **ppRawInput, 
+		WCHAR ch, 
+		ChmKeyEvent::Type type,
+		BOOL fEnd)
+		: _pic(pic), _ppComp(ppComp), _tid(tid), _ppRawInput(ppRawInput), _ch(ch), _type(type), _fEnd(fEnd), _cRef(1) {
 	}
 
 	STDMETHODIMP QueryInterface(REFIID riid, void** ppv) {
@@ -32,49 +39,6 @@ public:
         return S_OK;
     }
 
-//----- ITfEditSession の実装
-/*
-	// 最低限の処理だけを実装したシンプル版（参考用）
-	STDMETHODIMP DoEditSession_simple(TfEditCookie ec) {
-		ITfRange* pRange = nullptr;
-		if (*_ppComp == nullptr) { // 新規Composition開始
-			ITfInsertAtSelection* pInsert;
-			if (SUCCEEDED(_pic->QueryInterface(IID_ITfInsertAtSelection, (void**)&pInsert))) {
-				HRESULT hr = pInsert->InsertTextAtSelection(ec, TS_IAS_QUERYONLY, L"", 0, &pRange);
-				OUTPUT_HR_n_RETURN_ON_ERROR(L"InsertTextAtSelection",hr);
-
-				ITfContextComposition* pCtxComp = nullptr;
-				if (SUCCEEDED(_pic->QueryInterface(IID_ITfContextComposition, (void**)&pCtxComp))) {
-					hr = pCtxComp->StartComposition(ec, pRange, this, _ppComp);
-					OUTPUT_HR_n_RETURN_ON_ERROR(L"StartComposition",hr);
-					pCtxComp->Release(); // 目的の_ppCompは取得したので、ReleaseしてOK
-				}
-				pInsert->Release();
-			}
-		}
-		else { // 既存Compositionある場合
-			(*_ppComp)->GetRange(&pRange);
-		}
-
-		if (pRange) {
-			if (_fEnd) {
-				if (*_ppComp) {
-					(*_ppComp)->EndComposition(ec);
-					(*_ppComp)->Release();
-					*_ppComp = nullptr;
-				}
-			} else if (_ch != 0) {
-				// 文末に文字を追加
-				pRange->Collapse(ec, TF_ANCHOR_END);
-				pRange->SetText(ec, 0, &_ch, 1);
-				_ApplyDisplayAttribute(ec, pRange);
-			}
-			pRange->Release();
-		}
-		return S_OK;
-	}
-*/
-
 	// 現状で使用している実用版のDoEditSession（ある程度の構造化をしてある）
 	STDMETHODIMP DoEditSession(TfEditCookie ec) {
 		OutputDebugString(L"[hitomoji] DoEditSession");
@@ -83,19 +47,41 @@ public:
 		// 1. Compositionの準備
 		if (FAILED(_GetOrStartComposition(ec, &pRange))) return S_OK;
 
-		if (_fEnd) {
-			// 2. 確定処理
+		// 2. 確定処理（Type に応じて rawInput から最終変換）
+		if (_fEnd ) {
+			std::wstring converted;
+			std::string pending;
+
+			// rawInput -> ひらがな
+			ChmRomajiConverter::convert((*_ppRawInput)->get(), converted, pending);
+
+			std::wstring output;
+			switch (_type) {
+			case ChmKeyEvent::Type::CommitKana:
+				output = converted + std::wstring(pending.begin(), pending.end());
+				break;
+			case ChmKeyEvent::Type::CommitKatakana:
+				output = ChmRomajiConverter::HiraganaToKatakana(converted)
+					+ std::wstring(pending.begin(), pending.end());
+				break;
+			default:
+				break;
+			}
+
+			pRange->SetText(ec, TF_ST_CORRECTION, output.c_str(), output.length());
 			_TerminateComposition(ec);
-		} else if (_ch != 0) {
+		}
+		// 3. 変換中処理
+		else if (_ch != 0) {
 			LONG temp = 0;
-			std::wstring converted ;
-			std::string pending ;
+			std::wstring converted;
+			std::string pending;
 			std::wstring display;
-			// 3. テキストセットと属性付与
-			// pRange->Collapse(ec, TF_ANCHOR_START);
+
 			(*_ppRawInput)->push((char)std::tolower((unsigned char)_ch));
 			ChmRomajiConverter::convert((*_ppRawInput)->get(), converted, pending);
 			display = converted + std::wstring(pending.begin(), pending.end());
+
 			pRange->SetText(ec, TF_ST_CORRECTION, display.c_str(), display.length());
 			pRange->ShiftStart(ec, 0, &temp, nullptr); // Composition全体を選択状態に
 			_ApplyDisplayAttribute(ec, pRange);
@@ -157,12 +143,17 @@ private:
             (*_ppComp)->Release();
             *_ppComp = nullptr;
 			delete *_ppRawInput;
-			*_ppRawInput = nullptr;
+			(*_ppRawInput) = nullptr;
         }
     }
-    // メンバ変数はそのまま
-    ITfContext* _pic; ITfComposition** _ppComp; TfClientId _tid; WCHAR _ch; BOOL _fEnd; LONG _cRef;
+    // メンバ変数
+    ITfContext* _pic; ITfComposition** _ppComp; TfClientId _tid; 
+	WCHAR _ch; 
+	ChmKeyEvent::Type _type; 
+	BOOL _fEnd;
 	ChmRawInputStore **_ppRawInput = nullptr;
+
+	LONG _cRef;
 };
 
 // --- CHitomoji クラスの実装 ---
@@ -221,27 +212,26 @@ STDMETHODIMP CHitomoji::Deactivate() {
 // ITfKeyEventSink Implementation
 STDMETHODIMP CHitomoji::OnTestKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten) {
 	*pfEaten = _pController->IsKeyEaten(wp);
-	OutputDebugString(L"[Hitomoji]OnTestKeyDown");
 	return S_OK;
 }
 
-STDMETHODIMP CHitomoji::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten) {
+STDMETHODIMP CHitomoji::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten)
+{
 	*pfEaten = _pController->IsKeyEaten(wp);
-	if (*pfEaten) {
-		OutputDebugString(L"[Hitomoji]OnKeyDown:processed");
-		if (wp == VK_RETURN) _InvokeEditSession(pic, 0, TRUE);
-		else _InvokeEditSession(pic, (WCHAR)wp, FALSE);
-	}
-	return S_OK;
+    if (*pfEaten) {
+        ChmKeyEvent kEv(wp, lp);
+		_InvokeEditSession(pic, (WCHAR)kEv.GetChar(), kEv.GetType(), kEv.IsCommit());
+    }
+    return S_OK;
 }
 
 STDMETHODIMP CHitomoji::OnTestKeyUp(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten) {
-	*pfEaten = _pController->IsKeyEaten(wp);
+	*pfEaten = FALSE;
 	return S_OK;
 }
 
 STDMETHODIMP CHitomoji::OnKeyUp(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten) {
-	*pfEaten = _pController->IsKeyEaten(wp);
+	*pfEaten = FALSE;
 	return S_OK;
 }
 
@@ -310,8 +300,8 @@ HRESULT CHitomoji::_InitDisplayAttributeInfo()
 
 void CHitomoji::_UninitDisplayAttributeInfo() { return ; }
 
-HRESULT CHitomoji::_InvokeEditSession(ITfContext* pic, WCHAR ch, BOOL fEnd) {
-	CEditSession* pES = new CEditSession(pic, &_pComposition, _tfClientId, &_pRawInput, ch, fEnd);
+HRESULT CHitomoji::_InvokeEditSession(ITfContext* pic, WCHAR ch, ChmKeyEvent::Type type , BOOL fEnd) {
+	CEditSession* pES = new CEditSession(pic, &_pComposition, _tfClientId, &_pRawInput, ch, type, fEnd);
 	if (!pES) return E_OUTOFMEMORY;
 	HRESULT hr;
 	HRESULT hrSession = pic->RequestEditSession(_tfClientId, pES, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hr);

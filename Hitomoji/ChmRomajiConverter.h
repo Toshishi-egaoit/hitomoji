@@ -1,20 +1,22 @@
-// ChmRomajiConverter.h
+ï»¿// ChmRomajiConverter.h
 #pragma once
 #include <string>
 #include <unordered_map>
 
-// rawInput (ASCII) ‚ğ‘–¸‚µ‚ÄA‚Ğ‚ç‚ª‚È‚Ö•ÏŠ·‚·‚éƒNƒ‰ƒX
-// v0.1.1: Å’·ˆê’vi3¨2¨1j‚Ì‚İÀ‘•
+// rawInput (ASCII) ã‚’èµ°æŸ»ã—ã¦ã€ã²ã‚‰ãŒãªã¸å¤‰æ›ã™ã‚‹ã‚¯ãƒ©ã‚¹
+// v0.1.1: æœ€é•·ä¸€è‡´ï¼ˆ3â†’2â†’1ï¼‰ã®ã¿å®Ÿè£…
 class ChmRomajiConverter {
 public:
-    // ƒRƒ“ƒXƒgƒ‰ƒNƒ^•s—vistatic ‰Šú‰»‚Ì‚İj
+    // ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ä¸è¦ï¼ˆstatic åˆæœŸåŒ–ã®ã¿ï¼‰
 
-    // rawInput ‘S‘Ì‚ğ“ü—Í‚Æ‚µ‚Äˆ—‚·‚é
-    // converted : ‚©‚È‚É•ÏŠ·‚Å‚«‚½•”•ª
-    // pending   : •ÏŠ·‚Å‚«‚¸‚Éc‚Á‚½•”•ªi–¢Šm’èƒ[ƒ}šj
+    // rawInput å…¨ä½“ã‚’å…¥åŠ›ã¨ã—ã¦å‡¦ç†ã™ã‚‹
+    // converted : ã‹ãªã«å¤‰æ›ã§ããŸéƒ¨åˆ†
+    // pending   : å¤‰æ›ã§ããšã«æ®‹ã£ãŸéƒ¨åˆ†ï¼ˆæœªç¢ºå®šãƒ­ãƒ¼ãƒå­—ï¼‰
     static void convert(const std::string& rawInput,
                  std::wstring& converted,
                  std::string& pending) ;
+
+	static std::wstring HiraganaToKatakana(const std::wstring& hira);
 
 private:
     static const std::unordered_map<std::string, std::wstring>& table();
@@ -22,16 +24,16 @@ private:
 
 // ---- implementation ----
 
-// static ‰Šú‰»—pƒe[ƒuƒ‹
+// static åˆæœŸåŒ–ç”¨ãƒ†ãƒ¼ãƒ–ãƒ«
 inline const std::unordered_map<std::string, std::wstring>& ChmRomajiConverter::table() {
     static const std::unordered_map<std::string, std::wstring> tbl = {
-        {"a", L"‚ "}, {"i", L"‚¢"}, {"u", L"‚¤"}, {"e", L"‚¦"}, {"o", L"‚¨"},
-        {"ka", L"‚©"}, {"ki", L"‚«"}, {"ku", L"‚­"}, {"ke", L"‚¯"}, {"ko", L"‚±"},
-        {"na", L"‚È"}, {"ni", L"‚É"}, {"nu", L"‚Ê"}, {"ne", L"‚Ë"}, {"no", L"‚Ì"},
-        {"ra", L"‚ç"}, {"ri", L"‚è"}, {"ru", L"‚é"}, {"re", L"‚ê"}, {"ro", L"‚ë"},
-        {"rya", L"‚è‚á"}, {"ryu", L"‚è‚ã"}, {"ryo", L"‚è‚å"},
-        {"nn", L"‚ñ"}, {"n", L"‚ñ"},
-        {"-", L"["}
+        {"a", L"ã‚"}, {"i", L"ã„"}, {"u", L"ã†"}, {"e", L"ãˆ"}, {"o", L"ãŠ"},
+        {"ka", L"ã‹"}, {"ki", L"ã"}, {"ku", L"ã"}, {"ke", L"ã‘"}, {"ko", L"ã“"},
+        {"na", L"ãª"}, {"ni", L"ã«"}, {"nu", L"ã¬"}, {"ne", L"ã­"}, {"no", L"ã®"},
+        {"ra", L"ã‚‰"}, {"ri", L"ã‚Š"}, {"ru", L"ã‚‹"}, {"re", L"ã‚Œ"}, {"ro", L"ã‚"},
+        {"rya", L"ã‚Šã‚ƒ"}, {"ryu", L"ã‚Šã‚…"}, {"ryo", L"ã‚Šã‚‡"},
+        {"nn", L"ã‚“"}, {"n", L"ã‚“"},
+        {"-", L"ãƒ¼"}
     };
     return tbl;
 }
@@ -46,7 +48,7 @@ void ChmRomajiConverter::convert(const std::string& rawInput,
     while (i < rawInput.size()) {
         bool matched = false;
 
-        // Å’·ˆê’v: 3 ¨ 2 ¨ 1
+        // æœ€é•·ä¸€è‡´: 3 â†’ 2 â†’ 1
         for (int len = 3; len >= 1; --len) {
             if (i + len > rawInput.size()) continue;
 
@@ -60,10 +62,25 @@ void ChmRomajiConverter::convert(const std::string& rawInput,
             }
         }
 
-        if (!matched) break; // ‚±‚±‚©‚çæ‚Í pending
+        if (!matched) break; // ã“ã“ã‹ã‚‰å…ˆã¯ pending
     }
 
     if (i < rawInput.size()) {
         pending = rawInput.substr(i);
     }
+}
+
+std::wstring ChmRomajiConverter::HiraganaToKatakana(const std::wstring& hira)
+{
+    std::wstring result;
+    for (wchar_t ch : hira) {
+        // Unicode: ã²ã‚‰ãŒãª U+3041â€“3096
+        //           ã‚«ã‚¿ã‚«ãƒŠ U+30A1â€“30F6
+        if (ch >= 0x3041 && ch <= 0x3096) {
+            result.push_back(ch + 0x60);
+        } else {
+            result.push_back(ch);
+        }
+    }
+    return result;
 }

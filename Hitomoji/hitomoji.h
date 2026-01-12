@@ -2,7 +2,8 @@
 #pragma once
 #include <msctf.h>
 #include "Controller.h"
-#include "ChmRawInputStore.h"
+
+class ChmRawInputStore; // ëOï˚êÈåæ
 
 // --- GUID Definitions ---
 // {86B8A5A1-9B5A-4B6E-A77E-6A2F2B1F7B12}
@@ -57,7 +58,7 @@ private:
     HRESULT _InitDisplayAttributeInfo();
     void _UninitDisplayAttributeInfo();
     
-    HRESULT _InvokeEditSession(ITfContext* pic, WCHAR ch, BOOL fEnd);
+	HRESULT _InvokeEditSession(ITfContext* pic, WCHAR ch, ChmKeyEvent::Type type , BOOL fEnd) ;
 
     ITfThreadMgr* _pThreadMgr;
     TfClientId _tfClientId;
