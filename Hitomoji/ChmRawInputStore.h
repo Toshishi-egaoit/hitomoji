@@ -22,7 +22,7 @@ public:
         return rawInput_;
     }
 
-    // 長さ確認（TSF側の判断用）
+    // 長さ確認
     size_t size() const {
         return rawInput_.size();
     }

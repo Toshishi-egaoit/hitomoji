@@ -7,7 +7,7 @@
 #include <msctf.h>
 #include <combaseapi.h>
 #include <string>
-#include "Hitomoji.h"
+#include "TsfIf.h"
 
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "uuid.lib")

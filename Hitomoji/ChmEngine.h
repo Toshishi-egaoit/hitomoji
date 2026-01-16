@@ -3,22 +3,39 @@
 #pragma once
 #include <windows.h>
 #include <cstdint>
+#include <string>
 
 class ChmKeyEvent;
+class ChmRawInputStore;
 
-class CController {
+class ChmEngine {
 public:
-    CController();
+	enum compositionStatus {
+		COMP_NONE = 0,	// 初期状態
+		COMP_ONGOING,	// Compositionが存在
+		COMP_COMMITTING,// 確定キーの処理中
+		COMP_RECALL,	// 再変換キーの処理中(v0.3以降で実装予定)
+	};
+    ChmEngine();
     
     // キーをIMEで処理すべきか判定
     BOOL IsKeyEaten(WPARAM wp);
     
     // IMEのON/OFF
-    void ToggleIME() { m_isON = !m_isON; }
-    BOOL IsON() const { return m_isON; }
+    void ToggleIME() { _isON = !_isON; }
+    BOOL IsON() const { return _isON; }
+	std::wstring GetCompositionStr() ;
+
+	void UpdateComposition(const ChmKeyEvent& keyEvent);
+	void PostUpdateComposition();
 
 private:
-    BOOL m_isON;
+	void _InitComposition(const ChmKeyEvent& keyEvent);
+	void _UpdateComposition(const ChmKeyEvent& keyEvent);
+    BOOL _isON;
+	ChmRawInputStore* _pRawInputStore;
+	std::wstring _compositionStr ;
+	enum compositionStatus _compositionStatus; // v0.3以降でサブクラス化を予定
 };
 
 // v0.1.1: キー定義をテーブル駆動にする
@@ -43,6 +60,7 @@ public:
 
     // --- utility ---
     static bool IsKeyEaten(WPARAM wp);
+    static bool IsNormalKey(WPARAM wp);
 
     // --- ctor ---
     ChmKeyEvent(WPARAM wp, LPARAM lp);

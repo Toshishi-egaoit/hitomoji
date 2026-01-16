@@ -6,9 +6,8 @@
 #include <string>
 #include <cctype>
 #include <initguid.h> // GUIDの実体定義用
-#include "Hitomoji.h"
+#include "TsfIf.h"
 #include "DisplayAttribute.h"
-#include "ChmRomajiConverter.h"
 #include "ChmRawInputStore.h"
 
 class CEditSession : public ITfEditSession , public ITfCompositionSink{
@@ -18,11 +17,9 @@ public:
 		ITfContext* pic, 
 		ITfComposition** ppComp, 
 		TfClientId tid, 
-		ChmRawInputStore **ppRawInput, 
-		WCHAR ch, 
-		ChmKeyEvent::Type type,
+		std::wstring compositionStr,
 		BOOL fEnd)
-		: _pic(pic), _ppComp(ppComp), _tid(tid), _ppRawInput(ppRawInput), _ch(ch), _type(type), _fEnd(fEnd), _cRef(1) {
+		: _pic(pic), _ppComp(ppComp), _tid(tid), _compositionStr(compositionStr), _fEnd(fEnd), _cRef(1) {
 	}
 
 	STDMETHODIMP QueryInterface(REFIID riid, void** ppv) {
@@ -47,42 +44,13 @@ public:
 		// 1. Compositionの準備
 		if (FAILED(_GetOrStartComposition(ec, &pRange))) return S_OK;
 
-		// 2. 確定処理（Type に応じて rawInput から最終変換）
+		// 2. 確定処理
 		if (_fEnd ) {
-			std::wstring converted;
-			std::string pending;
-
-			// rawInput -> ひらがな
-			ChmRomajiConverter::convert((*_ppRawInput)->get(), converted, pending);
-
-			std::wstring output;
-			switch (_type) {
-			case ChmKeyEvent::Type::CommitKana:
-				output = converted + std::wstring(pending.begin(), pending.end());
-				break;
-			case ChmKeyEvent::Type::CommitKatakana:
-				output = ChmRomajiConverter::HiraganaToKatakana(converted)
-					+ std::wstring(pending.begin(), pending.end());
-				break;
-			default:
-				break;
-			}
-
-			pRange->SetText(ec, TF_ST_CORRECTION, output.c_str(), output.length());
 			_TerminateComposition(ec);
-		}
-		// 3. 変換中処理
-		else if (_ch != 0) {
+		} else {
+			// 3. 変換中文字列の表示
 			LONG temp = 0;
-			std::wstring converted;
-			std::string pending;
-			std::wstring display;
-
-			(*_ppRawInput)->push((char)std::tolower((unsigned char)_ch));
-			ChmRomajiConverter::convert((*_ppRawInput)->get(), converted, pending);
-			display = converted + std::wstring(pending.begin(), pending.end());
-
-			pRange->SetText(ec, TF_ST_CORRECTION, display.c_str(), display.length());
+			pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), _compositionStr.length());
 			pRange->ShiftStart(ec, 0, &temp, nullptr); // Composition全体を選択状態に
 			_ApplyDisplayAttribute(ec, pRange);
 		}
@@ -148,8 +116,7 @@ private:
     }
     // メンバ変数
     ITfContext* _pic; ITfComposition** _ppComp; TfClientId _tid; 
-	WCHAR _ch; 
-	ChmKeyEvent::Type _type; 
+	std::wstring _compositionStr;
 	BOOL _fEnd;
 	ChmRawInputStore **_ppRawInput = nullptr;
 
@@ -158,16 +125,16 @@ private:
 
 // --- CHitomoji クラスの実装 ---
 
-CHitomoji::CHitomoji() : _cRef(1), _pThreadMgr(nullptr), _pComposition(nullptr) {
-	_pController = new CController();
+ChmTsfInterface::ChmTsfInterface() : _cRef(1), _pThreadMgr(nullptr), _pComposition(nullptr) {
+	_pEngine = new ChmEngine();
 }
 
-CHitomoji::~CHitomoji() {
-	delete _pController;
+ChmTsfInterface::~ChmTsfInterface() {
+	delete _pEngine;
 }
 
 // IUnknown Implementation
-STDMETHODIMP CHitomoji::QueryInterface(REFIID riid, void** ppvObj) {
+STDMETHODIMP ChmTsfInterface::QueryInterface(REFIID riid, void** ppvObj) {
 	if (!ppvObj) return E_INVALIDARG;
 	*ppvObj = nullptr;
 	if (IsEqualIID(riid, IID_IUnknown) || IsEqualIID(riid, IID_ITfTextInputProcessor)) {
@@ -180,14 +147,14 @@ STDMETHODIMP CHitomoji::QueryInterface(REFIID riid, void** ppvObj) {
 	if (*ppvObj) { AddRef(); return S_OK; }
 	return E_NOINTERFACE;
 }
-STDMETHODIMP_(ULONG) CHitomoji::AddRef() { return ++_cRef; }
-STDMETHODIMP_(ULONG) CHitomoji::Release() {
+STDMETHODIMP_(ULONG) ChmTsfInterface::AddRef() { return ++_cRef; }
+STDMETHODIMP_(ULONG) ChmTsfInterface::Release() {
 	if (--_cRef == 0) { delete this; return 0; }
 	return _cRef;
 }
 
 // ITfTextInputProcessor
-STDMETHODIMP CHitomoji::Activate(ITfThreadMgr* ptm, TfClientId tid) {
+STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 	_pThreadMgr = ptm;
 	_pThreadMgr->AddRef();
 	_tfClientId = tid;
@@ -199,7 +166,7 @@ STDMETHODIMP CHitomoji::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 	return S_OK;
 }
 
-STDMETHODIMP CHitomoji::Deactivate() {
+STDMETHODIMP ChmTsfInterface::Deactivate() {
 	_UninitKeyEventSink();
 	_UninitPreservedKey();
 	if (_pThreadMgr) {
@@ -210,41 +177,43 @@ STDMETHODIMP CHitomoji::Deactivate() {
 }
 
 // ITfKeyEventSink Implementation
-STDMETHODIMP CHitomoji::OnTestKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten) {
-	*pfEaten = _pController->IsKeyEaten(wp);
+STDMETHODIMP ChmTsfInterface::OnTestKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten) {
+	*pfEaten = _pEngine->IsKeyEaten(wp);
 	return S_OK;
 }
 
-STDMETHODIMP CHitomoji::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten)
+STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten)
 {
-	*pfEaten = _pController->IsKeyEaten(wp);
+	*pfEaten = _pEngine->IsKeyEaten(wp);
     if (*pfEaten) {
         ChmKeyEvent kEv(wp, lp);
-		_InvokeEditSession(pic, (WCHAR)kEv.GetChar(), kEv.GetType(), kEv.IsCommit());
+		_pEngine->UpdateComposition(kEv);
+		_InvokeEditSession(pic, kEv.IsCommit());
+		_pEngine->PostUpdateComposition();
     }
     return S_OK;
 }
 
-STDMETHODIMP CHitomoji::OnTestKeyUp(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten) {
+STDMETHODIMP ChmTsfInterface::OnTestKeyUp(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten) {
 	*pfEaten = FALSE;
 	return S_OK;
 }
 
-STDMETHODIMP CHitomoji::OnKeyUp(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten) {
+STDMETHODIMP ChmTsfInterface::OnKeyUp(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten) {
 	*pfEaten = FALSE;
 	return S_OK;
 }
 
-STDMETHODIMP CHitomoji::OnPreservedKey(ITfContext* pic, REFGUID rguid, BOOL* pfEaten) {
+STDMETHODIMP ChmTsfInterface::OnPreservedKey(ITfContext* pic, REFGUID rguid, BOOL* pfEaten) {
 	if (IsEqualGUID(rguid, GUID_PreservedKey_OpenClose)) {
-		_pController->ToggleIME();
+		_pEngine->ToggleIME();
 		OutputDebugString(L"[Hitomoji]OnPreservedKey:processed");
 		*pfEaten = TRUE;
 	}
 	return S_OK;
 }
 
-HRESULT CHitomoji::_InitKeyEventSink() {
+HRESULT ChmTsfInterface::_InitKeyEventSink() {
 	ITfKeystrokeMgr* pKeystrokeMgr = nullptr;
 	HRESULT hr = _pThreadMgr->QueryInterface(IID_ITfKeystrokeMgr, (void**)&pKeystrokeMgr);
 	if (SUCCEEDED(hr)) {
@@ -254,7 +223,7 @@ HRESULT CHitomoji::_InitKeyEventSink() {
 	return hr;
 }
 
-void CHitomoji::_UninitKeyEventSink() {
+void ChmTsfInterface::_UninitKeyEventSink() {
 	ITfKeystrokeMgr* pKeystrokeMgr = nullptr;
 	if (SUCCEEDED(_pThreadMgr->QueryInterface(IID_ITfKeystrokeMgr, (void**)&pKeystrokeMgr))) {
 		pKeystrokeMgr->UnadviseKeyEventSink(_tfClientId);
@@ -262,7 +231,7 @@ void CHitomoji::_UninitKeyEventSink() {
 	}
 }
 
-HRESULT CHitomoji::_InitPreservedKey() {
+HRESULT ChmTsfInterface::_InitPreservedKey() {
 	ITfKeystrokeMgr* pKeystrokeMgr = nullptr;
 	HRESULT hr = _pThreadMgr->QueryInterface(IID_ITfKeystrokeMgr, (void**)&pKeystrokeMgr);
 	if (SUCCEEDED(hr)) {
@@ -273,7 +242,7 @@ HRESULT CHitomoji::_InitPreservedKey() {
 	return hr;
 }
 
-void CHitomoji::_UninitPreservedKey() {
+void ChmTsfInterface::_UninitPreservedKey() {
 	ITfKeystrokeMgr* pKeystrokeMgr = nullptr;
 	if (SUCCEEDED(_pThreadMgr->QueryInterface(IID_ITfKeystrokeMgr, (void**)&pKeystrokeMgr))) {
 		pKeystrokeMgr->UnpreserveKey(GUID_PreservedKey_OpenClose, &c_presKeyOpenClose);
@@ -281,7 +250,7 @@ void CHitomoji::_UninitPreservedKey() {
 	}
 }
 
-HRESULT CHitomoji::_InitDisplayAttributeInfo()
+HRESULT ChmTsfInterface::_InitDisplayAttributeInfo()
 {
     ITfCategoryMgr* pCategoryMgr = nullptr;
     HRESULT hr = CoCreateInstance(
@@ -298,10 +267,10 @@ HRESULT CHitomoji::_InitDisplayAttributeInfo()
     return hr;
 }
 
-void CHitomoji::_UninitDisplayAttributeInfo() { return ; }
+void ChmTsfInterface::_UninitDisplayAttributeInfo() { return ; }
 
-HRESULT CHitomoji::_InvokeEditSession(ITfContext* pic, WCHAR ch, ChmKeyEvent::Type type , BOOL fEnd) {
-	CEditSession* pES = new CEditSession(pic, &_pComposition, _tfClientId, &_pRawInput, ch, type, fEnd);
+HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
+	CEditSession* pES = new CEditSession(pic, &_pComposition, _tfClientId, _pEngine->GetCompositionStr(), fEnd);
 	if (!pES) return E_OUTOFMEMORY;
 	HRESULT hr;
 	HRESULT hrSession = pic->RequestEditSession(_tfClientId, pES, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hr);
@@ -311,7 +280,7 @@ HRESULT CHitomoji::_InvokeEditSession(ITfContext* pic, WCHAR ch, ChmKeyEvent::Ty
 // ------
 
 // ITfDisplayAttributeProvider
-STDMETHODIMP CHitomoji::GetDisplayAttributeInfo(REFGUID guid, ITfDisplayAttributeInfo **ppInfo) {
+STDMETHODIMP ChmTsfInterface::GetDisplayAttributeInfo(REFGUID guid, ITfDisplayAttributeInfo **ppInfo) {
 	if (CDisplayAttributeInfo::IsMyGuid(guid)) {
 		*ppInfo = new CDisplayAttributeInfo(); // さっき作ったクラスを投げる
 		return S_OK;
@@ -319,7 +288,7 @@ STDMETHODIMP CHitomoji::GetDisplayAttributeInfo(REFGUID guid, ITfDisplayAttribut
 	return E_INVALIDARG;
 }
 
-STDMETHODIMP CHitomoji::EnumDisplayAttributeInfo(IEnumTfDisplayAttributeInfo **ppEnum) {
+STDMETHODIMP ChmTsfInterface::EnumDisplayAttributeInfo(IEnumTfDisplayAttributeInfo **ppEnum) {
     if (ppEnum == nullptr) return E_INVALIDARG;
     *ppEnum = nullptr;
     

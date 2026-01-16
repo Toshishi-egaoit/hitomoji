@@ -1,7 +1,7 @@
 #include <windows.h>
 #include <msctf.h>
 #include <cstdio>
-#include "Hitomoji.h"
+#include "TsfIf.h"
 
 class CDisplayAttributeInfo : public ITfDisplayAttributeInfo {
 public:

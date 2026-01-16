@@ -1,7 +1,7 @@
 // Hitomoji.h
 #pragma once
 #include <msctf.h>
-#include "Controller.h"
+#include "ChmEngine.h"
 
 class ChmRawInputStore; // 前方宣言
 
@@ -21,12 +21,12 @@ DEFINE_GUID(GUID_HmProfile, 0xb1a5d3e2, 0x4c1f, 0x4b9a, 0x9d, 0x8c, 0x12, 0x34, 
 const TF_PRESERVEDKEY c_presKeyOpenClose = { VK_SPACE, TF_MOD_CONTROL };
 const GUID GUID_PreservedKey_OpenClose = { 0x6e9f9050, 0x05f8, 0x479c, { 0x82, 0x6e, 0x16, 0x93, 0x4e, 0x62, 0xe1, 0x01 } };
 
-class CHitomoji : public ITfTextInputProcessor,
+class ChmTsfInterface : public ITfTextInputProcessor,
                   public ITfDisplayAttributeProvider,
                   public ITfKeyEventSink {
 public:
-    CHitomoji();
-    ~CHitomoji();
+    ChmTsfInterface();
+    ~ChmTsfInterface();
 
     // IUnknown
     STDMETHODIMP QueryInterface(REFIID riid, void** ppvObj);
@@ -58,16 +58,15 @@ private:
     HRESULT _InitDisplayAttributeInfo();
     void _UninitDisplayAttributeInfo();
     
-	HRESULT _InvokeEditSession(ITfContext* pic, WCHAR ch, ChmKeyEvent::Type type , BOOL fEnd) ;
+	HRESULT _InvokeEditSession(ITfContext* pic, BOOL fEnd) ;
 
     ITfThreadMgr* _pThreadMgr;
     TfClientId _tfClientId;
     LONG _cRef;
 
     ITfComposition* _pComposition;
-    CController* _pController; // ロジック担当
 
-	ChmRawInputStore *_pRawInput; // 未確定入力文字列保持
+    ChmEngine* _pEngine; // ロジック担当
 };
 
 // --- debug support functions

@@ -58,7 +58,7 @@ https://github.com/toshishi-egaoit/hitomoji
 
 - TSFインタフェース部とエンジン部の分離
 - エンジン部は、TSFに依存しない形とし、現状のCContytollerをChmEngineに改名
-- TSFインタフェース部は現状のCHitomojiをChmeTsfIfにリネームしてファクタリング
+- TSFインタフェース部は現状のCHitomojiをChmTsfIfにリネームしてファクタリング
 - DoEditSessionのエンジン依存処理を切り出して、ChmEngineに移動
 - 機能追加は行わないが、バグ修正と、TSF対応アプリの拡充は行う(Edgeをターゲットとする)
 

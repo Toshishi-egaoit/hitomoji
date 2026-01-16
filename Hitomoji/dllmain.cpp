@@ -1,7 +1,7 @@
 ﻿// dllmain.cpp : DLL アプリケーションのエントリ ポイントを定義します。
 #include <windows.h>
 #include <ole2.h>
-#include "Hitomoji.h"
+#include "TsfIf.h"
 #include <cstdio>
 
 // --- グローバル変数 ---
@@ -22,7 +22,7 @@ public:
 
     STDMETHODIMP CreateInstance(IUnknown* pUnkOuter, REFIID riid, void** ppv) {
         if (pUnkOuter) return CLASS_E_NOAGGREGATION;
-        CHitomoji* pTip = new CHitomoji();
+        ChmTsfInterface* pTip = new ChmTsfInterface();
         if (!pTip) return E_OUTOFMEMORY;
         HRESULT hr = pTip->QueryInterface(riid, ppv);
         pTip->Release();
