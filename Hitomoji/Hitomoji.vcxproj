@@ -136,17 +136,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="ChmEngine.h" />
     <ClInclude Include="ChmRomajiConverter.h" />
-    <ClInclude Include="hitomoji.h" />
-    <ClInclude Include="Controller.h" />
+    <ClInclude Include="TsfIf.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ChmEngine.cpp" />
     <ClCompile Include="ChmRawInputStore.h" />
     <ClCompile Include="DisplayAttribute.cpp" />
     <ClCompile Include="DisplayAttribute.h" />
     <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="hitomoji.cpp" />
-    <ClCompile Include="Controller.cpp" />
+    <ClCompile Include="TsfIf.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Hitomoji.def" />
