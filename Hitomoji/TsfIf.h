@@ -1,9 +1,8 @@
 // Hitomoji.h
 #pragma once
 #include <msctf.h>
+#include "utils.h"
 #include "ChmEngine.h"
-
-class ChmRawInputStore; // 前方宣言
 
 // --- GUID Definitions ---
 // {86B8A5A1-9B5A-4B6E-A77E-6A2F2B1F7B12}
@@ -69,9 +68,6 @@ private:
     ChmEngine* _pEngine; // ロジック担当
 };
 
-// --- debug support functions
-extern void OutputDebugStringWithInt(wchar_t const* format, ULONG lvalue);
-extern void OutputDebugStringWithString(wchar_t const* format, wchar_t const* value);
 
 #define OUTPUT_HR(funcName,hr) \
 {\

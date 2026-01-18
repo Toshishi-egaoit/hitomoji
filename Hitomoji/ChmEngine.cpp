@@ -1,4 +1,4 @@
-// Controller.cpp 
+// ChmEngine.cpp 
 // Copyright (C) 2026 Hitomoji Project. All rights reserved.
 #include <cctype>
 #include <assert.h>
@@ -6,113 +6,82 @@
 #include "ChmRomajiConverter.h"
 #include "ChmRawInputStore.h"
 
-ChmEngine::ChmEngine() : _isON(FALSE) {}
+ChmEngine::ChmEngine() 
+	: _isON(FALSE), _hasComposition(FALSE),_converted(L""), _pending("") {
+	_pRawInputStore = new ChmRawInputStore();
+}
 
 BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
 	// IMEがOFFなら全てfalse
     if (!_isON) return FALSE;
 
-	// Compositionがない状態では通常文字キーのみ処理
-	if (_compositionStatus == COMP_NONE && (! ChmKeyEvent::IsNormalKey(wp) )) return false;
+	ChmKeyEvent ev(wp,0) ;
 
-	return ChmKeyEvent::IsKeyEaten(wp);
+	// Compositionがない場合は通常文字だけ食う。（特殊キーは処理しない）
+	if (!_hasComposition) {
+		return  (ev.GetType() == ChmKeyEvent::Type::CharInput);
+	}
+	// IMEが無視するもの以外は全て食う
+	return  (ev.GetType() != ChmKeyEvent::Type::None);
 }
 
 void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent){
+	OutputDebugStringWithString(
+		L"[Hitomoji] UpdateComposition: keyEvent=%s", 
+		keyEvent.dump().c_str()
+	);
 	ChmKeyEvent::Type _type = keyEvent.GetType();
-	// 最初の文字入力
-	switch (_compositionStatus) {
-		case COMP_NONE:
-			// Compositionを今から開始
-			if (_type == ChmKeyEvent::Type::CharInput ) {
-				// 文字入力でComposition開始
-				_InitComposition(keyEvent);
-			}
-			else {
-				// それ以外がくることはないはず。（Keyをアプリに返しているはず）
-				OutputDebugString(L"[Hitomoji] Invalid Key");
-				return;
-			}
+
+	// 確定キー
+	switch (_type) {
+		case ChmKeyEvent::Type::CommitKatakana: // カタカナ変換
+			_converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
+			[[fallthrough]]
+		case ChmKeyEvent::Type::CommitKana:		// ひらがな変換
+			_hasComposition = FALSE;
 			break;
-		case COMP_ONGOING:
-			break;
-		case COMP_COMMITTING:
-			// 確定キー処理
-			// ここでは何もしない
-			break;
-		case COMP_RECALL:
-			// 未実装
-			OutputDebugString(L"[Hitomoji] unimpremented: RECALL state\n");
-			return;
-	}
-	_UpdateComposition(keyEvent);
-
-	return ;
-};
-
-void ChmEngine::PostUpdateComposition(){
-	// キー処理が完了した時点では、COMP_NONEかCOMP_ONGOINGに必ずなる
-	if (_compositionStatus == COMP_COMMITTING) {
-		// 確定キー、キャンセル、BSなどで Composition消滅済
-		_compositionStatus = COMP_NONE;
-		delete _pRawInputStore;
-		_pRawInputStore = nullptr;
-	} else {
-		// 入力中
-		_compositionStatus = COMP_ONGOING;
-	}
-}
-
-void ChmEngine::_InitComposition(const ChmKeyEvent& keyEvent) {
-	// 既にCompositionが存在するのはおかしい
-	// ASSERT(_pRawInputStore == nullptr);
-	//	OutputDebugString(L"[Hitomoji] _InitComposition: Composition already exists\n");
-
-	_pRawInputStore = new ChmRawInputStore();
-
-	return ;
-}
-
-void ChmEngine::_UpdateComposition(const ChmKeyEvent& keyEvent) {
-	// ASSERT(_pRawInputStore != nullptr);
-
-	std::wstring converted;
-	std::string pending;
-
-	switch (keyEvent.GetType()) {
 		case ChmKeyEvent::Type::CharInput:
-			// TODO: lowercase変換はChmKeyEvent側でやる
+			// 通常の文字入力
+			if (!_hasComposition ) {
+				// 文字入力でComposition開始
+				_pRawInputStore->clear();
+				_hasComposition = TRUE;
+			}
 			_pRawInputStore->push((char)std::tolower((unsigned char)keyEvent.GetChar()));
-			break;
-
-		case ChmKeyEvent::Type::CommitKana:
-			// rawInput -> ひらがな
-			ChmRomajiConverter::convert(_pRawInputStore->get(), converted, pending);
-			_compositionStr = converted + std::wstring(pending.begin(), pending.end());
-			break;
-		case ChmKeyEvent::Type::CommitKatakana:
-			// rawInput -> ひらがな -> カタカナ
-			ChmRomajiConverter::convert(_pRawInputStore->get(), converted, pending);
-			_compositionStr = ChmRomajiConverter::HiraganaToKatakana(converted)
-				+ std::wstring(pending.begin(), pending.end());
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending);
 			break;
 		case ChmKeyEvent::Type::Cancel:
 			_pRawInputStore->clear();
-			_compositionStr = L"";
+			_converted = L"";
+			_pending = "";
+			_hasComposition = FALSE;
 			break;
+		// TODO: 再変換(確定取消）キー処理(v0.3以降)
+		// TODO: BSキー処理(v0.3以降)
 		default:
 			// その他のキーは無視
+			OutputDebugStringWithInt(L"   > Invalid Key:%d",(int)_type);
 			break;
 	}
 
 	return ;
+}
+
+void ChmEngine::PostUpdateComposition(){
+	// 変換中でなくなった場合は、残りかすを処分
+	if (!_hasComposition) {
+		_pRawInputStore->clear();
+		_converted = L"";
+		_pending = "";
+	}
+	return;
 }
 
 std::wstring ChmEngine::GetCompositionStr(){
 	if ( _pRawInputStore == nullptr ) return L"";
 
-	// rawInput -> ひらがな
-	return _compositionStr;
+	// 既に変換済みの文字列を連結して返却
+	return _converted + std::wstring(_pending.begin(), _pending.end());
 }
 
 
@@ -138,19 +107,8 @@ bool ChmKeyEvent::IsNormalKey(WPARAM wp) {
 	return false ;
 }
 
-bool ChmKeyEvent::IsKeyEaten(WPARAM wp)
-{
-	// TODO: Composition状態によって変える必要がある
-    if (IsNormalKey(wp)) return true;
-	if (wp == VK_SHIFT || wp == VK_CONTROL || wp == VK_MENU) return false;
-    for (auto& k : g_functionKeyTable) {
-        if (k.wp == wp) return true;
-    }
-    return false;
-}
-
 ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/)
-    : _wp(wp)
+	: _wp(wp), _shift(false), _type(Type::None), _ch(0)
 {
     _shift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
     _TranslateByTable();

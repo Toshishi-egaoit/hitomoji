@@ -8,7 +8,7 @@
 #include <initguid.h> // GUIDの実体定義用
 #include "TsfIf.h"
 #include "DisplayAttribute.h"
-#include "ChmRawInputStore.h"
+#include <objbase.h>
 
 class CEditSession : public ITfEditSession , public ITfCompositionSink{
 
@@ -38,7 +38,7 @@ public:
 
 	// 現状で使用している実用版のDoEditSession（ある程度の構造化をしてある）
 	STDMETHODIMP DoEditSession(TfEditCookie ec) {
-		OutputDebugString(L"[hitomoji] DoEditSession");
+		OutputDebugStringWithString(L"[hitomoji] DoEditSession:>>%s<<",_compositionStr.c_str());
 		ITfRange* pRange = nullptr;
 
 		// 1. Compositionの準備
@@ -46,6 +46,7 @@ public:
 
 		// 2. 確定処理
 		if (_fEnd ) {
+			pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), _compositionStr.length());
 			_TerminateComposition(ec);
 		} else {
 			// 3. 変換中文字列の表示
@@ -72,7 +73,6 @@ private:
 				if (SUCCEEDED(_pic->QueryInterface(IID_ITfContextComposition, (void**)&pCtxComp))) {
 					hr = pCtxComp->StartComposition(ec, *ppRange, this, _ppComp);
 					OUTPUT_HR_n_RETURN_ON_ERROR(L"StartComposition",hr);
-					if (*_ppRawInput == nullptr ) *_ppRawInput = new ChmRawInputStore(); 
 					pCtxComp->Release(); // 目的の_ppCompは取得したので、ReleaseしてOK
 				}
 				pInsert->Release();
@@ -110,22 +110,19 @@ private:
             (*_ppComp)->EndComposition(ec);
             (*_ppComp)->Release();
             *_ppComp = nullptr;
-			delete *_ppRawInput;
-			(*_ppRawInput) = nullptr;
         }
     }
     // メンバ変数
     ITfContext* _pic; ITfComposition** _ppComp; TfClientId _tid; 
 	std::wstring _compositionStr;
 	BOOL _fEnd;
-	ChmRawInputStore **_ppRawInput = nullptr;
 
 	LONG _cRef;
 };
 
 // --- CHitomoji クラスの実装 ---
 
-ChmTsfInterface::ChmTsfInterface() : _cRef(1), _pThreadMgr(nullptr), _pComposition(nullptr) {
+ChmTsfInterface::ChmTsfInterface() : _tfClientId(0), _cRef(1), _pThreadMgr(nullptr), _pComposition(nullptr) {
 	_pEngine = new ChmEngine();
 }
 
@@ -298,26 +295,3 @@ STDMETHODIMP ChmTsfInterface::EnumDisplayAttributeInfo(IEnumTfDisplayAttributeIn
     return E_NOTIMPL; 
 }
 // ------
-
-
-// debug support functions
-void OutputDebugStringWithInt(wchar_t const* format, ULONG lvalue)
-{
-    wchar_t buff[255];
-    // TODO: assertで255を越えたら落ちるようにする
-
-    wsprintf(buff, format, lvalue);
-    OutputDebugStringW(buff);
-    return;
-}
-
-void OutputDebugStringWithString(wchar_t const* format, wchar_t const* value)
-{
-    wchar_t buff[255];
-    // TODO: assertで255を越えたら落ちるようにする
-
-    wsprintf(buff, format, value);
-    OutputDebugStringW(buff);
-    return;
-}
-

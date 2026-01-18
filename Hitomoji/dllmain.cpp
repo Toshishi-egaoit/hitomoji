@@ -38,7 +38,7 @@ public:
 // --- DLLエクスポート関数 ---
 
 BOOL WINAPI DllMain(HINSTANCE hInst, DWORD dwReason, LPVOID pvReserved) {
-	OutputDebugString(L"[Hitomoji]dllMain");
+	OutputDebugStringWithInt(L"[Hitomoji]dllMain:%d",(LONG)dwReason);
     if (dwReason == DLL_PROCESS_ATTACH) {
         g_hInst = hInst;
 		OutputDebugString(L"   > PROCESS ATTACH");
@@ -48,7 +48,7 @@ BOOL WINAPI DllMain(HINSTANCE hInst, DWORD dwReason, LPVOID pvReserved) {
 }
 
 STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, void** ppv) {
-	OutputDebugString(L"[Hitomoji]DllGetClassObject");
+	OutputDebugStringWithGuid(L"[Hitomoji]DllGetClassObject:%s",riid);
     if (IsEqualCLSID(rclsid, CLSID_Hitomoji)) {
         CHitomojiClassFactory* pCF = new CHitomojiClassFactory();
         if (!pCF) return E_OUTOFMEMORY;

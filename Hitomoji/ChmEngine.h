@@ -1,21 +1,16 @@
-// Controller.h
+// ChmEngine.h
 // Copyright (C) 2026 by Hitomoji Project. All rights reserved.
 #pragma once
 #include <windows.h>
 #include <cstdint>
 #include <string>
+#include "utils.h"
 
 class ChmKeyEvent;
 class ChmRawInputStore;
 
 class ChmEngine {
 public:
-	enum compositionStatus {
-		COMP_NONE = 0,	// 初期状態
-		COMP_ONGOING,	// Compositionが存在
-		COMP_COMMITTING,// 確定キーの処理中
-		COMP_RECALL,	// 再変換キーの処理中(v0.3以降で実装予定)
-	};
     ChmEngine();
     
     // キーをIMEで処理すべきか判定
@@ -30,12 +25,12 @@ public:
 	void PostUpdateComposition();
 
 private:
-	void _InitComposition(const ChmKeyEvent& keyEvent);
-	void _UpdateComposition(const ChmKeyEvent& keyEvent);
+	void _InitComposition();
     BOOL _isON;
-	ChmRawInputStore* _pRawInputStore;
-	std::wstring _compositionStr ;
-	enum compositionStatus _compositionStatus; // v0.3以降でサブクラス化を予定
+	BOOL _hasComposition;
+	ChmRawInputStore* _pRawInputStore; // 入力されたローマ字列
+	std::wstring _converted; // かな変換できた部分
+	std::string _pending; // かなに変換できていない部分（残り）
 };
 
 // v0.1.1: キー定義をテーブル駆動にする
@@ -43,12 +38,13 @@ private:
 class ChmKeyEvent {
 public:
     enum class Type {
-        None,
+        None = 0,
         CharInput,      // 通常文字入力
         CommitKana,     // Enter
         CommitKatakana, // Shift+Enter
         Cancel,         // ESC
         Backspace,      // BS（将来）
+        Uncommit,       // 確定取消（将来）
     };
 
     struct KeyDef {
@@ -59,17 +55,21 @@ public:
     };
 
     // --- utility ---
-    static bool IsKeyEaten(WPARAM wp);
     static bool IsNormalKey(WPARAM wp);
 
     // --- ctor ---
     ChmKeyEvent(WPARAM wp, LPARAM lp);
 
     // --- accessors ---
-    bool IsCommit() const { return (GetType() == Type::CommitKana || GetType() == Type::CommitKatakana); }
+    bool IsCommit() const { return (GetType() == Type::CommitKana || GetType() == Type::CommitKatakana || GetType() == Type::Cancel); }
     Type GetType() const { return _type; }
     char GetChar() const { return _ch; }
     bool IsShift() const { return _shift; }
+	const std::wstring dump() const { 
+		wchar_t buff[64];
+		wsprintf(buff, L"[_type:%d,_ch:%c(%x)]", static_cast<int>(_type), static_cast<int>(GetChar()),static_cast<int>(GetChar()));
+		return buff ;
+	}
 
 private:
     void _TranslateByTable();
