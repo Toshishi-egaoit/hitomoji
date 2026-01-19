@@ -24,6 +24,7 @@ public:
 
 	void UpdateComposition(const ChmKeyEvent& keyEvent);
 	void PostUpdateComposition();
+	void ResetStatus() ;
 
 private:
 	void _InitComposition();

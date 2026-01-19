@@ -81,6 +81,13 @@ void ChmEngine::PostUpdateComposition(){
 	return;
 }
 
+void ChmEngine::ResetStatus() {
+    _hasComposition = FALSE;
+    _pRawInputStore->clear();
+    _converted = L"";
+    _pending = "";
+}
+
 std::wstring ChmEngine::GetCompositionStr(){
 	if ( _pRawInputStore == nullptr ) return L"";
 

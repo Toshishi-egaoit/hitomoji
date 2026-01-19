@@ -22,6 +22,7 @@ const GUID GUID_PreservedKey_OpenClose = { 0x6e9f9050, 0x05f8, 0x479c, { 0x82, 0
 
 class ChmTsfInterface : public ITfTextInputProcessor,
                   public ITfDisplayAttributeProvider,
+                  public ITfThreadFocusSink,
                   public ITfKeyEventSink {
 public:
     ChmTsfInterface();
@@ -37,7 +38,7 @@ public:
     STDMETHODIMP Deactivate();
 
     // ITfKeyEventSink
-    STDMETHODIMP OnSetFocus(BOOL fForeground) { return S_OK; }
+    STDMETHODIMP OnSetFocus(BOOL fForeground) ;
     STDMETHODIMP OnTestKeyDown(ITfContext* pic, WPARAM wParam, LPARAM lParam, BOOL* pfEaten);
     STDMETHODIMP OnTestKeyUp(ITfContext* pic, WPARAM wParam, LPARAM lParam, BOOL* pfEaten);
     STDMETHODIMP OnKeyDown(ITfContext* pic, WPARAM wParam, LPARAM lParam, BOOL* pfEaten);
@@ -47,6 +48,15 @@ public:
 	// ITfDisplayAttributeProvider
 	STDMETHODIMP GetDisplayAttributeInfo(REFGUID guid, ITfDisplayAttributeInfo **ppInfo) ;
 	STDMETHODIMP EnumDisplayAttributeInfo(IEnumTfDisplayAttributeInfo **ppEnum);
+
+	// ITfThreadFocusSink
+	STDMETHODIMP OnSetThreadFocus() ;
+	STDMETHODIMP OnKillThreadFocus();
+
+	// Compositionä«óù
+    ITfComposition* GetComposition() const;
+    void SetComposition(ITfComposition* pComp);
+    void ClearComposition();
 
 private:
     HRESULT _InitKeyEventSink();
@@ -59,12 +69,14 @@ private:
     
 	HRESULT _InvokeEditSession(ITfContext* pic, BOOL fEnd) ;
 
+    HRESULT _TerminateCompositionInternal();
+
     ITfThreadMgr* _pThreadMgr;
     TfClientId _tfClientId;
     LONG _cRef;
 
+    DWORD _dwThreadFocusSinkCookie; 
     ITfComposition* _pComposition;
-
     ChmEngine* _pEngine; // ÉçÉWÉbÉNíSìñ
 };
 
