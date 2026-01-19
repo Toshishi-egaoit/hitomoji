@@ -51,25 +51,26 @@ public:
         WPARAM wp;
         bool   needShift;
         Type   type;
+        bool   endComposition;   // compositionを閉じるアクションか？
         char   ch;   // CharInput のときのみ有効
     };
 
     // --- utility ---
     static bool IsNormalKey(WPARAM wp);
-
-    // --- ctor ---
-    ChmKeyEvent(WPARAM wp, LPARAM lp);
-
-    // --- accessors ---
-    bool IsCommit() const { return (GetType() == Type::CommitKana || GetType() == Type::CommitKatakana || GetType() == Type::Cancel); }
-    Type GetType() const { return _type; }
-    char GetChar() const { return _ch; }
-    bool IsShift() const { return _shift; }
 	const std::wstring dump() const { 
 		wchar_t buff[64];
 		wsprintf(buff, L"[_type:%d,_ch:%c(%x)]", static_cast<int>(_type), static_cast<int>(GetChar()),static_cast<int>(GetChar()));
 		return buff ;
 	}
+
+    // --- ctor ---
+    ChmKeyEvent(WPARAM wp, LPARAM lp);
+
+    // --- accessors ---
+    bool ShouldEndComposition();
+    Type GetType() const { return _type; }
+    char GetChar() const { return _ch; }
+    bool IsShift() const { return _shift; }
 
 private:
     void _TranslateByTable();

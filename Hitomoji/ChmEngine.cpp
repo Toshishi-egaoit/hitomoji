@@ -36,7 +36,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent){
 	switch (_type) {
 		case ChmKeyEvent::Type::CommitKatakana: // カタカナ変換
 			_converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
-			[[fallthrough]]
+			// [[fallthrough]]
 		case ChmKeyEvent::Type::CommitKana:		// ひらがな変換
 			_hasComposition = FALSE;
 			break;
@@ -87,15 +87,15 @@ std::wstring ChmEngine::GetCompositionStr(){
 
 // ---- 機能キー定義テーブル ----
 static const ChmKeyEvent::KeyDef g_functionKeyTable[] = {
-    { VK_RETURN, false, ChmKeyEvent::Type::CommitKana,     0 },
-    { VK_RETURN, true,  ChmKeyEvent::Type::CommitKatakana, 0 },
-    { VK_ESCAPE, false, ChmKeyEvent::Type::Cancel,         0 },
+    { VK_RETURN, false, ChmKeyEvent::Type::CommitKana,     true, 0 },
+    { VK_RETURN, true,  ChmKeyEvent::Type::CommitKatakana, true, 0 },
+    { VK_ESCAPE, false, ChmKeyEvent::Type::Cancel,         true, 0 },
 };
 
 // ---- 通常キー定義テーブル ----
 static const ChmKeyEvent::KeyDef g_normalKeyTable[] = {
     // CharInput
-    { VK_OEM_MINUS, false, ChmKeyEvent::Type::CharInput, '-' },
+    { VK_OEM_MINUS, false, ChmKeyEvent::Type::CharInput, false, '-' },
 };
 
 bool ChmKeyEvent::IsNormalKey(WPARAM wp) {
@@ -105,6 +105,15 @@ bool ChmKeyEvent::IsNormalKey(WPARAM wp) {
         if (k.wp == wp) return true;
     }
 	return false ;
+}
+
+bool ChmKeyEvent::ShouldEndComposition() {
+	for (auto& k : g_functionKeyTable) {
+		if (k.wp == _wp ) {
+			return k.endComposition;
+		}
+	}
+	return false;
 }
 
 ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/)

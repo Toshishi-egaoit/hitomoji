@@ -46,12 +46,12 @@ public:
 
 		// 2. 確定処理
 		if (_fEnd ) {
-			pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), _compositionStr.length());
+			pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
 			_TerminateComposition(ec);
 		} else {
 			// 3. 変換中文字列の表示
 			LONG temp = 0;
-			pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), _compositionStr.length());
+			pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
 			pRange->ShiftStart(ec, 0, &temp, nullptr); // Composition全体を選択状態に
 			_ApplyDisplayAttribute(ec, pRange);
 		}
@@ -185,7 +185,7 @@ STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, B
     if (*pfEaten) {
         ChmKeyEvent kEv(wp, lp);
 		_pEngine->UpdateComposition(kEv);
-		_InvokeEditSession(pic, kEv.IsCommit());
+		_InvokeEditSession(pic, kEv.ShouldEndComposition());
 		_pEngine->PostUpdateComposition();
     }
     return S_OK;
