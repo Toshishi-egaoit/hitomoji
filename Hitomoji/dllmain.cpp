@@ -17,8 +17,19 @@ public:
         }
         return E_NOINTERFACE;
     }
-    STDMETHODIMP_(ULONG) AddRef() { return 2; }
-    STDMETHODIMP_(ULONG) Release() { return 1; }
+	STDMETHODIMP_(ULONG) AddRef() { 
+        InterlockedIncrement(&g_cRefDll);
+		return InterlockedIncrement(&_cRef) ;
+	}
+	STDMETHODIMP_(ULONG) Release() {
+        InterlockedDecrement(&g_cRefDll);
+		LONG tmp = InterlockedDecrement(&_cRef) ;
+		if ( tmp == 0) {
+			delete this; 
+			return 0; 
+		} 
+		return tmp;
+	}
 
     STDMETHODIMP CreateInstance(IUnknown* pUnkOuter, REFIID riid, void** ppv) {
         if (pUnkOuter) return CLASS_E_NOAGGREGATION;
@@ -33,6 +44,8 @@ public:
         else InterlockedDecrement(&g_cRefDll);
         return S_OK;
     }
+private:
+	LONG _cRef = 1;
 };
 
 // --- DLLエクスポート関数 ---
@@ -54,6 +67,7 @@ STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, void** ppv) {
         if (!pCF) return E_OUTOFMEMORY;
         HRESULT hr = pCF->QueryInterface(riid, ppv);
 		OUTPUT_HR_ON_ERROR(L"pCF->QueryInterface",hr)
+		pCF->Release();
         return hr;
     }
     return CLASS_E_CLASSNOTAVAILABLE;
