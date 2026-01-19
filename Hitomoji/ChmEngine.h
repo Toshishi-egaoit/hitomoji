@@ -12,6 +12,7 @@ class ChmRawInputStore;
 class ChmEngine {
 public:
     ChmEngine();
+    ~ChmEngine();
     
     // ƒL[‚ğIME‚Åˆ—‚·‚×‚«‚©”»’è
     BOOL IsKeyEaten(WPARAM wp);
@@ -67,7 +68,7 @@ public:
     ChmKeyEvent(WPARAM wp, LPARAM lp);
 
     // --- accessors ---
-    bool ShouldEndComposition();
+    bool ShouldEndComposition() const {return _endComp ;};
     Type GetType() const { return _type; }
     char GetChar() const { return _ch; }
     bool IsShift() const { return _shift; }
@@ -76,7 +77,8 @@ private:
     void _TranslateByTable();
 
     WPARAM _wp;
-    bool   _shift;
+    bool   _shift = false;
+    bool _endComp = false;
 
     Type _type = Type::None;
     char _ch   = 0;

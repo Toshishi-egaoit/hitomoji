@@ -11,6 +11,10 @@ ChmEngine::ChmEngine()
 	_pRawInputStore = new ChmRawInputStore();
 }
 
+ChmEngine::~ChmEngine() {
+	if (_pRawInputStore) delete _pRawInputStore;
+}
+
 BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
 	// IMEがOFFなら全てfalse
     if (!_isON) return FALSE;
@@ -87,34 +91,18 @@ std::wstring ChmEngine::GetCompositionStr(){
 
 // ---- 機能キー定義テーブル ----
 static const ChmKeyEvent::KeyDef g_functionKeyTable[] = {
-    { VK_RETURN, false, ChmKeyEvent::Type::CommitKana,     true, 0 },
-    { VK_RETURN, true,  ChmKeyEvent::Type::CommitKatakana, true, 0 },
-    { VK_ESCAPE, false, ChmKeyEvent::Type::Cancel,         true, 0 },
+	// WPARAM    SHIFT  Type                               endComp ch
+    { VK_RETURN, false, ChmKeyEvent::Type::CommitKana,     true,   0 },
+    { VK_RETURN, true,  ChmKeyEvent::Type::CommitKatakana, true,   0 },
+    { VK_ESCAPE, false, ChmKeyEvent::Type::Cancel,         true,   0 },
 };
 
 // ---- 通常キー定義テーブル ----
 static const ChmKeyEvent::KeyDef g_normalKeyTable[] = {
     // CharInput
-    { VK_OEM_MINUS, false, ChmKeyEvent::Type::CharInput, false, '-' },
+	// WPARAM       SHIFT  Type                          endComp ch
+    { VK_OEM_MINUS, false, ChmKeyEvent::Type::CharInput, false,  '-' },
 };
-
-bool ChmKeyEvent::IsNormalKey(WPARAM wp) {
-	// TODO: モディファイアキーの考慮が必要
-    if ((wp >= 'A' && wp <= 'Z') || (wp >= 'a' && wp <= 'z')) return true;
-    for (auto& k : g_normalKeyTable) {
-        if (k.wp == wp) return true;
-    }
-	return false ;
-}
-
-bool ChmKeyEvent::ShouldEndComposition() {
-	for (auto& k : g_functionKeyTable) {
-		if (k.wp == _wp ) {
-			return k.endComposition;
-		}
-	}
-	return false;
-}
 
 ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/)
 	: _wp(wp), _shift(false), _type(Type::None), _ch(0)
@@ -130,17 +118,28 @@ void ChmKeyEvent::_TranslateByTable()
         if (k.wp == _wp && k.needShift == _shift) {
             _type = k.type;
             _ch   = k.ch;
+            _endComp = k.endComposition;
             return;
         }
     }
 
     // 英字は共通処理
-    if (IsNormalKey(_wp)) {
+    if ((_wp >= 'A' && _wp <= 'Z') || (_wp >= 'a' && _wp <= 'z')) {
         _type = Type::CharInput;
         _ch = (char)std::tolower((unsigned char)_wp);
-        return;
+		return ;
+	}
+
+    // その他の通常文字
+    for (auto& k : g_normalKeyTable) {
+		if (_wp == k.wp) {
+			_type = Type::CharInput;
+			_ch = (char)std::tolower((unsigned char)_wp);
+			return ;
+		}
     }
 
+	// それ以外は処理対象外
     _type = Type::None;
 }
 
