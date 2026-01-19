@@ -1,4 +1,4 @@
-// Hitomoji.h
+// TsfIf.h
 #pragma once
 #include <msctf.h>
 #include "utils.h"
