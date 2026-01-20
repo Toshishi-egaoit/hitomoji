@@ -27,7 +27,6 @@ public:
 	void ResetStatus() ;
 
 private:
-	void _InitComposition();
     BOOL _isON;
 	BOOL _hasComposition;
 	ChmRawInputStore* _pRawInputStore; // ì¸óÕÇ≥ÇÍÇΩÉçÅ[É}éöóÒ
@@ -58,7 +57,6 @@ public:
     };
 
     // --- utility ---
-    static bool IsNormalKey(WPARAM wp);
 	const std::wstring dump() const { 
 		wchar_t buff[64];
 		wsprintf(buff, L"[_type:%d,_ch:%c(%x)]", static_cast<int>(_type), static_cast<int>(GetChar()),static_cast<int>(GetChar()));

@@ -82,6 +82,7 @@ void ChmEngine::PostUpdateComposition(){
 }
 
 void ChmEngine::ResetStatus() {
+	OutputDebugString(L"ResetStatus");
     _hasComposition = FALSE;
     _pRawInputStore->clear();
     _converted = L"";

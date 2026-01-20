@@ -127,6 +127,7 @@ private:
 // --- CHitomoji クラスの実装 ---
 
 ChmTsfInterface::ChmTsfInterface() : _tfClientId(0), _cRef(1), _pThreadMgr(nullptr), _pComposition(nullptr) {
+	_dwThreadFocusSinkCookie = TF_INVALID_COOKIE; 
 	_pEngine = new ChmEngine();
 }
 
@@ -158,6 +159,7 @@ STDMETHODIMP_(ULONG) ChmTsfInterface::Release() {
 
 // ITfTextInputProcessor
 STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
+	OutputDebugString(L"[Hitomoji] Activate() called");
 	_pThreadMgr = ptm;
 	_pThreadMgr->AddRef();
 	_tfClientId = tid;
@@ -167,19 +169,47 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 	if (FAILED(_InitDisplayAttributeInfo())) return E_FAIL;
 
     // ThreadFocusSinkの登録
-    ITfSourceSingle* pSourceSingle = nullptr;
-    if (SUCCEEDED(_pThreadMgr->QueryInterface(IID_ITfSourceSingle, (void**)&pSourceSingle))) {
-        pSourceSingle->AdviseSingleSink(_tfClientId, IID_ITfThreadFocusSink, (ITfThreadFocusSink*)this);
-        pSourceSingle->Release();
+    ITfSource* pSource = nullptr;
+    if (SUCCEEDED(_pThreadMgr->QueryInterface(IID_ITfSource, (void**)&pSource))) {
+        HRESULT hr = pSource->AdviseSink(IID_ITfThreadFocusSink, (ITfThreadFocusSink*)this,&_dwThreadFocusSinkCookie);
+		OUTPUT_HR_ON_ERROR(L"Activate.AdviceSink",hr);
+		OutputDebugStringWithInt(L"THeadFocusCookie:%x",_dwThreadFocusSinkCookie);
+        pSource->Release();
     }
     return S_OK;
 }
 
+STDMETHODIMP ChmTsfInterface::Deactivate() {
+	ClearComposition();
+	if (_dwThreadFocusSinkCookie != TF_INVALID_COOKIE) {
+		ITfSource* pSource = nullptr;
+		if (SUCCEEDED(_pThreadMgr->QueryInterface(IID_ITfSource, (void**)&pSource))) {
+			pSource->UnadviseSink(_dwThreadFocusSinkCookie);
+			pSource->Release();
+		}
+		_dwThreadFocusSinkCookie = TF_INVALID_COOKIE;
+		OutputDebugStringWithInt(L"Deactivate cookie:%x",_dwThreadFocusSinkCookie);
+	}
+	_pEngine->ResetStatus();
+
+	_UninitKeyEventSink();
+	_UninitPreservedKey();
+	if (_pThreadMgr) {
+		_pThreadMgr->Release();
+		_pThreadMgr = nullptr;
+	}
+	return S_OK;
+}
+
 STDMETHODIMP ChmTsfInterface::OnSetFocus(BOOL fFocus)
 {
-	if (fFocus == FALSE) { // フォーカス喪失時
+	if (fFocus == TRUE) { // フォーカス喪失時
+		OutputDebugString(L"OnSetFocus(TRUE)");
         ClearComposition();
-    }
+		_pEngine->ResetStatus();
+    } else {
+		OutputDebugString(L"OnSetFocus(FALSE)");
+	}
 	return S_OK;
 }
 
@@ -287,10 +317,15 @@ HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
 
 STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 {
+	OutputDebugString(L"OnSetThreadFocus()");
+	ClearComposition();
+	_pEngine->ResetStatus();
 	return S_OK;
 }
 
 STDMETHODIMP ChmTsfInterface::OnKillThreadFocus() {
+	OutputDebugString(L"OnKillThreadFocus()");
+	/*
     if (_pComposition) {
         _pEngine->ResetStatus();
 
@@ -309,18 +344,8 @@ STDMETHODIMP ChmTsfInterface::OnKillThreadFocus() {
             pDocMgr->Release();
         }
     }
+	*/
     return S_OK;
-}
-
-STDMETHODIMP ChmTsfInterface::Deactivate() {
-	ClearComposition();
-	_UninitKeyEventSink();
-	_UninitPreservedKey();
-	if (_pThreadMgr) {
-		_pThreadMgr->Release();
-		_pThreadMgr = nullptr;
-	}
-	return S_OK;
 }
 
 ITfComposition* ChmTsfInterface::GetComposition() const
@@ -330,7 +355,7 @@ ITfComposition* ChmTsfInterface::GetComposition() const
 
 void ChmTsfInterface::SetComposition(ITfComposition* pComp)
 {
-    if (_pComposition)
+    if (_pComposition && _pComposition != pComp)
     {
         _pComposition->Release();
     }
@@ -343,6 +368,7 @@ void ChmTsfInterface::ClearComposition()
 {
     if (_pComposition)
     {
+		OutputDebugString(L"ClearComposition");
         _pComposition->Release();
         _pComposition = nullptr;
     }

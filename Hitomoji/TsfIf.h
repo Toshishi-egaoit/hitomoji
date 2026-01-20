@@ -69,8 +69,6 @@ private:
     
 	HRESULT _InvokeEditSession(ITfContext* pic, BOOL fEnd) ;
 
-    HRESULT _TerminateCompositionInternal();
-
     ITfThreadMgr* _pThreadMgr;
     TfClientId _tfClientId;
     LONG _cRef;
