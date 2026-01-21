@@ -1,10 +1,13 @@
 // ChmRawInputStore.h
 #pragma once
 #include <string>
+#include <algorithm>
+#include <cctype>
+// NOTE: 小文字化は RomajiConverter 側の責務とする
 
 // rawInput を唯一の真実として保持するクラス
 // v0.1.1 では文字追加のみ実装
-// BS / ESC 等は将来ここに集約する
+// BS などの文字列編集処理もここに集約する
 class ChmRawInputStore {
 public:
     // 文字入力（ASCII前提）
@@ -17,7 +20,8 @@ public:
         rawInput_.clear();
     }
 
-    // 現在の rawInput を取得
+        // 現在の rawInput を取得（唯一の公開インタフェース）
+    // ここでは加工せず、生入力をそのまま返す
     const std::string& get() const {
         return rawInput_;
     }

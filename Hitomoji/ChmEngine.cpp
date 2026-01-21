@@ -1,4 +1,4 @@
-// ChmEngine.cpp 
+ï»¿// ChmEngine.cpp 
 // Copyright (C) 2026 Hitomoji Project. All rights reserved.
 #include <cctype>
 #include <assert.h>
@@ -16,17 +16,13 @@ ChmEngine::~ChmEngine() {
 }
 
 BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
-	// IME‚ªOFF‚È‚ç‘S‚Äfalse
+    // IMEãŒOFFãªã‚‰å…¨ã¦false
     if (!_isON) return FALSE;
 
-	ChmKeyEvent ev(wp,0) ;
+    ChmKeyEvent ev(wp, 0);
 
-	// Composition‚ª‚È‚¢ê‡‚Í’Êí•¶š‚¾‚¯H‚¤Bi“ÁêƒL[‚Íˆ—‚µ‚È‚¢j
-	if (!_hasComposition) {
-		return  (ev.GetType() == ChmKeyEvent::Type::CharInput);
-	}
-	// IME‚ª–³‹‚·‚é‚à‚ÌˆÈŠO‚Í‘S‚ÄH‚¤
-	return  (ev.GetType() != ChmKeyEvent::Type::None);
+    // GetTypeã§æ„å‘³ã¥ã‘ã•ã‚ŒãŸã‚­ãƒ¼ã®ã¿IMEãŒé£Ÿã†
+    return (ev.GetType() != ChmKeyEvent::Type::None);
 }
 
 void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent){
@@ -36,43 +32,45 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent){
 	);
 	ChmKeyEvent::Type _type = keyEvent.GetType();
 
-	// Šm’èƒL[
+	// ç¢ºå®šã‚­ãƒ¼
 	switch (_type) {
-		case ChmKeyEvent::Type::CommitKatakana: // ƒJƒ^ƒJƒi•ÏŠ·
-			_converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
-			// [[fallthrough]]
-		case ChmKeyEvent::Type::CommitKana:		// ‚Ğ‚ç‚ª‚È•ÏŠ·
-			_hasComposition = FALSE;
-			break;
-		case ChmKeyEvent::Type::CharInput:
-			// ’Êí‚Ì•¶š“ü—Í
-			if (!_hasComposition ) {
-				// •¶š“ü—Í‚ÅCompositionŠJn
-				_pRawInputStore->clear();
-				_hasComposition = TRUE;
-			}
-			_pRawInputStore->push((char)std::tolower((unsigned char)keyEvent.GetChar()));
-			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending);
-			break;
-		case ChmKeyEvent::Type::Cancel:
-			_pRawInputStore->clear();
-			_converted = L"";
-			_pending = "";
-			_hasComposition = FALSE;
-			break;
-		// TODO: Ä•ÏŠ·(Šm’èæÁjƒL[ˆ—(v0.3ˆÈ~)
-		// TODO: BSƒL[ˆ—(v0.3ˆÈ~)
-		default:
-			// ‚»‚Ì‘¼‚ÌƒL[‚Í–³‹
-			OutputDebugStringWithInt(L"   > Invalid Key:%d",(int)_type);
-			break;
+        case ChmKeyEvent::Type::CommitKatakana: // ã‚«ã‚¿ã‚«ãƒŠå¤‰æ›
+            _converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
+            // [[fallthrough]]
+        case ChmKeyEvent::Type::CommitKana:     // ã²ã‚‰ãŒãªå¤‰æ›
+            _hasComposition = FALSE;
+            break;
+        case ChmKeyEvent::Type::CommitAscii:    // ASCIIç¢ºå®š
+            _converted = std::wstring(_pRawInputStore->get().begin(), _pRawInputStore->get().end());
+			_pending.clear();
+            _hasComposition = FALSE;
+            break;
+        case ChmKeyEvent::Type::CommitAsciiWide: // å…¨è§’ASCIIç¢ºå®š
+            _converted = AsciiToWide(_pRawInputStore->get());
+			_pending.clear();
+            _hasComposition = FALSE;
+            break;
+        case ChmKeyEvent::Type::CharInput:
+            // é€šå¸¸ã®æ–‡å­—å…¥åŠ›ï¼ˆv0.1.2.3 ç›¸å½“ï¼‰
+            if (!_hasComposition) {
+                // æ–‡å­—å…¥åŠ›ã§Compositioné–‹å§‹
+                _pRawInputStore->clear();
+                _hasComposition = TRUE;
+            }
+            // è‹±å­—ã¯æ—¢ã« ChmKeyEvent å´ã§å¤§å°æ±ºå®šæ¸ˆã¿
+            _pRawInputStore->push(keyEvent.GetChar());
+            ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending);
+            break;
+        default:
+            // ãã®ä»–ã®ã‚­ãƒ¼ã¯ä½•ã‚‚ã—ãªã„
+            break;
 	}
 
 	return ;
 }
 
 void ChmEngine::PostUpdateComposition(){
-	// •ÏŠ·’†‚Å‚È‚­‚È‚Á‚½ê‡‚ÍAc‚è‚©‚·‚ğˆ•ª
+	// å¤‰æ›ä¸­ã§ãªããªã£ãŸå ´åˆã¯ã€æ®‹ã‚Šã‹ã™ã‚’å‡¦åˆ†
 	if (!_hasComposition) {
 		_pRawInputStore->clear();
 		_converted = L"";
@@ -89,65 +87,125 @@ void ChmEngine::ResetStatus() {
     _pending = "";
 }
 
+std::wstring ChmEngine::AsciiToWide(const std::string& src)
+{
+    std::wstring out;
+    out.reserve(src.size());
+
+    for (unsigned char c : src) {
+        // è‹±æ•°å­—ãƒ»åŸºæœ¬è¨˜å·ã®ã¿å¯¾è±¡
+        if (c >= 0x21 && c <= 0x7E) {
+            // 0x21â€“0x7E ã¯ Fullwidth ã« +0xFEE0
+            out.push_back(static_cast<wchar_t>(c + 0xFEE0));
+        } else {
+            // ãã‚Œä»¥å¤–ã¯ãã®ã¾ã¾ï¼ˆä¿é™ºï¼‰
+            out.push_back(static_cast<wchar_t>(c));
+        }
+    }
+    return out;
+}
+
 std::wstring ChmEngine::GetCompositionStr(){
 	if ( _pRawInputStore == nullptr ) return L"";
 
-	// Šù‚É•ÏŠ·Ï‚İ‚Ì•¶š—ñ‚ğ˜AŒ‹‚µ‚Ä•Ô‹p
+	// æ—¢ã«å¤‰æ›æ¸ˆã¿ã®æ–‡å­—åˆ—ã‚’é€£çµã—ã¦è¿”å´
 	return _converted + std::wstring(_pending.begin(), _pending.end());
 }
 
 
-// ---- ‹@”\ƒL[’è‹`ƒe[ƒuƒ‹ ----
-static const ChmKeyEvent::KeyDef g_functionKeyTable[] = {
-	// WPARAM    SHIFT  Type                               endComp ch
-    { VK_RETURN, false, ChmKeyEvent::Type::CommitKana,     true,   0 },
-    { VK_RETURN, true,  ChmKeyEvent::Type::CommitKatakana, true,   0 },
-    { VK_ESCAPE, false, ChmKeyEvent::Type::Cancel,         true,   0 },
+// ---- æ©Ÿèƒ½ã‚­ãƒ¼å®šç¾©ãƒ†ãƒ¼ãƒ–ãƒ« ----
+static const ChmKeyEvent::FuncKeyDef g_functionKeyTable[] = {
+    // WPARAM      SHIFT  CTRL  ALT   Type                                   endComp
+    { VK_RETURN,   false, false, false, ChmKeyEvent::Type::CommitKana,         true },
+    { VK_RETURN,   true,  false, false, ChmKeyEvent::Type::CommitKatakana,     true },
+    { VK_TAB,      false, false, false, ChmKeyEvent::Type::CommitAscii,        true },
+    { VK_TAB,      true,  false, false, ChmKeyEvent::Type::CommitAsciiWide,    true },
+    { VK_ESCAPE,   false, false, false, ChmKeyEvent::Type::Cancel,             true },
+    // æ¤œè¨¼ç”¨: Ctrl+M = Enter
+    { 'M',         false, true,  false, ChmKeyEvent::Type::CommitKana,         true },
 };
 
-// ---- ’ÊíƒL[’è‹`ƒe[ƒuƒ‹ ----
-static const ChmKeyEvent::KeyDef g_normalKeyTable[] = {
-    // CharInput
-	// WPARAM       SHIFT  Type                          endComp ch
-    { VK_OEM_MINUS, false, ChmKeyEvent::Type::CharInput, false,  '-' },
+// ---- é€šå¸¸ã‚­ãƒ¼å®šç¾©ãƒ†ãƒ¼ãƒ–ãƒ« ----
+static const ChmKeyEvent::CharKeyDef g_charKeyTable[] = {
+    // WPARAM        SHIFT  ch
+    { VK_OEM_MINUS,  false, '-' },
+
+    // --- digits (ASCII keyboard) ---
+    // no-shift
+    { '0', false, '0' },
+    { '1', false, '1' },
+    { '2', false, '2' },
+    { '3', false, '3' },
+    { '4', false, '4' },
+    { '5', false, '5' },
+    { '6', false, '6' },
+    { '7', false, '7' },
+    { '8', false, '8' },
+    { '9', false, '9' },
+
+    // shift (US-ASCII)
+    { '1', true,  '!' },
+    { '2', true,  '@' },
+    { '3', true,  '#' },
+    { '4', true,  '$' },
+    { '5', true,  '%' },
+    { '6', true,  '^' },
+    { '7', true,  '&' },
+    { '8', true,  '*' },
+    { '9', true,  '(' },
+    { '0', true,  ')' },
 };
 
 ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/)
-	: _wp(wp), _shift(false), _type(Type::None), _ch(0)
+    : _wp(wp), _shift(false), _control(false), _alt(false), _type(Type::None), _ch(0)
 {
-    _shift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+    _shift   = (GetKeyState(VK_SHIFT)   & 0x8000) != 0;
+    _control = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+    _alt     = (GetKeyState(VK_MENU)    & 0x8000) != 0;
     _TranslateByTable();
 }
 
+
 void ChmKeyEvent::_TranslateByTable()
 {
-    // ‚Ü‚¸ƒe[ƒuƒ‹Æ‡
+    // â‘  æ©Ÿèƒ½ã‚­ãƒ¼å®šç¾©ãƒ†ãƒ¼ãƒ–ãƒ«
     for (auto& k : g_functionKeyTable) {
-        if (k.wp == _wp && k.needShift == _shift) {
+        if (k.wp == _wp &&
+            k.needShift == _shift &&
+            k.needCtrl  == _control &&
+            k.needAlt   == _alt) {
             _type = k.type;
-            _ch   = k.ch;
             _endComp = k.endComposition;
             return;
         }
     }
 
-    // ‰pš‚Í‹¤’Êˆ—
-    if ((_wp >= 'A' && _wp <= 'Z') || (_wp >= 'a' && _wp <= 'z')) {
-        _type = Type::CharInput;
-        _ch = (char)std::tolower((unsigned char)_wp);
-		return ;
-	}
-
-    // ‚»‚Ì‘¼‚Ì’Êí•¶š
-    for (auto& k : g_normalKeyTable) {
-		if (_wp == k.wp) {
-			_type = Type::CharInput;
-			_ch = (char)std::tolower((unsigned char)_wp);
-			return ;
-		}
+    // â‘¡ CTRL / ALT ä¿®é£¾ä¸­ã¯é€šå¸¸æ–‡å­—ã«ã—ãªã„
+    if (_control || _alt) {
+        _type = Type::None;
+        return;
     }
 
-	// ‚»‚êˆÈŠO‚Íˆ—‘ÎÛŠO
+    // â‘¢ è‹±å­—
+    if ((_wp >= 'A' && _wp <= 'Z') || (_wp >= 'a' && _wp <= 'z')) {
+        _type = Type::CharInput;
+        // shift çŠ¶æ…‹ã«å¿œã˜ã¦å¤§å°æ–‡å­—ã‚’æ±ºå®šï¼ˆCAPSLOCK ã¯å°†æ¥å¯¾å¿œï¼‰
+        if (_shift) {
+            _ch = (char)std::toupper((unsigned char)_wp);
+        } else {
+            _ch = (char)std::tolower((unsigned char)_wp);
+        }
+        return;
+    }
+
+    // â‘£ CharKeyTable
+    for (auto& k : g_charKeyTable) {
+        if (k.wp == _wp && k.needShift == _shift) {
+            _type = Type::CharInput;
+            _ch = k.ch;
+            return;
+        }
+    }
+
     _type = Type::None;
 }
-

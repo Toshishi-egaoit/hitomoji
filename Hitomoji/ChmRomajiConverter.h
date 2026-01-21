@@ -12,6 +12,10 @@ public:
     // rawInput 全体を入力として処理する
     // converted : かなに変換できた部分
     // pending   : 変換できずに残った部分（未確定ローマ字）
+        // rawInput を唯一の入力として処理する
+    // 内部で lower 化した文字列を用いてかな変換を行う
+    // converted : かなに変換できた部分
+    // pending   : rawInput を基準にした未確定部分（表示用）
     static void convert(const std::string& rawInput,
                  std::wstring& converted,
                  std::string& pending) ;
@@ -44,15 +48,22 @@ void ChmRomajiConverter::convert(const std::string& rawInput,
     converted.clear();
     pending.clear();
 
+    // かな変換用に lower 化した入力を生成
+    std::string lowerInput;
+    lowerInput.reserve(rawInput.size());
+    for (unsigned char c : rawInput) {
+        lowerInput.push_back(static_cast<char>(std::tolower(c)));
+    }
+
     size_t i = 0;
-    while (i < rawInput.size()) {
+    while (i < lowerInput.size()) {
         bool matched = false;
 
         // 最長一致: 3 → 2 → 1
         for (int len = 3; len >= 1; --len) {
-            if (i + len > rawInput.size()) continue;
+            if (i + len > lowerInput.size()) continue;
 
-            auto key = rawInput.substr(i, len);
+            auto key = lowerInput.substr(i, len);
             auto it = table().find(key);
             if (it != table().end()) {
                 converted += it->second;
@@ -65,6 +76,7 @@ void ChmRomajiConverter::convert(const std::string& rawInput,
         if (!matched) break; // ここから先は pending
     }
 
+    // pending は rawInput を基準に切り出す（大小文字を保持）
     if (i < rawInput.size()) {
         pending = rawInput.substr(i);
     }
