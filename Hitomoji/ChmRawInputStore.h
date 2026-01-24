@@ -20,7 +20,7 @@ public:
         rawInput_.clear();
     }
 
-        // 現在の rawInput を取得（唯一の公開インタフェース）
+    // 現在の rawInput を取得（唯一の公開インタフェース）
     // ここでは加工せず、生入力をそのまま返す
     const std::string& get() const {
         return rawInput_;

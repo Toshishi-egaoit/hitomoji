@@ -96,4 +96,3 @@ private:
     Type _type = Type::None;
     char _ch   = 0;
 };
-

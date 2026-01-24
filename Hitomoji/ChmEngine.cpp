@@ -2,9 +2,9 @@
 // Copyright (C) 2026 Hitomoji Project. All rights reserved.
 #include <cctype>
 #include <assert.h>
+#include "ChmRawInputStore.h"
 #include "ChmEngine.h"
 #include "ChmRomajiConverter.h"
-#include "ChmRawInputStore.h"
 
 ChmEngine::ChmEngine() 
 	: _isON(FALSE), _hasComposition(FALSE),_converted(L""), _pending("") {
@@ -21,8 +21,14 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
 
     ChmKeyEvent ev(wp, 0);
 
-    // GetTypeで意味づけされたキーのみIMEが食う
-    return (ev.GetType() != ChmKeyEvent::Type::None);
+	// 文字入力なら、常にIMEが食う
+	if (ev.GetType() == ChmKeyEvent::Type::CharInput) return TRUE;
+
+	// Compositonが存在する状態の特殊キーはIMEが食う
+	if (_hasComposition && ev.GetType() != ChmKeyEvent::Type::None && _hasComposition ) return TRUE;
+
+	// それ以外は食わない
+    return FALSE;
 }
 
 void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent){
@@ -42,14 +48,19 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent){
             break;
         case ChmKeyEvent::Type::CommitAscii:    // ASCII確定
             _converted = std::wstring(_pRawInputStore->get().begin(), _pRawInputStore->get().end());
-			_pending.clear();
+			_pending = "";
             _hasComposition = FALSE;
             break;
         case ChmKeyEvent::Type::CommitAsciiWide: // 全角ASCII確定
             _converted = AsciiToWide(_pRawInputStore->get());
-			_pending.clear();
+			_pending = "";
             _hasComposition = FALSE;
             break;
+        case ChmKeyEvent::Type::Cancel:         // ESCキャンセル
+			_converted = L"";
+			_pending = "";
+			_hasComposition = FALSE;
+			break;
         case ChmKeyEvent::Type::CharInput:
             // 通常の文字入力（v0.1.2.3 相当）
             if (!_hasComposition) {
@@ -209,3 +220,4 @@ void ChmKeyEvent::_TranslateByTable()
 
     _type = Type::None;
 }
+
