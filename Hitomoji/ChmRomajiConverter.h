@@ -108,7 +108,7 @@ inline const std::unordered_map<std::string, std::wstring>& ChmRomajiConverter::
 		{"dhi", L"でぃ"}, {"dhu", L"でゅ"},
         {"whi", L"うぃ"}, {"whe", L"うぇ"}, {"who", L"うぉ"},
         // --- 役物、記号類
-        {".", L"。"}, {",", L"、"},
+        {".", L"。"}, {",", L"、"}, {"?", L"？"}, {"!", L"！"},
         {"[", L"「"}, {"]", L"」"},
         {"-", L"ー"},
     };
