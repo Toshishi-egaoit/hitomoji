@@ -6,38 +6,7 @@
 #include <string>
 #include "utils.h"
 
-class ChmKeyEvent;
 class ChmRawInputStore;
-
-class ChmEngine {
-public:
-    ChmEngine();
-    ~ChmEngine();
-    
-    // キーをIMEで処理すべきか判定
-    BOOL IsKeyEaten(WPARAM wp);
-    
-    // IMEのON/OFF
-    void ToggleIME() { _isON = !_isON; }
-    BOOL IsON() const { return _isON; }
-	std::wstring GetCompositionStr() ;
-
-	void UpdateComposition(const ChmKeyEvent& keyEvent);
-	void PostUpdateComposition();
-	void ResetStatus() ;
-
-private:
-    // ASCII -> 全角 変換（v0.1.3 簡易実装）
-    static std::wstring AsciiToWide(const std::string& src);
-
-    BOOL _isON;
-	BOOL _hasComposition;
-	ChmRawInputStore* _pRawInputStore; // 入力されたローマ字列
-	std::wstring _converted; // かな変換できた部分
-	std::string _pending; // かなに変換できていない部分（残り）
-};
-
-// v0.1.1: キー定義をテーブル駆動にする
 
 class ChmKeyEvent {
 public:
@@ -91,8 +60,38 @@ private:
     bool   _shift   = false;
     bool   _control = false;
     bool   _alt     = false;
+    bool   _caps    = false;
     bool   _endComp = false;
 
     Type _type = Type::None;
     char _ch   = 0;
 };
+
+class ChmEngine {
+public:
+    ChmEngine();
+    ~ChmEngine();
+    
+    // キーをIMEで処理すべきか判定
+    BOOL IsKeyEaten(WPARAM wp);
+    
+    // IMEのON/OFF
+    void ToggleIME() { _isON = !_isON; }
+    BOOL IsON() const { return _isON; }
+	std::wstring GetCompositionStr() ;
+
+	void UpdateComposition(const ChmKeyEvent& keyEvent);
+	void PostUpdateComposition();
+	void ResetStatus() ;
+
+private:
+    // ASCII -> 全角 変換（v0.1.3 簡易実装）
+    static std::wstring AsciiToWide(const std::string& src);
+
+    BOOL _isON;
+	BOOL _hasComposition;
+	ChmRawInputStore* _pRawInputStore; // 入力されたローマ字列
+	std::wstring _converted; // かな変換できた部分
+	std::string _pending; // かなに変換できていない部分（残り）
+};
+

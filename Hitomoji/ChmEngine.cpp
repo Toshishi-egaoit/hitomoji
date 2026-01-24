@@ -61,7 +61,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent){
 			_pending = "";
 			_hasComposition = FALSE;
 			break;
-        case ChmKeyEvent::Type::CharInput:
+         case ChmKeyEvent::Type::CharInput:
             // 通常の文字入力（v0.1.2.3 相当）
             if (!_hasComposition) {
                 // 文字入力でComposition開始
@@ -124,6 +124,81 @@ std::wstring ChmEngine::GetCompositionStr(){
 }
 
 
+// ---- キーボードレイアウト（CharInput 専用） ----
+class ChmKeyLayout {
+public:
+    struct KeyDef {
+        WPARAM  vk;
+        wchar_t normal;
+        wchar_t shift;
+    };
+
+    static bool Translate(WPARAM vk, bool shift, bool caps, wchar_t& out)
+    {
+        bool logicalShift = shift;
+        if (vk >= 'A' && vk <= 'Z') {
+            logicalShift = shift ^ caps;
+        }
+        for (auto& k : g_keyTable) {
+            if (k.vk == vk) {
+                out = logicalShift ? k.shift : k.normal;
+                return out != 0;
+            }
+        }
+        return false;
+    }
+
+    static bool Translate(WPARAM vk, bool shift, wchar_t& out)
+    {
+        for (auto& k : g_keyTable) {
+            if (k.vk == vk) {
+                out = shift ? k.shift : k.normal;
+                return out != 0;
+            }
+        }
+        return false;
+    }
+
+private:
+    static constexpr KeyDef g_keyTable[] = {
+        // digits
+        { '0', L'0', L')' },
+        { '1', L'1', L'!' },
+        { '2', L'2', L'@' },
+        { '3', L'3', L'#' },
+        { '4', L'4', L'$' },
+        { '5', L'5', L'%' },
+        { '6', L'6', L'^' },
+        { '7', L'7', L'&' },
+        { '8', L'8', L'*' },
+        { '9', L'9', L'(' },
+
+        // letters (A–Z)
+        { 'A', L'a', L'A' }, { 'B', L'b', L'B' }, { 'C', L'c', L'C' },
+        { 'D', L'd', L'D' }, { 'E', L'e', L'E' }, { 'F', L'f', L'F' },
+        { 'G', L'g', L'G' }, { 'H', L'h', L'H' }, { 'I', L'i', L'I' },
+        { 'J', L'j', L'J' }, { 'K', L'k', L'K' }, { 'L', L'l', L'L' },
+        { 'M', L'm', L'M' }, { 'N', L'n', L'N' }, { 'O', L'o', L'O' },
+        { 'P', L'p', L'P' }, { 'Q', L'q', L'Q' }, { 'R', L'r', L'R' },
+        { 'S', L's', L'S' }, { 'T', L't', L'T' }, { 'U', L'u', L'U' },
+        { 'V', L'v', L'V' }, { 'W', L'w', L'W' }, { 'X', L'x', L'X' },
+        { 'Y', L'y', L'Y' }, { 'Z', L'z', L'Z' },
+
+        // basic symbols (US keyboard)
+        { VK_OEM_MINUS,      L'-',  L'_' },
+        { VK_OEM_PLUS,       L'=',  L'+' },
+        { VK_OEM_4,          L'[',  L'{' },
+        { VK_OEM_6,          L']',  L'}' },
+        { VK_OEM_5,          L'\\', L'|' },
+        { VK_OEM_1,          L';',  L':' },
+        { VK_OEM_7,          L'\'', L'"' },
+        { VK_OEM_COMMA,      L',',  L'<' },
+        { VK_OEM_PERIOD,     L'.',  L'>' },
+        { VK_OEM_2,          L'/',  L'?' },
+        { VK_OEM_3,          L'`',  L'~' },
+    };
+};
+
 // ---- 機能キー定義テーブル ----
 static const ChmKeyEvent::FuncKeyDef g_functionKeyTable[] = {
     // WPARAM      SHIFT  CTRL  ALT   Type                                   endComp
@@ -136,50 +211,21 @@ static const ChmKeyEvent::FuncKeyDef g_functionKeyTable[] = {
     { 'M',         false, true,  false, ChmKeyEvent::Type::CommitKana,         true },
 };
 
-// ---- 通常キー定義テーブル ----
-static const ChmKeyEvent::CharKeyDef g_charKeyTable[] = {
-    // WPARAM        SHIFT  ch
-    { VK_OEM_MINUS,  false, '-' },
-
-    // --- digits (ASCII keyboard) ---
-    // no-shift
-    { '0', false, '0' },
-    { '1', false, '1' },
-    { '2', false, '2' },
-    { '3', false, '3' },
-    { '4', false, '4' },
-    { '5', false, '5' },
-    { '6', false, '6' },
-    { '7', false, '7' },
-    { '8', false, '8' },
-    { '9', false, '9' },
-
-    // shift (US-ASCII)
-    { '1', true,  '!' },
-    { '2', true,  '@' },
-    { '3', true,  '#' },
-    { '4', true,  '$' },
-    { '5', true,  '%' },
-    { '6', true,  '^' },
-    { '7', true,  '&' },
-    { '8', true,  '*' },
-    { '9', true,  '(' },
-    { '0', true,  ')' },
-};
-
 ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/)
     : _wp(wp), _shift(false), _control(false), _alt(false), _type(Type::None), _ch(0)
 {
     _shift   = (GetKeyState(VK_SHIFT)   & 0x8000) != 0;
     _control = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
     _alt     = (GetKeyState(VK_MENU)    & 0x8000) != 0;
+	_caps    = (GetKeyState(VK_CAPITAL) & 0x0001) != 0;
+
     _TranslateByTable();
 }
 
 
 void ChmKeyEvent::_TranslateByTable()
 {
-    // ① 機能キー定義テーブル
+    // ① 機能キー
     for (auto& k : g_functionKeyTable) {
         if (k.wp == _wp &&
             k.needShift == _shift &&
@@ -191,31 +237,18 @@ void ChmKeyEvent::_TranslateByTable()
         }
     }
 
-    // ② CTRL / ALT 修飾中は通常文字にしない
+    // ② CTRL / ALT 中は CharInput にしない
     if (_control || _alt) {
         _type = Type::None;
         return;
     }
 
-    // ③ 英字
-    if ((_wp >= 'A' && _wp <= 'Z') || (_wp >= 'a' && _wp <= 'z')) {
+    // ③ キーボードレイアウトによる文字変換
+    wchar_t ch = 0;
+    if (ChmKeyLayout::Translate(_wp, _shift, _caps, ch)) {
         _type = Type::CharInput;
-        // shift 状態に応じて大小文字を決定（CAPSLOCK は将来対応）
-        if (_shift) {
-            _ch = (char)std::toupper((unsigned char)_wp);
-        } else {
-            _ch = (char)std::tolower((unsigned char)_wp);
-        }
+        _ch = ch;
         return;
-    }
-
-    // ④ CharKeyTable
-    for (auto& k : g_charKeyTable) {
-        if (k.wp == _wp && k.needShift == _shift) {
-            _type = Type::CharInput;
-            _ch = k.ch;
-            return;
-        }
     }
 
     _type = Type::None;
