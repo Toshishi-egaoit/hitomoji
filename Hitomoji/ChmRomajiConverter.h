@@ -90,7 +90,6 @@ inline const std::unordered_map<std::string, std::wstring>& ChmRomajiConverter::
 		{"pya", L"ぴゃ"}, {"pyu", L"ぴゅ"}, {"pyo", L"ぴょ"},
 		
         {"nn", L"ん"}, {"n", L"ん"}, {"n'", L"ん"},
-        {"-", L"ー"},
         // --- 小さい文字 (IME慣習) ---
         {"ltu", L"っ"}, {"xtu", L"っ"},
         {"lya", L"ゃ"}, {"lyu", L"ゅ"}, {"lyo", L"ょ"},
@@ -108,6 +107,10 @@ inline const std::unordered_map<std::string, std::wstring>& ChmRomajiConverter::
         {"thi", L"てぃ"}, {"thu", L"とぅ"}, 
 		{"dhi", L"でぃ"}, {"dhu", L"でゅ"},
         {"whi", L"うぃ"}, {"whe", L"うぇ"}, {"who", L"うぉ"},
+        // --- 役物、記号類
+        {".", L"。"}, {",", L"、"},
+        {"[", L"「"}, {"]", L"」"},
+        {"-", L"ー"},
     };
     return tbl;
 }
