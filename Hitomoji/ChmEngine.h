@@ -18,7 +18,7 @@ public:
         CommitAscii,        // TAB
         CommitAsciiWide,    // Shift+TAB
         Cancel,             // ESC
-        Backspace,          // BS（将来）
+        Backspace,          // BS
         Uncommit,           // 確定取消（将来）
     };
 
@@ -28,7 +28,7 @@ public:
         bool   needCtrl;
         bool   needAlt;
         Type   type;
-        bool   endComposition;   // compositionを閉じるアクションか？
+		// bool   endComposition;   // これは静的には決まらないので廃止
     };
 
     struct CharKeyDef {
@@ -48,7 +48,7 @@ public:
     ChmKeyEvent(WPARAM wp, LPARAM lp);
 
     // --- accessors ---
-    bool ShouldEndComposition() const {return _endComp ;};
+//    bool ShouldEndComposition() const {return _endComp ;};
     Type GetType() const { return _type; }
     char GetChar() const { return _ch; }
     bool IsShift() const { return _shift; }
@@ -80,7 +80,7 @@ public:
     BOOL IsON() const { return _isON; }
 	std::wstring GetCompositionStr() ;
 
-	void UpdateComposition(const ChmKeyEvent& keyEvent);
+	void UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition);
 	void PostUpdateComposition();
 	void ResetStatus() ;
 

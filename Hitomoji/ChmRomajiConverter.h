@@ -3,6 +3,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include "ChmConfig.h"
 
 // rawInput (ASCII) を走査して、ひらがなへ変換するクラス
 // v0.1.1: 最長一致（3→2→1）のみ実装
@@ -20,12 +21,14 @@ public:
 	// pending   : 変換できずに残った部分（未確定ローマ字）
     static void convert(const std::string& rawInput,
                         std::wstring& converted,
-                        std::string& pending);
+                        std::string& pending,
+						ChmConfigStore::DisplayMode mode);
 
     // 1ユニットだけ変換できるか試みる（v0.1.5 用）
     static bool TryConvertOne(const std::string& rawInput,
                               size_t pos,
-                              Unit& out);
+                              Unit& out,
+							  ChmConfigStore::DisplayMode mode);
 
     static size_t GetLastRawUnitLength() {
         return _lastRawUnitLength;
@@ -139,12 +142,20 @@ inline const std::unordered_set<char>& ChmRomajiConverter::sokuonConsonants() {
 
 bool ChmRomajiConverter::TryConvertOne(const std::string& rawInput,
                                         size_t pos,
-                                        Unit& out)
+										Unit& out,
+										ChmConfigStore::DisplayMode mode)
 {
     out.output.clear();
     out.rawLength = 0;
 
     if (pos >= rawInput.size()) return false;
+
+	// mode が Alphabet の場合は変換しない
+	if (mode == ChmConfigStore::DisplayMode::Alphabet) {
+		out.output.push_back(static_cast<wchar_t>(rawInput[pos]));
+		out.rawLength = 1;
+		return true ;
+	}
 
     // lower 化（convert と同じ方針）
     std::string lowerInput;
@@ -190,7 +201,8 @@ bool ChmRomajiConverter::TryConvertOne(const std::string& rawInput,
 
 void ChmRomajiConverter::convert(const std::string& rawInput,
                                  std::wstring& converted,
-                                 std::string& pending)
+                                 std::string& pending,
+								 ChmConfigStore::DisplayMode mode)
 {
     converted.clear();
     pending.clear();
@@ -200,7 +212,7 @@ void ChmRomajiConverter::convert(const std::string& rawInput,
     Unit unit;
 
     while (pos < rawInput.size()) {
-        if (TryConvertOne(rawInput, pos, unit)) {
+        if (TryConvertOne(rawInput, pos, unit, mode)) {
             converted += unit.output;
             _lastRawUnitLength = unit.rawLength;
             pos += unit.rawLength;
