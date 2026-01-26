@@ -41,6 +41,10 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 
 	// 確定キー
 	switch (_type) {
+        case ChmKeyEvent::Type::CommitNonConvert: // 無変換確定
+			// 未変換部分も含めて全確定
+            _hasComposition = FALSE;
+			break ;
         case ChmKeyEvent::Type::CommitKatakana: // カタカナ変換
             ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, ChmConfigStore::DisplayMode::Kana);
             _converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
@@ -267,13 +271,20 @@ void ChmKeyEvent::_TranslateByTable()
         }
     }
 
-    // ② CTRL / ALT 中は CharInput にしない
+	// ② ナビゲーションキー
+	if (IsNavigationKey()) {
+		_type = Type::CommitNonConvert;
+		_ch = VK_RIGHT; // ダミー
+		return ;
+	}
+
+    // ③ CTRL / ALT 中は CharInput にしない
     if (_control || _alt) {
         _type = Type::None;
         return;
     }
 
-    // ③ キーボードレイアウトによる文字変換
+    // ④ キーボードレイアウトによる文字変換
     wchar_t ch = 0;
     if (ChmKeyLayout::Translate(_wp, _shift, _caps, ch)) {
         _type = Type::CharInput;
