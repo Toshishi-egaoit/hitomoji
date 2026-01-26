@@ -142,6 +142,8 @@
     <ClInclude Include="utils.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ChmConfig.cpp" />
+    <ClCompile Include="ChmConfig.h" />
     <ClCompile Include="ChmEngine.cpp" />
     <ClCompile Include="ChmRawInputStore.h" />
     <ClCompile Include="DisplayAttribute.cpp" />

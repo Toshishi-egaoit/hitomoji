@@ -10,20 +10,34 @@ class ChmRomajiConverter {
 public:
     // コンストラクタ不要（static 初期化のみ）
 
+    struct Unit {
+        std::wstring output;   // 確定した1ユニットの表示文字
+        size_t rawLength = 0;  // 消費した raw 文字数
+    };
+
     // rawInput 全体を入力として処理する
     // converted : かなに変換できた部分
-    // pending   : 変換できずに残った部分（未確定ローマ字）
-        // rawInput を唯一の入力として処理する
-    // 内部で lower 化した文字列を用いてかな変換を行う
-    // converted : かなに変換できた部分
-    // pending   : rawInput を基準にした未確定部分（表示用）
+	// pending   : 変換できずに残った部分（未確定ローマ字）
     static void convert(const std::string& rawInput,
-                 std::wstring& converted,
-                 std::string& pending) ;
+                        std::wstring& converted,
+                        std::string& pending);
 
-	static std::wstring HiraganaToKatakana(const std::wstring& hira);
+    // 1ユニットだけ変換できるか試みる（v0.1.5 用）
+    static bool TryConvertOne(const std::string& rawInput,
+                              size_t pos,
+                              Unit& out);
+
+    static size_t GetLastRawUnitLength() {
+        return _lastRawUnitLength;
+    }
+
+
+    static std::wstring HiraganaToKatakana(const std::wstring& hira);
 
 private:
+    // v0.1.5 用：TryConvertOne ベースの拡張変換
+    // lastRawUnitLength は内部状態として保持する
+    static size_t _lastRawUnitLength;
     static const std::unordered_map<std::string, std::wstring>& table();
     static const std::unordered_set<char>& sokuonConsonants();
 };
@@ -123,64 +137,79 @@ inline const std::unordered_set<char>& ChmRomajiConverter::sokuonConsonants() {
     return set;
 }
 
-void ChmRomajiConverter::convert(const std::string& rawInput,
-                                          std::wstring& converted,
-                                          std::string& pending) {
-    converted.clear();
-    pending.clear();
+bool ChmRomajiConverter::TryConvertOne(const std::string& rawInput,
+                                        size_t pos,
+                                        Unit& out)
+{
+    out.output.clear();
+    out.rawLength = 0;
 
-    // かな変換用に lower 化した入力を生成
+    if (pos >= rawInput.size()) return false;
+
+    // lower 化（convert と同じ方針）
     std::string lowerInput;
     lowerInput.reserve(rawInput.size());
     for (unsigned char c : rawInput) {
         lowerInput.push_back(static_cast<char>(std::tolower(c)));
     }
 
-    size_t i = 0;
-    while (i < lowerInput.size()) {
-        bool matched = false;
-
-        // 最長一致: 3 → 2 → 1
-        for (int len = 3; len >= 1; --len) {
-            if (i + len > lowerInput.size()) continue;
-
-            auto key = lowerInput.substr(i, len);
-            auto it = table().find(key);
-            if (it != table().end()) {
-                converted += it->second;
-                i += len;
-                matched = true;
-                break;
-            }
-        }
-
-        if (!matched) {
-            // --- 記号・非アルファベット処理 ---
-            char cur = lowerInput[i];
-            if (!std::isalpha(static_cast<unsigned char>(cur))) {
-                // 記号はそのまま確定させる（convertedへ）
-                converted.push_back(static_cast<wchar_t>(rawInput[i]));
-                i += 1;
-                continue;
-            }
-
-            // --- 促音判定 ---
-            if (i + 1 < lowerInput.size()) {
-                char c1 = lowerInput[i];
-                char c2 = lowerInput[i + 1];
-                if (c1 == c2 && sokuonConsonants().count(c1)) {
-                    converted += L"っ";
-                    i += 1; // 子音1文字ぶん進める
-                    continue;
-                }
-            }
-            break; // ここから先は pending
+        // --- 最長一致（3→2→1） ---
+    for (int len = 3; len >= 1; --len) {
+        if (pos + len > lowerInput.size()) continue;
+        auto key = lowerInput.substr(pos, len);
+        auto it = table().find(key);
+        if (it != table().end()) {
+            out.output = it->second;
+            out.rawLength = len;
+            return true;
         }
     }
 
-    // pending は rawInput を基準に切り出す（大小文字を保持）
-    if (i < rawInput.size()) {
-        pending = rawInput.substr(i);
+    // --- 記号・非アルファベットは即確定 ---
+    char cur = lowerInput[pos];
+    if (!std::isalpha(static_cast<unsigned char>(cur))) {
+        out.output.push_back(static_cast<wchar_t>(rawInput[pos]));
+        out.rawLength = 1;
+        return true;
+    }
+
+    // --- 促音判定（tt など） ---
+    if (pos + 1 < lowerInput.size()) {
+        char c1 = lowerInput[pos];
+        char c2 = lowerInput[pos + 1];
+        if (c1 == c2 && sokuonConsonants().count(c1)) {
+            out.output = L"っ";
+            out.rawLength = 1; // 子音1文字ぶん消費
+            return true;
+        }
+    }
+
+    // ここまで来たら未確定（pending）
+    return false;
+}
+
+void ChmRomajiConverter::convert(const std::string& rawInput,
+                                 std::wstring& converted,
+                                 std::string& pending)
+{
+    converted.clear();
+    pending.clear();
+    _lastRawUnitLength = 0;
+
+    size_t pos = 0;
+    Unit unit;
+
+    while (pos < rawInput.size()) {
+        if (TryConvertOne(rawInput, pos, unit)) {
+            converted += unit.output;
+            _lastRawUnitLength = unit.rawLength;
+            pos += unit.rawLength;
+        } else {
+            // 未確定部分は pending に回す
+            pending = rawInput.substr(pos);
+            if (pending.length() != 0) _lastRawUnitLength = pending.length();  
+            break;
+        }
     }
 }
 
@@ -198,3 +227,6 @@ std::wstring ChmRomajiConverter::HiraganaToKatakana(const std::wstring& hira)
     }
     return result;
 }
+
+// --- v0.1.5: convert を TryConvertOne ベースで再実装 ---
+size_t ChmRomajiConverter::_lastRawUnitLength = 0;

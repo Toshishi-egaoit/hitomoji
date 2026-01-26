@@ -5,6 +5,7 @@
 #include "ChmRawInputStore.h"
 #include "ChmEngine.h"
 #include "ChmRomajiConverter.h"
+#include "ChmConfig.h"
 
 ChmEngine::ChmEngine() 
 	: _isON(FALSE), _hasComposition(FALSE),_converted(L""), _pending("") {
@@ -25,7 +26,7 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
 	if (ev.GetType() == ChmKeyEvent::Type::CharInput) return TRUE;
 
 	// Compositonが存在する状態の特殊キーはIMEが食う
-	if (_hasComposition && ev.GetType() != ChmKeyEvent::Type::None && _hasComposition ) return TRUE;
+	if (_hasComposition && ev.GetType() != ChmKeyEvent::Type::None ) return TRUE;
 
 	// それ以外は食わない
     return FALSE;
@@ -62,15 +63,55 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent){
 			_hasComposition = FALSE;
 			break;
          case ChmKeyEvent::Type::CharInput:
-            // 通常の文字入力（v0.1.2.3 相当）
+            // 通常の文字入力
             if (!_hasComposition) {
-                // 文字入力でComposition開始
                 _pRawInputStore->clear();
                 _hasComposition = TRUE;
             }
-            // 英字は既に ChmKeyEvent 側で大小決定済み
             _pRawInputStore->push(keyEvent.GetChar());
             ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending);
+            break;
+        case ChmKeyEvent::Type::Backspace:
+            {
+            if (!_hasComposition) break;
+                size_t len = _pRawInputStore->get().size();
+                size_t del = ChmRomajiConverter::GetLastRawUnitLength();
+
+                // Backspace の単位設定を考慮（Char / Unit）
+                if (g_config.backspaceUnit == ChmConfigStore::BackspaceUnit::Ascii) {
+                    del = 1;
+                }
+
+                // 念のためのガード：過剰な削除要求は全消去
+                if (del > len) del = len;
+
+                _pRawInputStore->pop(del);
+
+                // 削除の結果文字がなくなったらCompositionを削除
+                if (_pRawInputStore->get().empty()) {
+                    _hasComposition = FALSE;
+                    _converted = L"";
+                    _pending = "";
+                } else {
+                    ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending);
+                }
+            }
+            break;
+            {
+                size_t len = _pRawInputStore->get().size();
+                if (len > 0) {
+                    size_t del = ChmRomajiConverter::GetLastRawUnitLength();
+                    if (del == 0 || del > len) del = 1;
+                    _pRawInputStore->pop(del);
+                    if (_pRawInputStore->get().empty()) {
+                        _hasComposition = FALSE;
+                        _converted = L"";
+                        _pending = "";
+                    } else {
+                        ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending);
+                    }
+                }
+            }
             break;
         default:
             // その他のキーは何もしない
@@ -206,6 +247,7 @@ static const ChmKeyEvent::FuncKeyDef g_functionKeyTable[] = {
     { VK_RETURN,   true,  false, false, ChmKeyEvent::Type::CommitKatakana,     true },
     { VK_TAB,      false, false, false, ChmKeyEvent::Type::CommitAscii,        true },
     { VK_TAB,      true,  false, false, ChmKeyEvent::Type::CommitAsciiWide,    true },
+    { VK_BACK,     false, false, false, ChmKeyEvent::Type::Backspace,         false },
     { VK_ESCAPE,   false, false, false, ChmKeyEvent::Type::Cancel,             true },
     // 検証用: Ctrl+M = Enter
     { 'M',         false, true,  false, ChmKeyEvent::Type::CommitKana,         true },
@@ -253,4 +295,5 @@ void ChmKeyEvent::_TranslateByTable()
 
     _type = Type::None;
 }
+
 
