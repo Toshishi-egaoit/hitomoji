@@ -32,7 +32,7 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
     return FALSE;
 }
 
-void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent){
+void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition){
 	OutputDebugStringWithString(
 		L"[Hitomoji] UpdateComposition: keyEvent=%s", 
 		keyEvent.dump().c_str()
@@ -41,10 +41,21 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent){
 
 	// 確定キー
 	switch (_type) {
+        case ChmKeyEvent::Type::CommitNonConvert: // 無変換確定
+			// 未変換部分も含めて全確定
+            _hasComposition = FALSE;
+			break ;
         case ChmKeyEvent::Type::CommitKatakana: // カタカナ変換
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
+				true, 
+				(g_config.backspaceUnit == ChmConfigStore::BackspaceUnit::Symbol));
             _converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
-            // [[fallthrough]]
+            _hasComposition = FALSE;
+            break ;
         case ChmKeyEvent::Type::CommitKana:     // ひらがな変換
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+				true,
+				(g_config.backspaceUnit == ChmConfigStore::BackspaceUnit::Symbol));
             _hasComposition = FALSE;
             break;
         case ChmKeyEvent::Type::CommitAscii:    // ASCII確定
@@ -69,11 +80,14 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent){
                 _hasComposition = TRUE;
             }
             _pRawInputStore->push(keyEvent.GetChar());
-            ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending);
+            ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
+				(g_config.displayMode == ChmConfigStore::DisplayMode::Kana),
+				(g_config.backspaceUnit == ChmConfigStore::BackspaceUnit::Symbol));
+				;
             break;
         case ChmKeyEvent::Type::Backspace:
             {
-            if (!_hasComposition) break;
+				if (!_hasComposition) break;
                 size_t len = _pRawInputStore->get().size();
                 size_t del = ChmRomajiConverter::GetLastRawUnitLength();
 
@@ -86,30 +100,17 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent){
                 if (del > len) del = len;
 
                 _pRawInputStore->pop(del);
+				OutputDebugStringWithInt(L"[Hitomoji] Backspace %d chars",del);
 
                 // 削除の結果文字がなくなったらCompositionを削除
                 if (_pRawInputStore->get().empty()) {
-                    _hasComposition = FALSE;
                     _converted = L"";
                     _pending = "";
+                    _hasComposition = FALSE;
                 } else {
-                    ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending);
-                }
-            }
-            break;
-            {
-                size_t len = _pRawInputStore->get().size();
-                if (len > 0) {
-                    size_t del = ChmRomajiConverter::GetLastRawUnitLength();
-                    if (del == 0 || del > len) del = 1;
-                    _pRawInputStore->pop(del);
-                    if (_pRawInputStore->get().empty()) {
-                        _hasComposition = FALSE;
-                        _converted = L"";
-                        _pending = "";
-                    } else {
-                        ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending);
-                    }
+                    ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+						(g_config.displayMode == ChmConfigStore::DisplayMode::Kana),
+						(g_config.backspaceUnit == ChmConfigStore::BackspaceUnit::Symbol));
                 }
             }
             break;
@@ -117,6 +118,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent){
             // その他のキーは何もしない
             break;
 	}
+	pEndComposition = !_hasComposition;
 
 	return ;
 }
@@ -243,14 +245,14 @@ private:
 // ---- 機能キー定義テーブル ----
 static const ChmKeyEvent::FuncKeyDef g_functionKeyTable[] = {
     // WPARAM      SHIFT  CTRL  ALT   Type                                   endComp
-    { VK_RETURN,   false, false, false, ChmKeyEvent::Type::CommitKana,         true },
-    { VK_RETURN,   true,  false, false, ChmKeyEvent::Type::CommitKatakana,     true },
-    { VK_TAB,      false, false, false, ChmKeyEvent::Type::CommitAscii,        true },
-    { VK_TAB,      true,  false, false, ChmKeyEvent::Type::CommitAsciiWide,    true },
-    { VK_BACK,     false, false, false, ChmKeyEvent::Type::Backspace,         false },
-    { VK_ESCAPE,   false, false, false, ChmKeyEvent::Type::Cancel,             true },
+    { VK_RETURN,   false, false, false, ChmKeyEvent::Type::CommitKana     },
+    { VK_RETURN,   true,  false, false, ChmKeyEvent::Type::CommitKatakana },
+    { VK_TAB,      false, false, false, ChmKeyEvent::Type::CommitAscii    },
+    { VK_TAB,      true,  false, false, ChmKeyEvent::Type::CommitAsciiWide},
+    { VK_BACK,     false, false, false, ChmKeyEvent::Type::Backspace      },
+    { VK_ESCAPE,   false, false, false, ChmKeyEvent::Type::Cancel         },
     // 検証用: Ctrl+M = Enter
-    { 'M',         false, true,  false, ChmKeyEvent::Type::CommitKana,         true },
+    { 'M',         false, true,  false, ChmKeyEvent::Type::CommitKana     },
 };
 
 ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/)
@@ -274,18 +276,24 @@ void ChmKeyEvent::_TranslateByTable()
             k.needCtrl  == _control &&
             k.needAlt   == _alt) {
             _type = k.type;
-            _endComp = k.endComposition;
             return;
         }
     }
 
-    // ② CTRL / ALT 中は CharInput にしない
+	// ② ナビゲーションキー
+	if (IsNavigationKey()) {
+		_type = Type::CommitNonConvert;
+		_ch = VK_LEFT; // dummy
+		return ;
+	}
+
+    // ③ CTRL / ALT 中は CharInput にしない
     if (_control || _alt) {
         _type = Type::None;
         return;
     }
 
-    // ③ キーボードレイアウトによる文字変換
+    // ④ キーボードレイアウトによる文字変換
     wchar_t ch = 0;
     if (ChmKeyLayout::Translate(_wp, _shift, _caps, ch)) {
         _type = Type::CharInput;
@@ -295,5 +303,3 @@ void ChmKeyEvent::_TranslateByTable()
 
     _type = Type::None;
 }
-
-

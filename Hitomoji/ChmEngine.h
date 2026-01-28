@@ -17,8 +17,9 @@ public:
         CommitKatakana,     // Shift+Enter
         CommitAscii,        // TAB
         CommitAsciiWide,    // Shift+TAB
+        CommitNonConvert,   // 無変換確定（カーソルキーなど）
         Cancel,             // ESC
-        Backspace,          // BS（将来）
+        Backspace,          // BS
         Uncommit,           // 確定取消（将来）
     };
 
@@ -28,7 +29,7 @@ public:
         bool   needCtrl;
         bool   needAlt;
         Type   type;
-        bool   endComposition;   // compositionを閉じるアクションか？
+		// bool   endComposition;   // これは静的には決まらないので廃止
     };
 
     struct CharKeyDef {
@@ -48,10 +49,25 @@ public:
     ChmKeyEvent(WPARAM wp, LPARAM lp);
 
     // --- accessors ---
-    bool ShouldEndComposition() const {return _endComp ;};
+//    bool ShouldEndComposition() const {return _endComp ;};
     Type GetType() const { return _type; }
     char GetChar() const { return _ch; }
     bool IsShift() const { return _shift; }
+	// ナビゲーションキーか？(処理はしないが、確定処理が必要なキーの判定用)
+    bool IsNavigationKey() const { 
+		switch (_wp) {
+			case VK_LEFT:
+			case VK_RIGHT:
+			case VK_UP:
+			case VK_DOWN:
+			case VK_HOME:
+			case VK_END:
+			case VK_PRIOR: // PageUp
+			case VK_NEXT:  // PageDown
+				return true;
+		}
+		return false;
+	}
 
 private:
     void _TranslateByTable();
@@ -80,7 +96,7 @@ public:
     BOOL IsON() const { return _isON; }
 	std::wstring GetCompositionStr() ;
 
-	void UpdateComposition(const ChmKeyEvent& keyEvent);
+	void UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition);
 	void PostUpdateComposition();
 	void ResetStatus() ;
 
