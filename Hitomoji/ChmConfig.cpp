@@ -6,5 +6,5 @@
 // v0.1.5 では固定値のみ（永続化・変更なし）
 const ChmConfigStore g_config(
     ChmConfigStore::BackspaceUnit::Symbol,
-    ChmConfigStore::DisplayMode::Alphabet
+    ChmConfigStore::DisplayMode::Kana 
 );
