@@ -46,12 +46,16 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
             _hasComposition = FALSE;
 			break ;
         case ChmKeyEvent::Type::CommitKatakana: // カタカナ変換
-            ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, ChmConfigStore::DisplayMode::Kana);
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
+				true, 
+				(g_config.backspaceUnit == ChmConfigStore::BackspaceUnit::Symbol));
             _converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
             _hasComposition = FALSE;
             break ;
         case ChmKeyEvent::Type::CommitKana:     // ひらがな変換
-            ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, ChmConfigStore::DisplayMode::Kana);
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+				true,
+				(g_config.backspaceUnit == ChmConfigStore::BackspaceUnit::Symbol));
             _hasComposition = FALSE;
             break;
         case ChmKeyEvent::Type::CommitAscii:    // ASCII確定
@@ -76,7 +80,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
                 _hasComposition = TRUE;
             }
             _pRawInputStore->push(keyEvent.GetChar());
-            ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, g_config.displayMode);
+            ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending);
             break;
         case ChmKeyEvent::Type::Backspace:
             {
@@ -99,9 +103,24 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
                 if (_pRawInputStore->get().empty()) {
                     _converted = L"";
                     _pending = "";
-                    _hasComposition = FALSE;
                 } else {
-                    ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,g_config.displayMode);
+                    ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending);
+                }
+            }
+            break;
+            {
+                size_t len = _pRawInputStore->get().size();
+                if (len > 0) {
+                    size_t del = ChmRomajiConverter::GetLastRawUnitLength();
+                    if (del == 0 || del > len) del = 1;
+                    _pRawInputStore->pop(del);
+                    if (_pRawInputStore->get().empty()) {
+                        _hasComposition = FALSE;
+                        _converted = L"";
+                        _pending = "";
+                    } else {
+                        ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending);
+                    }
                 }
             }
             break;
@@ -271,13 +290,6 @@ void ChmKeyEvent::_TranslateByTable()
         }
     }
 
-	// ② ナビゲーションキー
-	if (IsNavigationKey()) {
-		_type = Type::CommitNonConvert;
-		_ch = VK_RIGHT; // ダミー
-		return ;
-	}
-
     // ③ CTRL / ALT 中は CharInput にしない
     if (_control || _alt) {
         _type = Type::None;
@@ -294,5 +306,3 @@ void ChmKeyEvent::_TranslateByTable()
 
     _type = Type::None;
 }
-
-

@@ -17,23 +17,23 @@ public:
     };
 
     // rawInput 全体を入力として処理する
-    // converted : かなに変換できた部分
-	// pending   : 変換できずに残った部分（未確定ローマ字）
+// converted : かなに変換できた部分
+// pending   : 変換できずに残った部分（未確定ローマ字）
     static void convert(const std::string& rawInput,
                         std::wstring& converted,
                         std::string& pending,
-						ChmConfigStore::DisplayMode mode);
+						bool isSybolMode,
+					    bool isBsSymbol);
 
     // 1ユニットだけ変換できるか試みる（v0.1.5 用）
     static bool TryConvertOne(const std::string& rawInput,
                               size_t pos,
-                              Unit& out,
-							  ChmConfigStore::DisplayMode mode);
+							  Unit& out,
+							  bool isSymbolMode);
 
-    static size_t GetLastRawUnitLength() {
-        return _lastRawUnitLength;
-    }
-
+	static size_t GetLastRawUnitLength() {
+		return _lastRawUnitLength;
+	}
 
     static std::wstring HiraganaToKatakana(const std::wstring& hira);
 
@@ -142,20 +142,15 @@ inline const std::unordered_set<char>& ChmRomajiConverter::sokuonConsonants() {
 
 bool ChmRomajiConverter::TryConvertOne(const std::string& rawInput,
                                         size_t pos,
-										Unit& out,
-										ChmConfigStore::DisplayMode mode)
+                                        Unit& out,
+										bool isDispSymbol)
 {
+	// TODO: この かんすうをユニットのもじすうをもとめるきのうとレンダリングきのうにわける。
+	// それによって、DisplayModeをConvertに とじこめる
     out.output.clear();
     out.rawLength = 0;
 
     if (pos >= rawInput.size()) return false;
-
-	// mode が Alphabet の場合は変換しない
-	if (mode == ChmConfigStore::DisplayMode::Alphabet) {
-		out.output.push_back(static_cast<wchar_t>(rawInput[pos]));
-		out.rawLength = 1;
-		return true ;
-	}
 
     // lower 化（convert と同じ方針）
     std::string lowerInput;
@@ -170,7 +165,12 @@ bool ChmRomajiConverter::TryConvertOne(const std::string& rawInput,
         auto key = lowerInput.substr(pos, len);
         auto it = table().find(key);
         if (it != table().end()) {
-            out.output = it->second;
+			if (isDispSymbol) {
+				out.output = it->second;
+			} else {
+				std::string sub = rawInput.substr(pos,len);
+				out.output = std::wstring(sub.begin(), sub.end());
+			}
             out.rawLength = len;
             return true;
         }
@@ -199,31 +199,6 @@ bool ChmRomajiConverter::TryConvertOne(const std::string& rawInput,
     return false;
 }
 
-void ChmRomajiConverter::convert(const std::string& rawInput,
-                                 std::wstring& converted,
-                                 std::string& pending,
-								 ChmConfigStore::DisplayMode mode)
-{
-    converted.clear();
-    pending.clear();
-    _lastRawUnitLength = 0;
-
-    size_t pos = 0;
-    Unit unit;
-
-    while (pos < rawInput.size()) {
-        if (TryConvertOne(rawInput, pos, unit, mode)) {
-            converted += unit.output;
-            _lastRawUnitLength = unit.rawLength;
-            pos += unit.rawLength;
-        } else {
-            // 未確定部分は pending に回す
-            pending = rawInput.substr(pos);
-            if (pending.length() != 0) _lastRawUnitLength = pending.length();  
-            break;
-        }
-    }
-}
 
 std::wstring ChmRomajiConverter::HiraganaToKatakana(const std::wstring& hira)
 {
@@ -242,3 +217,41 @@ std::wstring ChmRomajiConverter::HiraganaToKatakana(const std::wstring& hira)
 
 // --- v0.1.5: convert を TryConvertOne ベースで再実装 ---
 size_t ChmRomajiConverter::_lastRawUnitLength = 0;
+
+void ChmRomajiConverter::convert(const std::string& rawInput,
+                                 std::wstring& converted,
+                                 std::string& pending,
+								 bool isDispSymbol,
+								 bool isBsSymbol)
+{
+    converted.clear();
+    pending.clear();
+    _lastRawUnitLength = 0;
+
+    size_t pos = 0;
+    Unit unit;
+
+	while (pos < rawInput.size()) {
+		if (TryConvertOne(rawInput, pos, unit,isDispSymbol)) {
+			converted += unit.output;
+			_lastRawUnitLength = unit.rawLength;
+			pos += unit.rawLength;
+		}
+		else if (pos + 2 >= rawInput.size()) { // 残り2文字以下なら pending に回す
+			// TODO:この かんがえかたは ローマじかなへんかんでのみりようかのう。ConvertMgrではつかえない。
+			pending = rawInput.substr(pos);
+			_lastRawUnitLength = pending.length();
+			// ループ終了
+			break;
+		}
+		else { // 未確定部分がまだある場合、1文字進めて再試行}
+			converted += rawInput[pos]; // 未確定文字をそのまま出力に追加
+			_lastRawUnitLength = 1;
+			pos ++;
+		}
+	}
+	// ただし、bsUnitがASCIIの場合は、最後のユニット長を1にする
+	if (!isBsSymbol) {
+		_lastRawUnitLength = 1;
+	}
+}
