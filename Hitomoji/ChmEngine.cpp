@@ -100,7 +100,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
                 if (del > len) del = len;
 
                 _pRawInputStore->pop(del);
-				OutputDebugStringWithInt(L"[Hitomoji] Backspace %d chars",del);
+				OutputDebugStringWithInt(L"[Hitomoji] Backspace %d chars",(ULONG)del);
 
                 // 削除の結果文字がなくなったらCompositionを削除
                 if (_pRawInputStore->get().empty()) {
@@ -298,7 +298,7 @@ void ChmKeyEvent::_TranslateByTable()
     wchar_t ch = 0;
     if (ChmKeyLayout::Translate(_wp, _shift, _caps, ch)) {
         _type = Type::CharInput;
-        _ch = ch;
+        _ch = (char)ch;
         return;
     }
 
