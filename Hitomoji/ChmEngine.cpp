@@ -124,21 +124,21 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 }
 
 void ChmEngine::PostUpdateComposition(){
+	OutputDebugString(L"[Hitomoji] PostUpdateComposition");
 	// 変換中でなくなった場合は、残りかすを処分
 	if (!_hasComposition) {
-		_pRawInputStore->clear();
-		_converted = L"";
-		_pending = "";
+		ResetStatus();
 	}
 	return;
 }
 
 void ChmEngine::ResetStatus() {
-	OutputDebugString(L"ResetStatus");
+	OutputDebugString(L"[Hitomoji] ResetStatus");
     _hasComposition = FALSE;
     _pRawInputStore->clear();
     _converted = L"";
     _pending = "";
+	return;
 }
 
 std::wstring ChmEngine::AsciiToWide(const std::string& src)
