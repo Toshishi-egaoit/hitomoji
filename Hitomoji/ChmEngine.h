@@ -8,6 +8,8 @@
 
 class ChmRawInputStore;
 
+#define VK_HITOMOJI 0 // 仮想キーコード: マウスイベントなどの特殊用途
+
 class ChmKeyEvent {
 public:
     enum class Type {
@@ -29,7 +31,6 @@ public:
         bool   needCtrl;
         bool   needAlt;
         Type   type;
-		// bool   endComposition;   // これは静的には決まらないので廃止
     };
 
     struct CharKeyDef {
@@ -47,6 +48,7 @@ public:
 
     // --- ctor ---
     ChmKeyEvent(WPARAM wp, LPARAM lp);
+	ChmKeyEvent(ChmKeyEvent::Type type); // マウスクリックなどの特殊用途（OnEndEditで使用）
 
     // --- accessors ---
     Type GetType() const { return _type; }
@@ -93,6 +95,7 @@ public:
     // IMEのON/OFF
     void ToggleIME() { _isON = !_isON; }
     BOOL IsON() const { return _isON; }
+	BOOL HasComposition() { return _hasComposition;} ;
 	std::wstring GetCompositionStr() ;
 
 	void UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition);

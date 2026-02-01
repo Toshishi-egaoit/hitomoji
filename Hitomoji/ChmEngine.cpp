@@ -257,7 +257,7 @@ static const ChmKeyEvent::FuncKeyDef g_functionKeyTable[] = {
 };
 
 ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/)
-    : _wp(wp), _shift(false), _control(false), _alt(false), _type(Type::None), _ch(0)
+    : _wp(wp), _type(Type::None), _ch(0)
 {
     _shift   = (GetKeyState(VK_SHIFT)   & 0x8000) != 0;
     _control = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
@@ -267,6 +267,12 @@ ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/)
     _TranslateByTable();
 }
 
+// 特殊用途コンストラクタ（マウスクリックなど）
+ChmKeyEvent::ChmKeyEvent(ChmKeyEvent::Type type)
+    : _wp(VK_HITOMOJI), _shift(false), _control(false), _alt(false), _type(type), _ch(0)
+{
+	_caps    = false;
+}
 
 void ChmKeyEvent::_TranslateByTable()
 {
@@ -284,7 +290,7 @@ void ChmKeyEvent::_TranslateByTable()
 	// ② ナビゲーションキー
 	if (IsNavigationKey()) {
 		_type = Type::CommitNonConvert;
-		_ch = VK_LEFT; // dummy
+		_ch = VK_HITOMOJI; // dummy
 		return ;
 	}
 
