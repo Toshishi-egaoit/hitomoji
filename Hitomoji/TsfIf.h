@@ -4,6 +4,8 @@
 #include "utils.h"
 #include "ChmEngine.h"
 
+#define CHM_ONENDEDIT_TICK 30  // OnEndEdit セッションとみなす時間間隔（ms）
+
 // --- GUID Definitions ---
 // {86B8A5A1-9B5A-4B6E-A77E-6A2F2B1F7B12}
 DEFINE_GUID(CLSID_Hitomoji, 0x86b8a5a1, 0x9b5a, 0x4b6e, 0xa7, 0x7e, 0x6a, 0x2f, 0x2b, 0x1f, 0x7b, 0x12);
@@ -21,9 +23,10 @@ const TF_PRESERVEDKEY c_presKeyOpenClose = { VK_SPACE, TF_MOD_CONTROL };
 const GUID GUID_PreservedKey_OpenClose = { 0x6e9f9050, 0x05f8, 0x479c, { 0x82, 0x6e, 0x16, 0x93, 0x4e, 0x62, 0xe1, 0x01 } };
 
 class ChmTsfInterface : public ITfTextInputProcessor,
-                  public ITfDisplayAttributeProvider,
-                  public ITfThreadFocusSink,
-                  public ITfKeyEventSink {
+		public ITfKeyEventSink ,
+		public ITfDisplayAttributeProvider,
+		public ITfThreadFocusSink,
+		public ITfTextEditSink{
 public:
     ChmTsfInterface();
     ~ChmTsfInterface();
@@ -53,28 +56,61 @@ public:
 	STDMETHODIMP OnSetThreadFocus() ;
 	STDMETHODIMP OnKillThreadFocus();
 
+	// ITfTextEditSink
+	STDMETHODIMP OnEndEdit(ITfContext* pic, TfEditCookie ecReadOnly, ITfEditRecord* pEditRecord) ;
+
 	// Composition管理
-    ITfComposition* GetComposition() const;
-    void SetComposition(ITfComposition* pComp);
-    void ClearComposition();
+
+	void SetMyEditSessionTick() { _dwMyEditSessionTick = GetTickCount() ; }
+	BOOL IsMyEditSession() { return (GetTickCount() - _dwMyEditSessionTick <= CHM_ONENDEDIT_TICK) ; }
+	ITfComposition* GetComposition() const { return _pComposition; }
+	void SetComposition(ITfComposition* pComp)
+	{
+		if (_pComposition && _pComposition != pComp)
+		{
+			_pComposition->Release();
+		}
+		_pComposition = pComp;
+		// _pComposition->AddRef();
+		// ↑ 呼び出し元(StartComposition)でAddRefしているので、ここでは不要
+	}
+
+	void ClearComposition()
+	{
+		if (_pComposition)
+		{
+			OutputDebugString(L"ClearComposition");
+			_pComposition->Release();
+			_pComposition = nullptr;
+		}
+		return ;
+	}
 
 private:
+    // ITfKeyEventSink
     HRESULT _InitKeyEventSink();
     void _UninitKeyEventSink();
     HRESULT _InitPreservedKey();
     void _UninitPreservedKey();
+	HRESULT _InvokeEditSession(ITfContext* pic, BOOL fEnd) ;
 
+	// ITfDisplayAttributeProvider
     HRESULT _InitDisplayAttributeInfo();
     void _UninitDisplayAttributeInfo();
     
-	HRESULT _InvokeEditSession(ITfContext* pic, BOOL fEnd) ;
+	// ITfTextEditSink
+	HRESULT _InitTextEditSink(ITfContext* pic);
+	HRESULT _UninitTextEditSink(ITfContext* pic);
 
     ITfThreadMgr* _pThreadMgr;
     TfClientId _tfClientId;
     LONG _cRef;
 
     DWORD _dwThreadFocusSinkCookie; 
+    DWORD _dwTextEditSinkCookie; 
+	DWORD _dwMyEditSessionTick;
     ITfComposition* _pComposition;
+	ITfContext* _pContext;
     ChmEngine* _pEngine; // ロジック担当
 };
 

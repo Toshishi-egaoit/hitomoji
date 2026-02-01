@@ -57,6 +57,8 @@ public:
 		}
 
 		if (pRange) pRange->Release();
+		_pTsfIf->SetMyEditSessionTick(); 
+		OutputDebugString(L"[hitomoji] DoEditSession: end");
 		return S_OK;
 	}
 
@@ -118,16 +120,23 @@ private:
     ITfContext* _pic; 
 	TfClientId _tid; 
 	ChmTsfInterface* _pTsfIf;
-	ITfComposition* _pCompositoin;
 	std::wstring _compositionStr;
 	BOOL _fEnd;
 	LONG _cRef;
 };
 
-// --- CHitomoji クラスの実装 ---
+// --- CTsfInterface クラスの実装 ---
 
-ChmTsfInterface::ChmTsfInterface() : _tfClientId(0), _cRef(1), _pThreadMgr(nullptr), _pComposition(nullptr) {
-	_dwThreadFocusSinkCookie = TF_INVALID_COOKIE; 
+ChmTsfInterface::ChmTsfInterface():
+	_tfClientId (0),
+	_cRef(1),
+	_pThreadMgr(nullptr),
+	_pComposition(nullptr),
+	_dwThreadFocusSinkCookie(TF_INVALID_COOKIE),
+	_dwTextEditSinkCookie(TF_INVALID_COOKIE),
+	_dwMyEditSessionTick(0),
+	_pContext(nullptr)
+{ 
 	_pEngine = new ChmEngine();
 }
 
@@ -141,6 +150,8 @@ STDMETHODIMP ChmTsfInterface::QueryInterface(REFIID riid, void** ppvObj) {
 	*ppvObj = nullptr;
 	if (IsEqualIID(riid, IID_IUnknown) || IsEqualIID(riid, IID_ITfTextInputProcessor)) {
 		*ppvObj = (ITfTextInputProcessor*)this;
+	} else if (IsEqualIID(riid, IID_ITfTextEditSink)) {
+		*ppvObj = (ITfTextEditSink*)this;
 	} else if (IsEqualIID(riid, IID_ITfKeyEventSink)) {
 		*ppvObj = (ITfKeyEventSink*)this;
 	} else if (IsEqualIID(riid, IID_ITfDisplayAttributeProvider)) {
@@ -157,7 +168,10 @@ STDMETHODIMP_(ULONG) ChmTsfInterface::Release() {
 	return _cRef;
 }
 
-// ITfTextInputProcessor
+// -----
+// ----- ITfTextInputProcessor のイベント処理 -----
+// -----
+
 STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 	OutputDebugString(L"[Hitomoji] Activate() called");
 	_pThreadMgr = ptm;
@@ -201,6 +215,10 @@ STDMETHODIMP ChmTsfInterface::Deactivate() {
 	return S_OK;
 }
 
+// -----
+// ----- ITfKeyEventSink  のイベント処理 -----
+// -----
+
 STDMETHODIMP ChmTsfInterface::OnSetFocus(BOOL fFocus)
 {
 	if (fFocus == TRUE) { // フォーカス喪失時
@@ -223,6 +241,7 @@ STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, B
 {
 	*pfEaten = _pEngine->IsKeyEaten(wp);
     if (*pfEaten) {
+
 		bool fEnd = false;
         ChmKeyEvent kEv(wp, lp);
 		_pEngine->UpdateComposition(kEv,fEnd);
@@ -288,98 +307,22 @@ void ChmTsfInterface::_UninitPreservedKey() {
 	}
 }
 
-HRESULT ChmTsfInterface::_InitDisplayAttributeInfo()
-{
-    ITfCategoryMgr* pCategoryMgr = nullptr;
-    HRESULT hr = CoCreateInstance(
-        CLSID_TF_CategoryMgr,
-        nullptr,
-        CLSCTX_INPROC_SERVER,
-        IID_ITfCategoryMgr,
-        (void**)&pCategoryMgr
-    );
-	OUTPUT_HR_n_RETURN_ON_ERROR("_InitDisplayAttributeInfo/CoCreateInstance",hr);
-
-    hr = CDisplayAttributeInfo::InitGuid(pCategoryMgr);
-    pCategoryMgr->Release();
-    return hr;
-}
-
-void ChmTsfInterface::_UninitDisplayAttributeInfo() { return ; }
-
 HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
+	HRESULT hr;
 	CEditSession* pES = new CEditSession(pic, _tfClientId, this, _pEngine->GetCompositionStr(), fEnd);
 	if (!pES) return E_OUTOFMEMORY;
-	HRESULT hr;
 	HRESULT hrSession = pic->RequestEditSession(_tfClientId, pES, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hr);
+	if (!SUCCEEDED(hrSession)) {
+		OUTPUT_HR("_InvokeEditSession/RequestEditSession", hrSession);
+	}
 	pES->Release();
 	return hrSession;
 }
 
-STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
-{
-	OutputDebugString(L"OnSetThreadFocus()");
-	ClearComposition();
-	_pEngine->ResetStatus();
-	return S_OK;
-}
+// -----
+// ----- ITfDisplayAttributeProvider  のイベント処理 -----
+// -----
 
-STDMETHODIMP ChmTsfInterface::OnKillThreadFocus() {
-	OutputDebugString(L"OnKillThreadFocus()");
-	/*
-    if (_pComposition) {
-        _pEngine->ResetStatus();
-
-        ITfDocumentMgr* pDocMgr = nullptr;
-        // 1. まず DocumentMgr を取得
-		// TODO: フォーカス喪失時に GetFocus がNULLを返す可能性がある
-		// なので、活きているContextを保持し続けるロジックが必要かも
-        if (SUCCEEDED(_pThreadMgr->GetFocus(&pDocMgr)) && pDocMgr != nullptr) {
-            ITfContext* pic = nullptr;
-            // 2. DocumentMgr から現在トップにある Context を取得
-            if (SUCCEEDED(pDocMgr->GetTop(&pic)) && pic != nullptr) {
-                // 3. ここでようやく EditSession が呼べる
-                _InvokeEditSession(pic, TRUE);
-                pic->Release();
-            }
-            pDocMgr->Release();
-        }
-    }
-	*/
-    return S_OK;
-}
-
-ITfComposition* ChmTsfInterface::GetComposition() const
-{
-    return _pComposition;
-}
-
-void ChmTsfInterface::SetComposition(ITfComposition* pComp)
-{
-    if (_pComposition && _pComposition != pComp)
-    {
-        _pComposition->Release();
-    }
-    _pComposition = pComp;
-	// _pComposition->AddRef();
-	// ↑ 呼び出し元(StartComposition)でAddRefしているので、ここでは不要
-}
-
-void ChmTsfInterface::ClearComposition()
-{
-    if (_pComposition)
-    {
-		OutputDebugString(L"ClearComposition");
-        _pComposition->Release();
-        _pComposition = nullptr;
-    }
-	return ;
-}
-
-
-// ------
-
-// ITfDisplayAttributeProvider
 STDMETHODIMP ChmTsfInterface::GetDisplayAttributeInfo(REFGUID guid, ITfDisplayAttributeInfo **ppInfo) {
 	if (CDisplayAttributeInfo::IsMyGuid(guid)) {
 		*ppInfo = new CDisplayAttributeInfo(); // さっき作ったクラスを投げる
@@ -397,4 +340,141 @@ STDMETHODIMP ChmTsfInterface::EnumDisplayAttributeInfo(IEnumTfDisplayAttributeIn
     // エディタは GetDisplayAttributeInfo さえ呼べれば描画できます。
     return E_NOTIMPL; 
 }
-// ------
+
+HRESULT ChmTsfInterface::_InitDisplayAttributeInfo()
+{
+    ITfCategoryMgr* pCategoryMgr = nullptr;
+    HRESULT hr = CoCreateInstance(
+        CLSID_TF_CategoryMgr,
+        nullptr,
+        CLSCTX_INPROC_SERVER,
+        IID_ITfCategoryMgr,
+        (void**)&pCategoryMgr
+    );
+	OUTPUT_HR_n_RETURN_ON_ERROR("_InitDisplayAttributeInfo/CoCreateInstance",hr);
+
+    hr = CDisplayAttributeInfo::InitGuid(pCategoryMgr);
+    pCategoryMgr->Release();
+    return hr;
+}
+
+void ChmTsfInterface::_UninitDisplayAttributeInfo() { 
+	// TODO:ちゃんと解放処理を書く
+	return ; 
+}
+
+// -----
+// ----- ITfThreadFocusSink  のイベント処理 -----
+// -----
+
+STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
+{
+	OutputDebugString(L"[Hitomoji] OnSetThreadFocus()");
+
+    // 1. 現在フォーカスされている DocumentMgr を取得
+    ITfDocumentMgr* pDocMgr = nullptr;
+    HRESULT hr = _pThreadMgr->GetFocus(&pDocMgr);
+    if (FAILED(hr) || !pDocMgr) {
+        OutputDebugString(L"[Hitomoji] GetFocus failed");
+        return S_OK;
+    }
+
+    // 2. Top Context を取得
+    ITfContext* picNew = nullptr;
+    hr = pDocMgr->GetTop(&picNew);
+    pDocMgr->Release();
+
+    if (FAILED(hr) || !picNew) {
+        OutputDebugString(L"[Hitomoji] GetTop failed");
+        return S_OK;
+    }
+
+    // 3. Context が変わったか？
+    if (picNew != _pContext)
+    {
+        // --- 古い Context の後始末 ---
+        if (_pContext) {
+            OutputDebugString(L"[Hitomoji] Context changed -> cleanup old context");
+
+            // TextEditSink 解除
+            _UninitTextEditSink(_pContext);
+
+            // Composition は意味的に破綻するのでキャンセル
+            if (_pComposition) {
+                ClearComposition(); // ec不要版 or RequestEditSessionで
+            }
+
+            _pContext->Release();
+            _pContext = nullptr;
+        }
+
+        // --- 新しい Context を設定 ---
+        _pContext = picNew;
+        _pContext->AddRef();
+
+        // TextEditSink 登録
+        _InitTextEditSink(_pContext);
+
+        // Engine 状態リセット（軽め）
+        _pEngine->ResetStatus();
+    }
+
+    // GetTop で取得した参照の解放
+    picNew->Release();
+
+    return S_OK;
+}
+
+
+STDMETHODIMP ChmTsfInterface::OnKillThreadFocus() {
+	OutputDebugString(L"OnKillThreadFocus()");
+    return S_OK;
+}
+
+// -----
+// ----- ITfTextEdit のイベント処理 -----
+// -----
+
+STDMETHODIMP ChmTsfInterface::OnEndEdit(
+    ITfContext* pic,
+    TfEditCookie ecReadOnly,
+    ITfEditRecord* pEditRecord)
+{
+	OutputDebugString(L"[Hitomoji] OnEndEdit()");
+
+	// 編集中でなければ、何もしない
+	if (_pComposition == nullptr) return S_OK;
+	// 自分で処理したEditSessionなら何もしない（やるべきことは終わってる）
+	if (IsMyEditSession() ) return S_OK;
+
+	// コンテキスト違ってたら(他のフィールドへの遷移など）Compositionを確定させる
+	if (pic != _pContext) {
+		// 現在のCompositionを確定させる
+		OutputDebugString(L"   > InvokeEditSession()");
+		_InvokeEditSession(_pContext, TRUE);
+		_pEngine->ResetStatus();
+		_pContext->Release();
+		_pContext = nullptr;
+	}
+    return S_OK;
+}
+
+HRESULT ChmTsfInterface::_InitTextEditSink(ITfContext* pic)
+{
+    ITfSource* pSource = nullptr;
+    if (FAILED(pic->QueryInterface(IID_ITfSource, (void**)&pSource)))
+        return E_FAIL;
+
+    HRESULT hr = pSource->AdviseSink(
+        IID_ITfTextEditSink,
+        static_cast<ITfTextEditSink*>(this),
+        &_dwTextEditSinkCookie
+    );
+
+    pSource->Release();
+    return hr;
+}
+
+HRESULT ChmTsfInterface::_UninitTextEditSink(ITfContext* pic) {
+	return S_OK;
+}
