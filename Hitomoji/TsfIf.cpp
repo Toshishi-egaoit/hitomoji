@@ -44,15 +44,27 @@ public:
 		// 1. Compositionの準備
 		if (FAILED(_GetOrStartComposition(ec, &pRange))) return S_OK;
 
-		// 2. 確定処理
+		// 2. 確定処理／未確定表示（共通 SetText）
+		pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
+
 		if (_fEnd ) {
-			pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
+			// 確定：キャレットを末尾へ移動して Composition 終了
+            pRange->Collapse(ec, TF_ANCHOR_END);
+
+            // 【追加】アプリ側のキャレット位置をこの Range の場所に同期させる
+            TF_SELECTION sel;
+            sel.range = pRange;
+            sel.style.ase = TF_AE_NONE; // アクティブな末尾
+            sel.style.fInterimChar = FALSE;
+            _pic->SetSelection(ec, 1, &sel);
+
 			_TerminateComposition(ec);
 		} else {
-			// 3. 変換中文字列の表示
-			LONG temp = 0;
-			pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
-			pRange->ShiftStart(ec, 0, &temp, nullptr); // Composition全体を選択状態に
+			// 未確定：末尾をアクティブにし、そこから左へ未確定範囲を構成
+			LONG cch = (LONG)_compositionStr.length();
+			LONG shifted = 0;
+			pRange->ShiftEnd(ec, cch, &shifted, nullptr);
+			// TODO: キャレット位置がつねに左端になってしまっている
 			_ApplyDisplayAttribute(ec, pRange);
 		}
 
