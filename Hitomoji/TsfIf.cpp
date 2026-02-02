@@ -64,31 +64,66 @@ public:
 
 private:
 
-	// 既存のCompositionを取得するか、なければ新しく開始する（改良版）
+	// 既存のCompositionを取得するか、なければ新しく開始する（最終版）
 	HRESULT _GetOrStartComposition(TfEditCookie ec, ITfRange** ppRange) {
-		ITfComposition *_pComposition = _pTsfIf->GetComposition();
-		if (_pComposition  == nullptr) { // 新規Composition開始
-			ITfInsertAtSelection* pInsert;
-			if (SUCCEEDED(_pic->QueryInterface(IID_ITfInsertAtSelection, (void**)&pInsert))) {
-				HRESULT hr = pInsert->InsertTextAtSelection(ec, TS_IAS_QUERYONLY, L"", 0, ppRange);
-				OUTPUT_HR_n_RETURN_ON_ERROR(L"InsertTextAtSelection",hr);
+		if (!ppRange) return E_INVALIDARG;
+		*ppRange = nullptr;
 
-				ITfContextComposition* pCtxComp = nullptr;
-				if (SUCCEEDED(_pic->QueryInterface(IID_ITfContextComposition, (void**)&pCtxComp))) {
-					hr = pCtxComp->StartComposition(ec, *ppRange, this, &_pComposition);
-					OUTPUT_HR_n_RETURN_ON_ERROR(L"StartComposition",hr);
-					_pTsfIf->SetComposition(_pComposition);
-					pCtxComp->Release(); // 目的の_pCompositionは取得したので、ReleaseしてOK
+		ITfComposition* pComp = _pTsfIf->GetComposition();
+		ITfContext* pCompCtx = _pTsfIf->GetCompositionContext();
+
+		// --- 既存 Composition の再利用可否判定 ---
+		if (pComp && pCompCtx == _pic) {
+			ITfCompositionView* pView = nullptr;
+			HRESULT hrView = _pTsfIf->GetFirstCompositionView(_pic, &pView);
+			if (hrView == S_OK && pView) {
+				// この context 上で生きている Composition
+				HRESULT hr = pView->GetRange(ppRange);
+				pView->Release();
+				if (SUCCEEDED(hr) && *ppRange) {
+					return S_OK;
 				}
-				pInsert->Release();
 			}
+
+			// context 不一致 or view 不在 = 死骸
+			OutputDebugString(L"[hitomoji] GetOrStartComposition: stale or mismatched composition -> clear");
+			_pTsfIf->ClearComposition();
+			pComp = nullptr;
 		}
-	
-		if (_pComposition != nullptr) {
-			_pComposition->GetRange(ppRange);
-			return S_OK;
+
+		// --- 新規 Composition 開始 ---
+		ITfInsertAtSelection* pInsert = nullptr;
+		HRESULT hr = _pic->QueryInterface(IID_ITfInsertAtSelection, (void**)&pInsert);
+		if (FAILED(hr) || !pInsert) {
+			return E_FAIL;
 		}
-		return E_FAIL;
+
+		hr = pInsert->InsertTextAtSelection(ec, TS_IAS_QUERYONLY, L"", 0, ppRange);
+		pInsert->Release();
+		if (FAILED(hr) || !*ppRange) {
+			return E_FAIL;
+		}
+
+		ITfContextComposition* pCtxComp = nullptr;
+		hr = _pic->QueryInterface(IID_ITfContextComposition, (void**)&pCtxComp);
+		if (FAILED(hr) || !pCtxComp) {
+			(*ppRange)->Release();
+			*ppRange = nullptr;
+			return E_FAIL;
+		}
+
+		ITfComposition* pNewComp = nullptr;
+		hr = pCtxComp->StartComposition(ec, *ppRange, this, &pNewComp);
+		pCtxComp->Release();
+
+		if (FAILED(hr) || !pNewComp) {
+			(*ppRange)->Release();
+			*ppRange = nullptr;
+			return E_FAIL;
+		}
+
+		_pTsfIf->SetComposition(_pic, pNewComp);
+		return S_OK;
 	}
 
     // 下線を引くための詳細実装を切り出す
@@ -128,14 +163,14 @@ private:
 // --- CTsfInterface クラスの実装 ---
 
 ChmTsfInterface::ChmTsfInterface():
-	_tfClientId (0),
-	_cRef(1),
-	_pThreadMgr(nullptr),
-	_pComposition(nullptr),
-	_dwThreadFocusSinkCookie(TF_INVALID_COOKIE),
-	_dwTextEditSinkCookie(TF_INVALID_COOKIE),
-	_llMyEditSessionTick(0),
-	_pContext(nullptr)
+    _tfClientId (0),
+    _cRef(1),
+    _pThreadMgr(nullptr),
+    _pComposition(nullptr),
+    _pContextForComposition(nullptr),
+    _dwThreadFocusSinkCookie(TF_INVALID_COOKIE),
+    _dwTextEditSinkCookie(TF_INVALID_COOKIE),
+    _llMyEditSessionTick(0)
 { 
 	_pEngine = new ChmEngine();
 }
@@ -215,7 +250,7 @@ STDMETHODIMP ChmTsfInterface::Deactivate() {
 	return S_OK;
 }
 
-HRESULT ChmTsfInterface::_GetFirstCompositionView(
+HRESULT ChmTsfInterface::GetFirstCompositionView(
     ITfContext* pic,
     ITfCompositionView** ppView)
 {
@@ -413,57 +448,11 @@ STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 {
 	OutputDebugString(L"[Hitomoji] OnSetThreadFocus()");
 
-    // 1. 現在フォーカスされている DocumentMgr を取得
-    ITfDocumentMgr* pDocMgr = nullptr;
-    HRESULT hr = _pThreadMgr->GetFocus(&pDocMgr);
-    if (FAILED(hr) || !pDocMgr) {
-        OutputDebugString(L"[Hitomoji] GetFocus failed");
-        return S_OK;
-    }
-
-    // 2. Top Context を取得
-    ITfContext* picNew = nullptr;
-    hr = pDocMgr->GetTop(&picNew);
-    pDocMgr->Release();
-
-    if (FAILED(hr) || !picNew) {
-        OutputDebugString(L"[Hitomoji] GetTop failed");
-        return S_OK;
-    }
-
-    // 3. Context が変わったか？
-    if (picNew != _pContext)
-    {
-        // --- 古い Context の後始末 ---
-        if (_pContext) {
-            OutputDebugString(L"[Hitomoji] Context changed -> cleanup old context");
-
-            // TextEditSink 解除
-            _UninitTextEditSink(_pContext);
-
-            // Composition は意味的に破綻するのでキャンセル
-            if (_pComposition) {
-                ClearComposition(); // ec不要版 or RequestEditSessionで
-            }
-
-            _pContext->Release();
-            _pContext = nullptr;
-        }
-
-        // --- 新しい Context を設定 ---
-        _pContext = picNew;
-        _pContext->AddRef();
-
-        // TextEditSink 登録
-        _InitTextEditSink(_pContext);
-
-        // Engine 状態リセット（軽め）
+    // フォーカス取得時は Composition 側のみを基準に整理
+    if (GetCompositionContext()) {
+        ClearComposition();
         _pEngine->ResetStatus();
     }
-
-    // GetTop で取得した参照の解放
-    picNew->Release();
-
     return S_OK;
 }
 
@@ -484,19 +473,16 @@ STDMETHODIMP ChmTsfInterface::OnEndEdit(
 {
 	OutputDebugString(L"[Hitomoji] OnEndEdit()");
 
-	// 編集中でなければ、何もしない
+	// 編集中でなければ何もしない
 	if (_pComposition == nullptr) return S_OK;
-	// 自分で処理したEditSessionなら何もしない（やるべきことは終わってる）
-	if (IsMyEditSession() ) return S_OK;
+	// 自分の EditSession 由来なら無視
+	if (IsMyEditSession()) return S_OK;
 
-	// コンテキスト違ってたら(他のフィールドへの遷移など）Compositionを確定させる
-	if (pic != _pContext) {
-		// 現在のCompositionを確定させる
-		OutputDebugString(L"   > InvokeEditSession()");
-		_InvokeEditSession(_pContext, TRUE);
+	// Composition の属する Context と異なる編集が入った場合のみ確定
+	if (_pContextForComposition && pic != GetCompositionContext()) {
+		OutputDebugString(L"   > InvokeEditSession via composition context");
+		_InvokeEditSession(GetCompositionContext(), TRUE);
 		_pEngine->ResetStatus();
-		_pContext->Release();
-		_pContext = nullptr;
 	}
     return S_OK;
 }
@@ -531,3 +517,4 @@ HRESULT ChmTsfInterface::_UninitTextEditSink(ITfContext* pic)
     _dwTextEditSinkCookie = TF_INVALID_COOKIE;
     return S_OK;
 }
+
