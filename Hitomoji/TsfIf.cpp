@@ -133,8 +133,9 @@ private:
     }
 
     void _TerminateComposition(TfEditCookie ec) {
-		ITfComposition *_pComposition = _pTsfIf->GetComposition();
-		_pComposition->EndComposition(ec);
+		ITfComposition* pComp = _pTsfIf->GetComposition();
+		if (!pComp) return; // Ž–‘O‚É Clear ‚³‚ê‚Ä‚¢‚é‰Â”\«‚ª‚ ‚é‚½‚ß–hŒä
+		pComp->EndComposition(ec);
 		_pTsfIf->ClearComposition();
     }
 
