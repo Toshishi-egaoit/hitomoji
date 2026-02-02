@@ -134,7 +134,7 @@ ChmTsfInterface::ChmTsfInterface():
 	_pComposition(nullptr),
 	_dwThreadFocusSinkCookie(TF_INVALID_COOKIE),
 	_dwTextEditSinkCookie(TF_INVALID_COOKIE),
-	_dwMyEditSessionTick(0),
+	_llMyEditSessionTick(0),
 	_pContext(nullptr)
 { 
 	_pEngine = new ChmEngine();
@@ -214,6 +214,48 @@ STDMETHODIMP ChmTsfInterface::Deactivate() {
 	}
 	return S_OK;
 }
+
+HRESULT ChmTsfInterface::_GetFirstCompositionView(
+    ITfContext* pic,
+    ITfCompositionView** ppView)
+{
+    if (!pic || !ppView) return E_INVALIDARG;
+    *ppView = nullptr;
+
+    ITfContextComposition* pCtxComp = nullptr;
+    HRESULT hr = pic->QueryInterface(
+        IID_ITfContextComposition,
+        (void**)&pCtxComp);
+
+    if (FAILED(hr) || !pCtxComp) {
+        return hr;
+    }
+
+    IEnumITfCompositionView* pEnum = nullptr;
+    hr = pCtxComp->EnumCompositions(&pEnum);
+    pCtxComp->Release();
+
+    if (FAILED(hr) || !pEnum) {
+        return hr;
+    }
+
+    ITfCompositionView* pView = nullptr;
+    ULONG fetched = 0;
+    hr = pEnum->Next(1, &pView, &fetched);
+    pEnum->Release();
+
+    if (hr == S_OK && fetched == 1 && pView) {
+        *ppView = pView; // AddRef Ï‚Ý
+        return S_OK;
+    }
+
+    // Composition ‚È‚µ
+    if (pView) {
+        pView->Release();
+    }
+    return S_FALSE;
+}
+
 
 // -----
 // ----- ITfKeyEventSink  ‚ÌƒCƒxƒ“ƒgˆ— -----
@@ -475,6 +517,17 @@ HRESULT ChmTsfInterface::_InitTextEditSink(ITfContext* pic)
     return hr;
 }
 
-HRESULT ChmTsfInterface::_UninitTextEditSink(ITfContext* pic) {
-	return S_OK;
+HRESULT ChmTsfInterface::_UninitTextEditSink(ITfContext* pic)
+{
+    if (!pic) return S_OK;
+    if (_dwTextEditSinkCookie == TF_INVALID_COOKIE) return S_OK;
+
+    ITfSource* pSource = nullptr;
+    if (SUCCEEDED(pic->QueryInterface(IID_ITfSource, (void**)&pSource))) {
+        pSource->UnadviseSink(_dwTextEditSinkCookie);
+        pSource->Release();
+    }
+
+    _dwTextEditSinkCookie = TF_INVALID_COOKIE;
+    return S_OK;
 }

@@ -61,8 +61,8 @@ public:
 
 	// Composition管理
 
-	void SetMyEditSessionTick() { _dwMyEditSessionTick = GetTickCount() ; }
-	BOOL IsMyEditSession() { return (GetTickCount() - _dwMyEditSessionTick <= CHM_ONENDEDIT_TICK) ; }
+	void SetMyEditSessionTick() { _llMyEditSessionTick = GetTickCount64() ; }
+	BOOL IsMyEditSession() { return (GetTickCount64() - _llMyEditSessionTick <= CHM_ONENDEDIT_TICK) ; }
 	ITfComposition* GetComposition() const { return _pComposition; }
 	void SetComposition(ITfComposition* pComp)
 	{
@@ -87,6 +87,16 @@ public:
 	}
 
 private:
+	// Composition管理
+	// 観測専用：Composition があれば最初の View を返す
+	// 戻り値：S_OK + *ppView != nullptr → Composition あり
+	//         S_FALSE                    → Composition なし
+	//         それ以外                   → エラー
+	HRESULT _GetFirstCompositionView(
+		ITfContext* pic,
+		ITfCompositionView** ppView
+	);
+
     // ITfKeyEventSink
     HRESULT _InitKeyEventSink();
     void _UninitKeyEventSink();
@@ -108,12 +118,11 @@ private:
 
     DWORD _dwThreadFocusSinkCookie; 
     DWORD _dwTextEditSinkCookie; 
-	DWORD _dwMyEditSessionTick;
+	LONGLONG _llMyEditSessionTick;
     ITfComposition* _pComposition;
 	ITfContext* _pContext;
     ChmEngine* _pEngine; // ロジック担当
 };
-
 
 #define OUTPUT_HR(funcName,hr) \
 {\
