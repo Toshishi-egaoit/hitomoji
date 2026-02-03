@@ -44,15 +44,27 @@ public:
 		// 1. Compositionの準備
 		if (FAILED(_GetOrStartComposition(ec, &pRange))) return S_OK;
 
-		// 2. 確定処理
+		// 2. 確定処理／未確定表示（共通 SetText）
+		pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
+
 		if (_fEnd ) {
-			pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
+			// 確定：キャレットを末尾へ移動して Composition 終了
+            pRange->Collapse(ec, TF_ANCHOR_END);
+
+            // 【追加】アプリ側のキャレット位置をこの Range の場所に同期させる
+            TF_SELECTION sel;
+            sel.range = pRange;
+            sel.style.ase = TF_AE_NONE; // アクティブな末尾
+            sel.style.fInterimChar = FALSE;
+            _pic->SetSelection(ec, 1, &sel);
+
 			_TerminateComposition(ec);
 		} else {
-			// 3. 変換中文字列の表示
-			LONG temp = 0;
-			pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
-			pRange->ShiftStart(ec, 0, &temp, nullptr); // Composition全体を選択状態に
+			// 未確定：末尾をアクティブにし、そこから左へ未確定範囲を構成
+			LONG cch = (LONG)_compositionStr.length();
+			LONG shifted = 0;
+			pRange->ShiftEnd(ec, cch, &shifted, nullptr);
+			// TODO: キャレット位置がつねに左端になってしまっている
 			_ApplyDisplayAttribute(ec, pRange);
 		}
 
@@ -64,31 +76,18 @@ public:
 
 private:
 
-	// 既存のCompositionを取得するか、なければ新しく開始する（最終版）
+	// 既存のCompositionを取得するか、なければ新しく開始する（簡略版）
 	HRESULT _GetOrStartComposition(TfEditCookie ec, ITfRange** ppRange) {
 		if (!ppRange) return E_INVALIDARG;
 		*ppRange = nullptr;
 
+		// --- 既存 Composition があれば無条件で再利用 ---
 		ITfComposition* pComp = _pTsfIf->GetComposition();
-		ITfContext* pCompCtx = _pTsfIf->GetCompositionContext();
-
-		// --- 既存 Composition の再利用可否判定 ---
-		if (pComp && pCompCtx == _pic) {
-			ITfCompositionView* pView = nullptr;
-			HRESULT hrView = _pTsfIf->GetFirstCompositionView(_pic, &pView);
-			if (hrView == S_OK && pView) {
-				// この context 上で生きている Composition
-				HRESULT hr = pView->GetRange(ppRange);
-				pView->Release();
-				if (SUCCEEDED(hr) && *ppRange) {
-					return S_OK;
-				}
+		if (pComp) {
+			HRESULT hr = pComp->GetRange(ppRange);
+			if (SUCCEEDED(hr) && *ppRange) {
+				return S_OK;
 			}
-
-			// context 不一致 or view 不在 = 死骸
-			OutputDebugString(L"[hitomoji] GetOrStartComposition: stale or mismatched composition -> clear");
-			_pTsfIf->ClearComposition();
-			pComp = nullptr;
 		}
 
 		// --- 新規 Composition 開始 ---
@@ -146,8 +145,9 @@ private:
     }
 
     void _TerminateComposition(TfEditCookie ec) {
-		ITfComposition *_pComposition = _pTsfIf->GetComposition();
-		_pComposition->EndComposition(ec);
+		ITfComposition* pComp = _pTsfIf->GetComposition();
+		if (!pComp) return; // 事前に Clear されている可能性があるため防御
+		pComp->EndComposition(ec);
 		_pTsfIf->ClearComposition();
     }
 
@@ -385,6 +385,31 @@ void ChmTsfInterface::_UninitPreservedKey() {
 }
 
 HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
+	// ---- pre-check: composition / context validity ----
+	if (_pComposition) {
+		// context mismatch -> clear
+		if (_pContextForComposition != pic) {
+			OutputDebugString(L"[Hitomoji] _InvokeEditSession: context mismatch -> clear");
+			ClearComposition();
+			_pEngine->ResetStatus();
+		} else {
+			// context match -> check view existence
+			ITfCompositionView* pView = nullptr;
+			HRESULT hrView = GetFirstCompositionView(pic, &pView);
+			if (hrView != S_OK || !pView) {
+				// TODO： OnEndEditが届かない場合、_pCompositionが初期化されずここに来る。でも、その検出手段がない。
+				// 　　　 ここを通ると、エンジン側のRawInputがクリアされ、フォーカス移動直後の1文字が消失するが、
+				// 　　　 現状では対抗手段がないので、この仕様を受容する。
+                OutputDebugString(L"[Hitomoji] _InvokeEditSession: no view -> clear");
+				ClearComposition();
+				_pEngine->ResetStatus();
+			} else {
+				pView->Release();
+			}
+		}
+	}
+
+	// ---- normal edit session request ----
 	HRESULT hr;
 	CEditSession* pES = new CEditSession(pic, _tfClientId, this, _pEngine->GetCompositionStr(), fEnd);
 	if (!pES) return E_OUTOFMEMORY;
