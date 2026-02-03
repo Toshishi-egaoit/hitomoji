@@ -311,6 +311,9 @@ STDMETHODIMP ChmTsfInterface::OnSetFocus(BOOL fFocus)
 // ITfKeyEventSink Implementation
 STDMETHODIMP ChmTsfInterface::OnTestKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten) {
 	*pfEaten = _pEngine->IsKeyEaten(wp);
+	ChmKeyEvent kEv(wp,lp);
+	OutputDebugString(((std::wstring)L"[Hitomoji] OnTestKeyDown eat=%s" + kEv.toString()).c_str()), *pfEaten ? L"TRUE" : L"FALSE" ;
+
 	return S_OK;
 }
 

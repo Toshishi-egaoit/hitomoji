@@ -40,9 +40,18 @@ public:
     };
 
     // --- utility ---
-	const std::wstring dump() const { 
-		wchar_t buff[64];
+	const std::wstring toString() const { 
+		wchar_t buff[80];
 		wsprintf(buff, L"[_type:%d,_ch:%c(%x)]", static_cast<int>(_type), static_cast<int>(GetChar()),static_cast<int>(GetChar()));
+
+		wchar_t ch = GetChar();
+		wsprintf(buff, L"Type:%d ch=%d(%c) %s %s %s",
+			_type,
+			ch , 
+			((ch < 0x20) ? L'.' : ch & 0x7f),
+			_shift ?   L"Shift"  : L"",
+			_control ? L"Control": L"",
+			_alt ?     L"Alt"    : L"");
 		return buff ;
 	}
 

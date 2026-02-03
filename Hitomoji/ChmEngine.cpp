@@ -35,7 +35,7 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
 void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition){
 	OutputDebugStringWithString(
 		L"[Hitomoji] UpdateComposition: keyEvent=%s", 
-		keyEvent.dump().c_str()
+		keyEvent.toString().c_str()
 	);
 	ChmKeyEvent::Type _type = keyEvent.GetType();
 
