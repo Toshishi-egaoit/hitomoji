@@ -8,7 +8,7 @@
 #include "ChmConfig.h"
 
 ChmEngine::ChmEngine() 
-	: _isON(FALSE), _hasComposition(FALSE),_converted(L""), _pending("") {
+	: _isON(FALSE), _hasComposition(FALSE),_converted(L""), _pending(L"") {
 	_pRawInputStore = new ChmRawInputStore();
 }
 
@@ -33,10 +33,6 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
 }
 
 void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition){
-	OutputDebugStringWithString(
-		L"[Hitomoji] UpdateComposition: keyEvent=%s", 
-		keyEvent.toString().c_str()
-	);
 	ChmKeyEvent::Type _type = keyEvent.GetType();
 
 	// 確定キー
@@ -59,18 +55,18 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
             _hasComposition = FALSE;
             break;
         case ChmKeyEvent::Type::CommitAscii:    // ASCII確定
-            _converted = std::wstring(_pRawInputStore->get().begin(), _pRawInputStore->get().end());
-			_pending = "";
+            _converted = _pRawInputStore->get();
+			_pending = L"";
             _hasComposition = FALSE;
             break;
         case ChmKeyEvent::Type::CommitAsciiWide: // 全角ASCII確定
             _converted = AsciiToWide(_pRawInputStore->get());
-			_pending = "";
+			_pending = L"";
             _hasComposition = FALSE;
             break;
         case ChmKeyEvent::Type::Cancel:         // ESCキャンセル
 			_converted = L"";
-			_pending = "";
+			_pending = L"";
 			_hasComposition = FALSE;
 			break;
          case ChmKeyEvent::Type::CharInput:
@@ -105,7 +101,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
                 // 削除の結果文字がなくなったらCompositionを削除
                 if (_pRawInputStore->get().empty()) {
                     _converted = L"";
-                    _pending = "";
+                    _pending = L"";
                     _hasComposition = FALSE;
                 } else {
                     ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
@@ -137,16 +133,16 @@ void ChmEngine::ResetStatus() {
     _hasComposition = FALSE;
     _pRawInputStore->clear();
     _converted = L"";
-    _pending = "";
+    _pending = L"";
 	return;
 }
 
-std::wstring ChmEngine::AsciiToWide(const std::string& src)
+std::wstring ChmEngine::AsciiToWide(const std::wstring& src)
 {
     std::wstring out;
     out.reserve(src.size());
 
-    for (unsigned char c : src) {
+    for (wchar_t c : src) {
         // 英数字・基本記号のみ対象
         if (c >= 0x21 && c <= 0x7E) {
             // 0x21–0x7E は Fullwidth に +0xFEE0
@@ -163,7 +159,7 @@ std::wstring ChmEngine::GetCompositionStr(){
 	if ( _pRawInputStore == nullptr ) return L"";
 
 	// 既に変換済みの文字列を連結して返却
-	return _converted + std::wstring(_pending.begin(), _pending.end());
+	return _converted + _pending;
 }
 
 
@@ -245,19 +241,22 @@ private:
 
 // ---- 機能キー定義テーブル ----
 static const ChmKeyEvent::FuncKeyDef g_functionKeyTable[] = {
-    // WPARAM      SHIFT  CTRL  ALT   Type                                   endComp
+    // WPARAM      SHIFT  CTRL   ALT    Type
     { VK_RETURN,   false, false, false, ChmKeyEvent::Type::CommitKana     },
     { VK_RETURN,   true,  false, false, ChmKeyEvent::Type::CommitKatakana },
     { VK_TAB,      false, false, false, ChmKeyEvent::Type::CommitAscii    },
     { VK_TAB,      true,  false, false, ChmKeyEvent::Type::CommitAsciiWide},
     { VK_BACK,     false, false, false, ChmKeyEvent::Type::Backspace      },
     { VK_ESCAPE,   false, false, false, ChmKeyEvent::Type::Cancel         },
-    // 検証用: Ctrl+M = Enter
+    // CTRL+* 
+    { 'H',         false, true,  false, ChmKeyEvent::Type::Backspace      },
+    { 'I',         false, true,  false, ChmKeyEvent::Type::CommitAscii    },
+    { 'I',         true,  true,  false, ChmKeyEvent::Type::CommitAsciiWide},
     { 'M',         false, true,  false, ChmKeyEvent::Type::CommitKana     },
 };
 
 ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/)
-    : _wp(wp), _type(Type::None), _ch(0)
+    : _wp(wp), _type(Type::None)
 {
     _shift   = (GetKeyState(VK_SHIFT)   & 0x8000) != 0;
     _control = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
@@ -269,7 +268,7 @@ ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/)
 
 // 特殊用途コンストラクタ（マウスクリックなど）
 ChmKeyEvent::ChmKeyEvent(ChmKeyEvent::Type type)
-    : _wp(VK_HITOMOJI), _shift(false), _control(false), _alt(false), _type(type), _ch(0)
+    : _wp(VK_HITOMOJI), _shift(false), _control(false), _alt(false), _type(type)
 {
 	_caps    = false;
 }
@@ -290,7 +289,6 @@ void ChmKeyEvent::_TranslateByTable()
 	// ② ナビゲーションキー
 	if (IsNavigationKey()) {
 		_type = Type::CommitNonConvert;
-		_ch = VK_HITOMOJI; // dummy
 		return ;
 	}
 
@@ -304,9 +302,18 @@ void ChmKeyEvent::_TranslateByTable()
     wchar_t ch = 0;
     if (ChmKeyLayout::Translate(_wp, _shift, _caps, ch)) {
         _type = Type::CharInput;
-        _ch = (char)ch;
+        //_ch = (char)ch;
         return;
     }
 
     _type = Type::None;
+}
+
+wchar_t ChmKeyEvent::GetChar() const {
+	wchar_t ch;
+	if (ChmKeyLayout::Translate(_wp, _shift, _caps, ch)) {
+		return ch;
+	} else {
+		return  '\0' ;
+	}
 }

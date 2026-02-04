@@ -42,13 +42,11 @@ public:
     // --- utility ---
 	const std::wstring toString() const { 
 		wchar_t buff[80];
-		wsprintf(buff, L"[_type:%d,_ch:%c(%x)]", static_cast<int>(_type), static_cast<int>(GetChar()),static_cast<int>(GetChar()));
-
 		wchar_t ch = GetChar();
 		wsprintf(buff, L"Type:%d ch=%d(%c) %s %s %s",
 			_type,
 			ch , 
-			((ch < 0x20) ? L'.' : ch & 0x7f),
+			((ch < 0x20) ? L'-' : ch & 0x7f),
 			_shift ?   L"Shift"  : L"",
 			_control ? L"Control": L"",
 			_alt ?     L"Alt"    : L"");
@@ -61,7 +59,7 @@ public:
 
     // --- accessors ---
     Type GetType() const { return _type; }
-    char GetChar() const { return _ch; }
+	wchar_t GetChar() const ;
     bool IsShift() const { return _shift; }
 	// ナビゲーションキーか？(処理はしないが、確定処理が必要なキーの判定用)
     bool IsNavigationKey() const { 
@@ -87,10 +85,8 @@ private:
     bool   _control = false;
     bool   _alt     = false;
     bool   _caps    = false;
-    bool   _endComp = false;
 
     Type _type = Type::None;
-    char _ch   = 0;
 };
 
 class ChmEngine {
@@ -113,12 +109,12 @@ public:
 
 private:
     // ASCII -> 全角 変換（v0.1.3 簡易実装）
-    static std::wstring AsciiToWide(const std::string& src);
+    static std::wstring AsciiToWide(const std::wstring& src);
 
     BOOL _isON;
 	BOOL _hasComposition;
 	ChmRawInputStore* _pRawInputStore; // 入力されたローマ字列
 	std::wstring _converted; // かな変換できた部分
-	std::string _pending; // かなに変換できていない部分（残り）
+	std::wstring _pending; // かなに変換できていない部分（残り）
 };
 

@@ -19,14 +19,14 @@ public:
     // rawInput 全体を入力として処理する
 // converted : かなに変換できた部分
 // pending   : 変換できずに残った部分（未確定ローマ字）
-    static void convert(const std::string& rawInput,
+    static void convert(const std::wstring& rawInput,
                         std::wstring& converted,
-                        std::string& pending,
+                        std::wstring& pending,
 						bool isSybolMode,
 					    bool isBsSymbol);
 
     // 1ユニットだけ変換できるか試みる（v0.1.5 用）
-    static bool TryConvertOne(const std::string& rawInput,
+    static bool TryConvertOne(const std::wstring& rawInput,
                               size_t pos,
 							  Unit& out,
 							  bool isSymbolMode);
@@ -41,106 +41,106 @@ private:
     // v0.1.5 用：TryConvertOne ベースの拡張変換
     // lastRawUnitLength は内部状態として保持する
     static size_t _lastRawUnitLength;
-    static const std::unordered_map<std::string, std::wstring>& table();
-    static const std::unordered_set<char>& sokuonConsonants();
+    static const std::unordered_map<std::wstring, std::wstring>& table();
+    static const std::unordered_set<wchar_t>& sokuonConsonants();
 };
 
 // ---- implementation ----
 
 // static 初期化用テーブル
-inline const std::unordered_map<std::string, std::wstring>& ChmRomajiConverter::table() {
-    static const std::unordered_map<std::string, std::wstring> tbl = {
+inline const std::unordered_map<std::wstring, std::wstring>& ChmRomajiConverter::table() {
+    static const std::unordered_map<std::wstring, std::wstring> tbl = {
         // --- 母音 ---
-        {"a", L"あ"}, {"i", L"い"}, {"u", L"う"}, {"e", L"え"}, {"o", L"お"},
+        {L"a", L"あ"}, {L"i", L"い"}, {L"u", L"う"}, {L"e", L"え"}, {L"o", L"お"},
 
         // ---か(k)、が(g) ---
-        {"ka", L"か"}, {"ki", L"き"}, {"ku", L"く"}, {"ke", L"け"}, {"ko", L"こ"},
-        {"ga", L"が"}, {"gi", L"ぎ"}, {"gu", L"ぐ"}, {"ge", L"げ"}, {"go", L"ご"},
+        {L"ka", L"か"}, {L"ki", L"き"}, {L"ku", L"く"}, {L"ke", L"け"}, {L"ko", L"こ"},
+        {L"ga", L"が"}, {L"gi", L"ぎ"}, {L"gu", L"ぐ"}, {L"ge", L"げ"}, {L"go", L"ご"},
 
         // ---さ(s)、ざ(z) ---
-        {"sa", L"さ"}, {"si", L"し"}, {"shi", L"し"}, {"su", L"す"}, {"se", L"せ"}, {"so", L"そ"},
-        {"za", L"ざ"}, {"zi", L"じ"}, {"ji" , L"じ"}, {"zu", L"ず"}, {"ze", L"ぜ"}, {"zo", L"ぞ"},
+        {L"sa", L"さ"}, {L"si", L"し"}, {L"shi", L"し"}, {L"su", L"す"}, {L"se", L"せ"}, {L"so", L"そ"},
+        {L"za", L"ざ"}, {L"zi", L"じ"}, {L"ji" , L"じ"}, {L"zu", L"ず"}, {L"ze", L"ぜ"}, {L"zo", L"ぞ"},
 
         // ---た(t)、だ(d) ---
-        {"ta", L"た"}, {"ti", L"ち"}, {"chi", L"ち"}, {"tu", L"つ"}, {"te", L"て"}, {"to", L"と"},
-        {"da", L"だ"}, {"di", L"ぢ"},                 {"du", L"づ"}, {"de", L"で"}, {"do", L"ど"},
+        {L"ta", L"た"}, {L"ti", L"ち"}, {L"chi", L"ち"}, {L"tu", L"つ"}, {L"te", L"て"}, {L"to", L"と"},
+        {L"da", L"だ"}, {L"di", L"ぢ"},                 {L"du", L"づ"}, {L"de", L"で"}, {L"do", L"ど"},
 
         // ---な(n) ---
-        {"na", L"な"}, {"ni", L"に"}, {"nu", L"ぬ"}, {"ne", L"ね"}, {"no", L"の"},
+        {L"na", L"な"}, {L"ni", L"に"}, {L"nu", L"ぬ"}, {L"ne", L"ね"}, {L"no", L"の"},
 
         // --- は(h)、ば(b)、ぱ(p) ---
-        {"ha", L"は"}, {"hi", L"ひ"}, {"hu", L"ふ"}, {"he", L"へ"}, {"ho", L"ほ"},
-        {"ba", L"ば"}, {"bi", L"び"}, {"bu", L"ぶ"}, {"be", L"べ"}, {"bo", L"ぼ"},
-        {"pa", L"ぱ"}, {"pi", L"ぴ"}, {"pu", L"ぷ"}, {"pe", L"ぺ"}, {"po", L"ぽ"},
+        {L"ha", L"は"}, {L"hi", L"ひ"}, {L"hu", L"ふ"}, {L"he", L"へ"}, {L"ho", L"ほ"},
+        {L"ba", L"ば"}, {L"bi", L"び"}, {L"bu", L"ぶ"}, {L"be", L"べ"}, {L"bo", L"ぼ"},
+        {L"pa", L"ぱ"}, {L"pi", L"ぴ"}, {L"pu", L"ぷ"}, {L"pe", L"ぺ"}, {L"po", L"ぽ"},
 
         // ---ま(m) ---
-        {"ma", L"ま"}, {"mi", L"み"}, {"mu", L"む"}, {"me", L"め"}, {"mo", L"も"},
+        {L"ma", L"ま"}, {L"mi", L"み"}, {L"mu", L"む"}, {L"me", L"め"}, {L"mo", L"も"},
 
         // ---や(y) ---
-        {"ya", L"や"}, {"yu", L"ゆ"}, {"yo", L"よ"},
+        {L"ya", L"や"}, {L"yu", L"ゆ"}, {L"yo", L"よ"},
 
         // ---ら(r) ---
-        {"ra", L"ら"}, {"ri", L"り"}, {"ru", L"る"}, {"re", L"れ"}, {"ro", L"ろ"},
+        {L"ra", L"ら"}, {L"ri", L"り"}, {L"ru", L"る"}, {L"re", L"れ"}, {L"ro", L"ろ"},
 
         // --- わ(w)行（本仮名遣い対応） ---
-        {"wa", L"わ"}, {"wi", L"ゐ"}, {"we", L"ゑ"}, {"wo", L"を"},
+        {L"wa", L"わ"}, {L"wi", L"ゐ"}, {L"we", L"ゑ"}, {L"wo", L"を"},
 
         // --- 拗音の清音（y系） ---
-		{"kya", L"きゃ"}, {"kyu", L"きゅ"}, {"kyo", L"きょ"}, 
-		{"sya", L"しゃ"}, {"syu", L"しゅ"}, {"sye", L"しぇ"}, {"syo", L"しょ"}, 
-		{"sha", L"しゃ"}, {"shu", L"しゅ"}, {"sho", L"しょ"}, 
-		{"cha", L"ちゃ"}, {"chu", L"ちゅ"}, {"cho", L"ちょ"}, 
-		{"tya", L"ちゃ"}, {"tyu", L"ちゅ"}, {"tye", L"ちぇ"}, {"tyo", L"ちょ"}, 
-		{"nya", L"にゃ"}, {"nyu", L"にゅ"}, {"nyo", L"にょ"},
-		{"hya", L"ひゃ"}, {"hyu", L"ひゅ"}, {"hyo", L"ひょ"},
-		{"mya", L"みゃ"}, {"myu", L"みゅ"}, {"myo", L"みょ"},
-        {"rya", L"りゃ"}, {"ryu", L"りゅ"}, {"ryo", L"りょ"},
+		{L"kya", L"きゃ"}, {L"kyu", L"きゅ"}, {L"kyo", L"きょ"}, 
+		{L"sya", L"しゃ"}, {L"syu", L"しゅ"}, {L"sye", L"しぇ"}, {L"syo", L"しょ"}, 
+		{L"sha", L"しゃ"}, {L"shu", L"しゅ"}, {L"sho", L"しょ"}, 
+		{L"cha", L"ちゃ"}, {L"chu", L"ちゅ"}, {L"cho", L"ちょ"}, 
+		{L"tya", L"ちゃ"}, {L"tyu", L"ちゅ"}, {L"tye", L"ちぇ"}, {L"tyo", L"ちょ"}, 
+		{L"nya", L"にゃ"}, {L"nyu", L"にゅ"}, {L"nyo", L"にょ"},
+		{L"hya", L"ひゃ"}, {L"hyu", L"ひゅ"}, {L"hyo", L"ひょ"},
+		{L"mya", L"みゃ"}, {L"myu", L"みゅ"}, {L"myo", L"みょ"},
+        {L"rya", L"りゃ"}, {L"ryu", L"りゅ"}, {L"ryo", L"りょ"},
         // --- 拗音の濁音 (gy系) ---
-        {"gya", L"ぎゃ"}, {"gyu", L"ぎゅ"}, {"gyo", L"ぎょ"},
+        {L"gya", L"ぎゃ"}, {L"gyu", L"ぎゅ"}, {L"gyo", L"ぎょ"},
         // --- 拗音の濁音 (zy,j系) ---
-		{"zya", L"じゃ"}, {"zyu", L"じゅ"}, {"zye", L"じぇ"}, {"zyo", L"じょ"},
-        {"ja", L"じゃ"},  {"ju", L"じゅ"},  {"je", L"じぇ"},  {"jo", L"じょ"},
+		{L"zya", L"じゃ"}, {L"zyu", L"じゅ"}, {L"zye", L"じぇ"}, {L"zyo", L"じょ"},
+        {L"ja", L"じゃ"},  {L"ju", L"じゅ"},  {L"je", L"じぇ"},  {L"jo", L"じょ"},
         // --- 拗音の濁音 (dy系) ---
-		{"dya", L"ぢゃ"}, {"dyu", L"ぢゅ"}, {"dyo", L"ぢょ"}, 
+		{L"dya", L"ぢゃ"}, {L"dyu", L"ぢゅ"}, {L"dyo", L"ぢょ"}, 
         // --- 拗音の濁音 (by,py系) ---
-		{"bya", L"びゃ"}, {"byu", L"びゅ"}, {"byo", L"びょ"},
-		{"pya", L"ぴゃ"}, {"pyu", L"ぴゅ"}, {"pyo", L"ぴょ"},
+		{L"bya", L"びゃ"}, {L"byu", L"びゅ"}, {L"byo", L"びょ"},
+		{L"pya", L"ぴゃ"}, {L"pyu", L"ぴゅ"}, {L"pyo", L"ぴょ"},
 		
-        {"nn", L"ん"}, {"n", L"ん"}, {"n'", L"ん"},
+        {L"nn", L"ん"}, {L"n", L"ん"}, {L"n'", L"ん"},
         // --- 小さい文字 (IME慣習) ---
-        {"ltu", L"っ"}, {"xtu", L"っ"},
-        {"lya", L"ゃ"}, {"lyu", L"ゅ"}, {"lyo", L"ょ"},
-        {"xya", L"ゃ"}, {"xyu", L"ゅ"}, {"xyo", L"ょ"},
-        {"la", L"ぁ"}, {"li", L"ぃ"}, {"lu", L"ぅ"}, {"le", L"ぇ"}, {"lo", L"ぉ"},
-        {"xa", L"ぁ"}, {"xi", L"ぃ"}, {"xu", L"ぅ"}, {"xe", L"ぇ"}, {"xo", L"ぉ"},
-        {"lwa", L"ゎ"}, {"lka", L"ゕ"}, {"lke", L"ゖ"},
-        {"xwa", L"ゎ"}, {"xka", L"ゕ"}, {"xke", L"ゖ"},
+        {L"ltu", L"っ"}, {L"xtu", L"っ"},
+        {L"lya", L"ゃ"}, {L"lyu", L"ゅ"}, {L"lyo", L"ょ"},
+        {L"xya", L"ゃ"}, {L"xyu", L"ゅ"}, {L"xyo", L"ょ"},
+        {L"la", L"ぁ"}, {L"li", L"ぃ"}, {L"lu", L"ぅ"}, {L"le", L"ぇ"}, {L"lo", L"ぉ"},
+        {L"xa", L"ぁ"}, {L"xi", L"ぃ"}, {L"xu", L"ぅ"}, {L"xe", L"ぇ"}, {L"xo", L"ぉ"},
+        {L"lwa", L"ゎ"}, {L"lka", L"ゕ"}, {L"lke", L"ゖ"},
+        {L"xwa", L"ゎ"}, {L"xka", L"ゕ"}, {L"xke", L"ゖ"},
         // --- 外来音・拡張表記 ---
-        {"khu", L"くゅ"}, {"qe", L"くぇ"}, {"qo",L"くぉ"} ,
-		{"she", L"しぇ"},
-		{"che", L"ちぇ"},
-		{"va", L"ゔぁ"}, {"vi", L"ゔぃ"}, {"vu", L"ゔ"}, {"ve", L"ゔぇ"}, {"vo", L"ゔぉ"},
-        {"fa", L"ふぁ"}, {"fi", L"ふぃ"}, {"fu", L"ふ"}, {"fe", L"ふぇ"}, {"fo", L"ふぉ"},
-        {"thi", L"てぃ"}, {"thu", L"とぅ"}, 
-		{"dhi", L"でぃ"}, {"dhu", L"でゅ"},
-        {"whi", L"うぃ"}, {"whe", L"うぇ"}, {"who", L"うぉ"},
+        {L"khu", L"くゅ"}, {L"qe", L"くぇ"}, {L"qo",L"くぉ"} ,
+		{L"she", L"しぇ"},
+		{L"che", L"ちぇ"},
+		{L"va", L"ゔぁ"}, {L"vi", L"ゔぃ"}, {L"vu", L"ゔ"}, {L"ve", L"ゔぇ"}, {L"vo", L"ゔぉ"},
+        {L"fa", L"ふぁ"}, {L"fi", L"ふぃ"}, {L"fu", L"ふ"}, {L"fe", L"ふぇ"}, {L"fo", L"ふぉ"},
+        {L"thi", L"てぃ"}, {L"thu", L"とぅ"}, 
+		{L"dhi", L"でぃ"}, {L"dhu", L"でゅ"},
+        {L"whi", L"うぃ"}, {L"whe", L"うぇ"}, {L"who", L"うぉ"},
         // --- 役物、記号類
-        {".", L"。"}, {",", L"、"}, {"?", L"？"}, {"!", L"！"},
-        {"[", L"「"}, {"]", L"」"},
-        {"-", L"ー"},
+        {L".", L"。"}, {L",", L"、"}, {L"?", L"？"}, {L"!", L"！"},
+        {L"[", L"「"}, {L"]", L"」"},
+        {L"-", L"ー"},
     };
     return tbl;
 }
 
 // 促音判定用 子音セット（x, l, n 除外）
-inline const std::unordered_set<char>& ChmRomajiConverter::sokuonConsonants() {
-    static const std::unordered_set<char> set = {
-        'b','c','d','f','g','h','j','k','m','p','q','r','s','t','v','w','y','z'
+inline const std::unordered_set<wchar_t>& ChmRomajiConverter::sokuonConsonants() {
+    static const std::unordered_set<wchar_t> set = {
+        L'b',L'c',L'd',L'f',L'g',L'h',L'j',L'k',L'm',L'p',L'q',L'r',L's',L't',L'v',L'w',L'y',L'z'
     };
     return set;
 }
 
-bool ChmRomajiConverter::TryConvertOne(const std::string& rawInput,
+bool ChmRomajiConverter::TryConvertOne(const std::wstring& rawInput,
                                         size_t pos,
                                         Unit& out,
 										bool isDispSymbol)
@@ -153,9 +153,9 @@ bool ChmRomajiConverter::TryConvertOne(const std::string& rawInput,
     if (pos >= rawInput.size()) return false;
 
     // lower 化（convert と同じ方針）
-    std::string lowerInput;
+    std::wstring lowerInput;
     lowerInput.reserve(rawInput.size());
-    for (unsigned char c : rawInput) {
+    for (wchar_t c : rawInput) {
         lowerInput.push_back(static_cast<char>(std::tolower(c)));
     }
 
@@ -168,7 +168,7 @@ bool ChmRomajiConverter::TryConvertOne(const std::string& rawInput,
 			if (isDispSymbol) {
 				out.output = it->second;
 			} else {
-				std::string sub = rawInput.substr(pos,len);
+				std::wstring sub = rawInput.substr(pos,len);
 				out.output = std::wstring(sub.begin(), sub.end());
 			}
             out.rawLength = len;
@@ -177,7 +177,7 @@ bool ChmRomajiConverter::TryConvertOne(const std::string& rawInput,
     }
 
     // --- 記号・非アルファベットは即確定 ---
-    char cur = lowerInput[pos];
+    wchar_t cur = lowerInput[pos];
     if (!std::isalpha(static_cast<unsigned char>(cur))) {
         out.output.push_back(static_cast<wchar_t>(rawInput[pos]));
         out.rawLength = 1;
@@ -186,8 +186,8 @@ bool ChmRomajiConverter::TryConvertOne(const std::string& rawInput,
 
     // --- 促音判定（tt など） ---
     if (pos + 1 < lowerInput.size()) {
-        char c1 = lowerInput[pos];
-        char c2 = lowerInput[pos + 1];
+        wchar_t c1 = lowerInput[pos];
+        wchar_t c2 = lowerInput[pos + 1];
         if (c1 == c2 && sokuonConsonants().count(c1)) {
             out.output = L"っ";
             out.rawLength = 1; // 子音1文字ぶん消費
@@ -218,9 +218,9 @@ std::wstring ChmRomajiConverter::HiraganaToKatakana(const std::wstring& hira)
 // --- v0.1.5: convert を TryConvertOne ベースで再実装 ---
 size_t ChmRomajiConverter::_lastRawUnitLength = 0;
 
-void ChmRomajiConverter::convert(const std::string& rawInput,
+void ChmRomajiConverter::convert(const std::wstring& rawInput,
                                  std::wstring& converted,
-                                 std::string& pending,
+                                 std::wstring& pending,
 								 bool isDispSymbol,
 								 bool isBsSymbol)
 {

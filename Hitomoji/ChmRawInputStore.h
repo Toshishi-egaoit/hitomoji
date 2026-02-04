@@ -8,7 +8,7 @@
 class ChmRawInputStore {
 public:
     // ASCII 1•¶Žš“ü—Í
-    void push(char c) {
+    void push(wchar_t c) {
         rawInput_.push_back(c);
     }
 
@@ -17,7 +17,7 @@ public:
         rawInput_.clear();
     }
 
-    const std::string& get() const {
+    const std::wstring& get() const {
         return rawInput_;
     }
 
@@ -41,7 +41,7 @@ public:
     }
 
 private:
-    std::string rawInput_;
+    std::wstring rawInput_;
 };
 
 
