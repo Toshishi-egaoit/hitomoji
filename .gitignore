@@ -2,7 +2,6 @@
 *.user
 Debug/
 Release/
-x64/
 *.obj
 *.pdb
 *.ipch
@@ -12,3 +11,5 @@ x64/
 *.lib
 *.exp
 
+/distribution/x64/regHitomoji.exe
+/distribution/x86/regHitomoji.exe
