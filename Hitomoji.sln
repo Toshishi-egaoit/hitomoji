@@ -11,8 +11,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tsftest", "tsftest\tsftest.
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ソリューション項目", "ソリューション項目", "{2022CB0F-8BAF-F49E-0C48-8EF4C96EC109}"
 	ProjectSection(SolutionItems) = preProject
-		Install.md = Install.md
+		distribution\install.bat = distribution\install.bat
+		distribution\Install.md = distribution\Install.md
 		Readme.md = Readme.md
+		distribution\Readme.md = distribution\Readme.md
 	EndProjectSection
 EndProject
 Global
@@ -42,7 +44,6 @@ Global
 		{E92217E1-3308-44A0-B404-8AFC58F909B1}.Debug|x64.ActiveCfg = Debug|x64
 		{E92217E1-3308-44A0-B404-8AFC58F909B1}.Debug|x64.Build.0 = Debug|x64
 		{E92217E1-3308-44A0-B404-8AFC58F909B1}.Debug|x86.ActiveCfg = Debug|Win32
-		{E92217E1-3308-44A0-B404-8AFC58F909B1}.Debug|x86.Build.0 = Debug|Win32
 		{E92217E1-3308-44A0-B404-8AFC58F909B1}.Release|x64.ActiveCfg = Release|x64
 		{E92217E1-3308-44A0-B404-8AFC58F909B1}.Release|x64.Build.0 = Release|x64
 		{E92217E1-3308-44A0-B404-8AFC58F909B1}.Release|x86.ActiveCfg = Release|Win32
