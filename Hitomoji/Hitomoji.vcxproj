@@ -171,6 +171,7 @@ if exist "$(SolutionDir)install.bat" copy /y "$(SolutionDir)install.bat" "$(Solu
   <ItemGroup>
     <ClInclude Include="ChmEngine.h" />
     <ClInclude Include="ChmRomajiConverter.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="TsfIf.h" />
     <ClInclude Include="utils.h" />
   </ItemGroup>
@@ -178,6 +179,7 @@ if exist "$(SolutionDir)install.bat" copy /y "$(SolutionDir)install.bat" "$(Solu
     <ClCompile Include="ChmConfig.cpp" />
     <ClCompile Include="ChmConfig.h" />
     <ClCompile Include="ChmEngine.cpp" />
+    <ClCompile Include="ChmLangBar.cpp" />
     <ClCompile Include="ChmRawInputStore.h" />
     <ClCompile Include="DisplayAttribute.cpp" />
     <ClCompile Include="DisplayAttribute.h" />
@@ -187,6 +189,15 @@ if exist "$(SolutionDir)install.bat" copy /y "$(SolutionDir)install.bat" "$(Solu
   </ItemGroup>
   <ItemGroup>
     <None Include="Hitomoji.def" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="resource.rc">
+      <DeploymentContent>true</DeploymentContent>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="icon-off.ico" />
+    <Image Include="icon-on.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

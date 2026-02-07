@@ -57,7 +57,8 @@ int main() {
     if (SUCCEEDED(hr)) {
         hr = pProfiles->Register(CLSID_Hitomoji);
         if (SUCCEEDED(hr)) {
-            hr = pProfiles->AddLanguageProfile(CLSID_Hitomoji, 0x0411, GUID_HmProfile, L"ひともじ", 4, L"ひともじ", 4, 0);
+            hr = pProfiles->AddLanguageProfile(CLSID_Hitomoji, 0x0411, GUID_HmProfile, L"ひともじ", 4, 
+				pathStr.c_str(), pathStr.length(), 0);
             
             ITfCategoryMgr* pCategoryMgr = nullptr;
             if (SUCCEEDED(CoCreateInstance(CLSID_TF_CategoryMgr, NULL, CLSCTX_INPROC_SERVER, IID_ITfCategoryMgr, (void**)&pCategoryMgr))) {

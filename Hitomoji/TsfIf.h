@@ -6,6 +6,8 @@
 
 #define CHM_ONENDEDIT_TICK 30  // OnEndEdit セッションとみなす時間間隔（ms）
 
+extern HINSTANCE g_hInst;
+
 // --- GUID Definitions ---
 // {86B8A5A1-9B5A-4B6E-A77E-6A2F2B1F7B12}
 DEFINE_GUID(CLSID_Hitomoji, 0x86b8a5a1, 0x9b5a, 0x4b6e, 0xa7, 0x7e, 0x6a, 0x2f, 0x2b, 0x1f, 0x7b, 0x12);

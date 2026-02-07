@@ -1,0 +1,6 @@
+#include "resource.h"
+
+// アイコンの定義
+// IDI_ICON1 という名前で、icon.ico をリソースとして登録する
+IDI_HITOMOJI_ON   ICON  "icon-on.ico"
+IDI_HITOMOJI_OFF  ICON  "icon-off.ico"
