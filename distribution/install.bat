@@ -10,19 +10,50 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
-:: --- ここから下にコピー・登録の処理を書く ---
+set SYSTEM_DIR=%SystemRoot%\System32
+set TARGET_DIR=%SYSTEM_DIR%\hitomoji
+set TARGET_DLL=%TARGET_DIR%\Hitomoji.dll
+
+set SYSTEM_DIR32=%SystemRoot%\SysWOW64
+set TARGET_DIR32=%SYSTEM_DIR32%\hitomoji
+set TARGET_DLL32=%TARGET_DIR32%\Hitomoji.dll
+
+:: 前回のゴミがあれば掃除（リブート後なら消せる）
+if exist "%TARGET_DLL%.old" (
+    del /q "%TARGET_DLL%.old" >nul 2>&1
+)
+if exist "%TARGET_DLL32%.old" (
+    del /q "%TARGET_DLL32%.old" >nul 2>&1
+)
+
+:: 2. フォルダがなければ作成
+if not exist "%TARGET_DIR%" (
+    mkdir "%TARGET_DIR%"
+)
+
+:: 3. 使用中の現行版を .old に退避（これが「上書き不可」を回避するコツ）
+if exist "%TARGET_DLL%" (
+    move /y "%TARGET_DLL%" "%TARGET_DLL%.old" >nul 2>&1
+)
+if exist "%TARGET_DLL32%" (
+    move /y "%TARGET_DLL32%" "%TARGET_DLL32%.old" >nul 2>&1
+)
+
 echo 管理者権限で実行中...
 
-copy /y "x64\hitomoji.dll" "%SystemRoot%\System32\"
-"%SystemRoot%\System32\regsvr32.exe" /s "%SystemRoot%\System32\hitomoji.dll"
+:: 64ビット版DLLのコピーと登録
+copy /y "x64\hitomoji.dll" "%TARGET_DIR%"
+"%SYSTEM_DIR%\regsvr32.exe" /s "%TARGET_DIR%\hitomoji.dll"
 
-if exist "%SystemRoot%\SysWOW64" (
-    copy /y "x86\hitomoji.dll" "%SystemRoot%\SysWOW64\"
-    "%SystemRoot%\SysWOW64\regsvr32.exe" /s "%SystemRoot%\SysWOW64\hitomoji.dll"
+if exist "%SYSTEM_DIR32%" (
+	if not exist "%TARGET_DIR32%" mkdir "%TARGET_DIR32%"
+    copy /y "x86\hitomoji.dll" "%TARGET_DIR32%"
+    "%SYSTEM_DIR32%\regsvr32.exe" /s "%TARGET_DIR32%\hitomoji.dll"
 )
 
 :: プロファイル登録用EXEの実行（あれば）
-:: start /wait regHitomoji.exe
+copy /y "x64\regHitomoji.exe" "%TARGET_DIR%"
+"%TARGET_DIR%\regHitomoji.exe"
 
 echo 全てのインストール工程が完了しました！
 pause
