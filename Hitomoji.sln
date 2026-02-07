@@ -11,10 +11,14 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tsftest", "tsftest\tsftest.
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ソリューション項目", "ソリューション項目", "{2022CB0F-8BAF-F49E-0C48-8EF4C96EC109}"
 	ProjectSection(SolutionItems) = preProject
-		distribution\install.bat = distribution\install.bat
-		distribution\Install.md = distribution\Install.md
 		Readme.md = Readme.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "distribution", "distribution", "{DDB4EF12-CC4E-5E88-E6FC-71A802F4DE97}"
+	ProjectSection(SolutionItems) = preProject
+		distribution\install.bat = distribution\install.bat
 		distribution\Readme.md = distribution\Readme.md
+		distribution\Usage.md = distribution\Usage.md
 	EndProjectSection
 EndProject
 Global
@@ -51,6 +55,9 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{DDB4EF12-CC4E-5E88-E6FC-71A802F4DE97} = {2022CB0F-8BAF-F49E-0C48-8EF4C96EC109}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {D96F88E2-452B-415A-A33F-F18B54311258}
