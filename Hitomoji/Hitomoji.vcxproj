@@ -76,6 +76,12 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -92,18 +98,10 @@
       <ModuleDefinitionFile>Hitomoji.def</ModuleDefinitionFile>
     </Link>
     <PostBuildEvent>
-      <Command>:: フォルダ作成（x86として作成）
+      <Command>:: DLLのコピー
 
-if not exist "$(SolutionDir)distribution\x86" mkdir "$(SolutionDir)distribution\x86"
-
-
-
-:: DLLのコピー
-
-copy /y "$(TargetPath)" "$(SolutionDir)distribution\x86\"
-
-
-:: バッチはx64側でもコピーしているので、こちらでは省略してもOKです</Command>
+copy /y "$(TargetPath)" "$(SolutionDir)dbg_distribution\x86\"
+</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -114,7 +112,7 @@ copy /y "$(TargetPath)" "$(SolutionDir)distribution\x86\"
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;HITOMOJI_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
@@ -122,6 +120,12 @@ copy /y "$(TargetPath)" "$(SolutionDir)distribution\x86\"
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
     </Link>
+    <PostBuildEvent>
+      <Command>:: DLLのコピー
+
+copy /y "$(TargetPath)" "$(SolutionDir)distribution\x86\"
+</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -139,19 +143,11 @@ copy /y "$(TargetPath)" "$(SolutionDir)distribution\x86\"
       <ModuleDefinitionFile>Hitomoji.def</ModuleDefinitionFile>
     </Link>
     <PostBuildEvent>
-      <Command>:: フォルダ作成（x64）
+      <Command>:: DLLのコピー
 
-if not exist "$(SolutionDir)distribution\x64" mkdir "$(SolutionDir)distribution\x64"
+copy /y "$(TargetPath)" "$(SolutionDir)dbg_distribution\x64\"
 
-
-
-:: DLLのコピー
-
-copy /y "$(TargetPath)" "$(SolutionDir)distribution\x64\"
-
-:: インストールバッチのコピー（ソリューション直下にある場合）
-
-if exist "$(SolutionDir)install.bat" copy /y "$(SolutionDir)install.bat" "$(SolutionDir)distribution\"</Command>
+</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -172,19 +168,10 @@ if exist "$(SolutionDir)install.bat" copy /y "$(SolutionDir)install.bat" "$(Solu
       <ModuleDefinitionFile>Hitomoji.def</ModuleDefinitionFile>
     </Link>
     <PostBuildEvent>
-      <Command>:: フォルダ作成（x64）
-
-if not exist "$(SolutionDir)distribution\x64" mkdir "$(SolutionDir)distribution\x64"
-
-
-
-:: DLLのコピー
+      <Command>:: DLLのコピー
 
 copy /y "$(TargetPath)" "$(SolutionDir)distribution\x64\"
-
-:: インストールバッチのコピー（ソリューション直下にある場合）
-
-if exist "$(SolutionDir)install.bat" copy /y "$(SolutionDir)install.bat" "$(SolutionDir)distribution\"</Command>
+</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

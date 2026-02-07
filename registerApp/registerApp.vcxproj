@@ -76,8 +76,13 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <TargetName>regHitomoji</TargetName>
+    <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <TargetName>regHitomoji</TargetName>
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <TargetName>regHitomoji</TargetName>
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
@@ -94,18 +99,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>:: フォルダ作成（x86として作成）
-
-if not exist "$(SolutionDir)distribution\x86" mkdir "$(SolutionDir)distribution\x86"
-
-
-
-:: DLLのコピー
-
-copy /y "$(TargetPath)" "$(SolutionDir)distribution\x86\"
-
-
-</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -116,11 +111,16 @@ copy /y "$(TargetPath)" "$(SolutionDir)distribution\x86\"
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>..\hitomoji</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PostBuildEvent>
+      <Command>
+</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -135,15 +135,9 @@ copy /y "$(TargetPath)" "$(SolutionDir)distribution\x86\"
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>:: フォルダ作成（x64）
+      <Command>:: Installerのコピー
 
-if not exist "$(SolutionDir)distribution\x64" mkdir "$(SolutionDir)distribution\x64"
-
-
-
-:: Installerのコピー
-
-copy /y "$(TargetPath)" "$(SolutionDir)distribution\x64\"
+copy /y "$(TargetPath)" "$(SolutionDir)dbg_distribution\x64\"
 
 </Command>
     </PostBuildEvent>
@@ -156,19 +150,14 @@ copy /y "$(TargetPath)" "$(SolutionDir)distribution\x64\"
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>..\hitomoji</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>:: フォルダ作成（x64）
-
-if not exist "$(SolutionDir)distribution\x64" mkdir "$(SolutionDir)distribution\x64"
-
-
-
-:: Installerのコピー
+      <Command>:: Installerのコピー
 
 copy /y "$(TargetPath)" "$(SolutionDir)distribution\x64\"
 
