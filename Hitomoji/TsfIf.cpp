@@ -8,6 +8,7 @@
 #include <initguid.h> // GUIDの実体定義用
 #include "TsfIf.h"
 #include "DisplayAttribute.h"
+#include "ChmLangBar.h"
 #include <objbase.h>
 
 class CEditSession : public ITfEditSession , public ITfCompositionSink{
@@ -217,6 +218,11 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 	if (FAILED(_InitPreservedKey())) return E_FAIL;
 	if (FAILED(_InitDisplayAttributeInfo())) return E_FAIL;
 
+	// ChmLangBarItemButtonの初期化
+	_pLangBarItem = new ChmLangBarItemButton(GUID_HmLangBar);
+	// TODO AddToLangBarを実行すると原因不明のループに陥る様子
+	// _pLangBarItem->AddToLangBar(_pThreadMgr);
+
     // ThreadFocusSinkの登録
     ITfSource* pSource = nullptr;
     if (SUCCEEDED(_pThreadMgr->QueryInterface(IID_ITfSource, (void**)&pSource))) {
@@ -240,6 +246,11 @@ STDMETHODIMP ChmTsfInterface::Deactivate() {
 		OutputDebugStringWithInt(L"Deactivate cookie:%x",_dwThreadFocusSinkCookie);
 	}
 	_pEngine->ResetStatus();
+
+	// ChmLangBarItemButtonの後始末
+	_pLangBarItem->RemoveFromLangBar();
+	_pLangBarItem->Release();
+	_pLangBarItem = nullptr;
 
 	_UninitKeyEventSink();
 	_UninitPreservedKey();
@@ -344,6 +355,8 @@ STDMETHODIMP ChmTsfInterface::OnKeyUp(ITfContext* pic, WPARAM wp, LPARAM lp, BOO
 STDMETHODIMP ChmTsfInterface::OnPreservedKey(ITfContext* pic, REFGUID rguid, BOOL* pfEaten) {
 	if (IsEqualGUID(rguid, GUID_PreservedKey_OpenClose)) {
 		_pEngine->ToggleIME();
+		_pLangBarItem->SetImeState(_pEngine->IsON());
+
 		OutputDebugString(L"[Hitomoji]OnPreservedKey:processed");
 		*pfEaten = TRUE;
 	}

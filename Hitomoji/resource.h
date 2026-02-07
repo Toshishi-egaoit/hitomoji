@@ -1,2 +1,3 @@
+#define IDI_HITOMOJI_LOGO  1
 #define IDI_HITOMOJI_ON  101
 #define IDI_HITOMOJI_OFF 102

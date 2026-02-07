@@ -7,13 +7,17 @@ class ChmLangBarItemButton : public ITfLangBarItemButton,
                            public ITfSource
 {
 public:
-    ChmLangBarItemButton(REFGUID guidItem) : _cRef(1), _guidItem(guidItem) {
+        ChmLangBarItemButton(REFGUID guidItem) : _cRef(1), _guidItem(guidItem), _bOn(FALSE), _hIconOn(nullptr), _hIconOff(nullptr) {
         // アイコン情報の初期化
         _info.clsidService = CLSID_Hitomoji;
         _info.guidItem = _guidItem;
         _info.dwStyle = TF_LBI_STYLE_BTN_BUTTON;
         _info.ulSort = 0;
         wcscpy_s(_info.szDescription, L"ひともじ");
+        LoadIcons();
+    }
+    ~ChmLangBarItemButton() {
+        FreeIcons();
     }
 
     // --- IUnknown ---
@@ -34,6 +38,47 @@ public:
         if (cRef == 0) delete this;
         return cRef;
     }
+
+    // --- icon management (instance-based) ---
+    void LoadIcons() {
+        _hIconOn = (HICON)LoadImage(g_hInst, MAKEINTRESOURCE(IDI_HITOMOJI_ON), IMAGE_ICON, 16, 16, 0);
+        _hIconOff = (HICON)LoadImage(g_hInst, MAKEINTRESOURCE(IDI_HITOMOJI_OFF), IMAGE_ICON, 16, 16, 0);
+    }
+
+    void FreeIcons() {
+        if (_hIconOn) { DestroyIcon(_hIconOn); _hIconOn = nullptr; }
+        if (_hIconOff) { DestroyIcon(_hIconOff); _hIconOff = nullptr; }
+    }
+
+	HRESULT AddToLangBar(ITfThreadMgr *pThreadMgr) { // 引数で ThreadMgr を受け取る
+		if (!pThreadMgr) return E_INVALIDARG;
+
+		OutputDebugString(L"ChmLangBarItemButton::AddToLangBar called");
+		ITfLangBarItemMgr* pMgr = nullptr;
+		// ThreadMgr に対して「言語バーマネージャーを貸して！」と頼む
+		HRESULT hr = pThreadMgr->QueryInterface(IID_ITfLangBarItemMgr, (void**)&pMgr);
+    
+		if (SUCCEEDED(hr)) {
+			OutputDebugString(L"skip AddItem");
+			//hr = pMgr->AddItem(this); 
+			pMgr->Release();
+		}
+		OUTPUT_HR_ON_ERROR(L"AddToLangBar.AddItem (via ThreadMgr)", hr);
+		return hr;
+	}
+
+	HRESULT RemoveFromLangBar() {
+		ITfLangBarItemMgr* pMgr = nullptr;
+		HRESULT hr = CoCreateInstance(
+			CLSID_TF_LangBarItemMgr, nullptr, CLSCTX_INPROC_SERVER,
+			IID_ITfLangBarItemMgr, (void**)&pMgr);
+		OUTPUT_HR_n_RETURN_ON_ERROR(L"CoCreateInstance:CLSID_TF_LangBarItemMgr", hr);
+
+		hr = pMgr->RemoveItem(this); // Release される
+		pMgr->Release();
+		OUTPUT_HR_ON_ERROR(L"RemoveFromLangBar.RemoveItem", hr);
+		return hr;
+	}
 
     // --- ITfLangBarItem (基本情報) ---
     STDMETHODIMP GetInfo(TF_LANGBARITEMINFO *pInfo) {
@@ -57,11 +102,11 @@ public:
         return S_OK;
     }
     STDMETHODIMP GetIcon(HICON *phIcon) {
-        // ここが重要！DLL内のリソースからアイコンをロードして渡す
-        // IDI_ICON1 はリソースファイルで定義したID
-        *phIcon = (HICON)LoadImage(g_hInst, MAKEINTRESOURCE(IDI_HITOMOJI_ON), IMAGE_ICON, 16, 16, LR_SHARED);
+        *phIcon = (_bOn) ? _hIconOn : _hIconOff;
+		OutputDebugStringWithInt(L"   > GetIcon: *phIcon=%x", (ULONG)(*phIcon));
         return *phIcon ? S_OK : E_FAIL;
     }
+
     STDMETHODIMP InitMenu(ITfMenu *pMenu) { return S_OK; }
     STDMETHODIMP OnMenuSelect(UINT wID) { return S_OK; }
 
@@ -78,9 +123,24 @@ public:
         return S_OK;
     }
 
+    // --- IME 状態切り替え ---
+    // Engine 側の IsOn() / BOOL インタフェースに合わせる
+    void SetImeState(BOOL bOn) {
+        if (_bOn == bOn) return;
+        _bOn = bOn;
+        if (_pLangBarItemSink) {
+            _pLangBarItemSink->OnUpdate(TF_LBI_ICON);
+        }
+    }
+
 private:
     long _cRef;
     GUID _guidItem;
     TF_LANGBARITEMINFO _info;
     ITfLangBarItemSink *_pLangBarItemSink = nullptr;
+    BOOL _bOn;
+
+    // icon handles
+    HICON _hIconOn;
+    HICON _hIconOff;
 };

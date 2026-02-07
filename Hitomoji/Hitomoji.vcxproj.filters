@@ -59,8 +59,8 @@
     <ClCompile Include="ChmConfig.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="ChmLangBar.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="ChmLangBar.h">
+      <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -78,6 +78,9 @@
       <Filter>リソース ファイル</Filter>
     </Image>
     <Image Include="icon-on.ico">
+      <Filter>リソース ファイル</Filter>
+    </Image>
+    <Image Include="icon-logo.ico">
       <Filter>リソース ファイル</Filter>
     </Image>
   </ItemGroup>

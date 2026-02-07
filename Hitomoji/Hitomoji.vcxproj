@@ -179,7 +179,7 @@ if exist "$(SolutionDir)install.bat" copy /y "$(SolutionDir)install.bat" "$(Solu
     <ClCompile Include="ChmConfig.cpp" />
     <ClCompile Include="ChmConfig.h" />
     <ClCompile Include="ChmEngine.cpp" />
-    <ClCompile Include="ChmLangBar.cpp" />
+    <ClCompile Include="ChmLangBar.h" />
     <ClCompile Include="ChmRawInputStore.h" />
     <ClCompile Include="DisplayAttribute.cpp" />
     <ClCompile Include="DisplayAttribute.h" />
@@ -196,6 +196,7 @@ if exist "$(SolutionDir)install.bat" copy /y "$(SolutionDir)install.bat" "$(Solu
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
+    <Image Include="icon-logo.ico" />
     <Image Include="icon-off.ico" />
     <Image Include="icon-on.ico" />
   </ItemGroup>

@@ -7,12 +7,17 @@
 #define CHM_ONENDEDIT_TICK 30  // OnEndEdit セッションとみなす時間間隔（ms）
 
 extern HINSTANCE g_hInst;
+class ChmLangBarItemButton; // forward declaration
+
 
 // --- GUID Definitions ---
 // {86B8A5A1-9B5A-4B6E-A77E-6A2F2B1F7B12}
 DEFINE_GUID(CLSID_Hitomoji, 0x86b8a5a1, 0x9b5a, 0x4b6e, 0xa7, 0x7e, 0x6a, 0x2f, 0x2b, 0x1f, 0x7b, 0x12);
 // {B1A5D3E2-4C1F-4B9A-9D8C-123456789ABC}
 DEFINE_GUID(GUID_HmProfile, 0xb1a5d3e2, 0x4c1f, 0x4b9a, 0x9d, 0x8c, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc);
+// {722E3A38-3C76-40CC-AA9D-D0F201DF761A}
+DEFINE_GUID(GUID_HmLangBar, 0x722e3a38, 0x3c76, 0x40cc, 0xaa, 0x9d, 0xd0, 0xf2, 0x01, 0xdf, 0x76, 0x1a);
+
 
 // --- 標準的なGUIDの定義 ---
 // {5AD346D8-9B21-460b-AF53-0604AD7A94D4}
@@ -130,6 +135,7 @@ private:
     ITfComposition* _pComposition;
 	ITfContext* _pContextForComposition;
     ChmEngine* _pEngine; // ロジック担当
+	ChmLangBarItemButton* _pLangBarItem ;
 };
 
 #define OUTPUT_HR(funcName,hr) \

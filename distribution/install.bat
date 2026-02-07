@@ -41,19 +41,19 @@ if exist "%TARGET_DLL32%" (
 
 echo 管理者権限で実行中...
 
-:: 64ビット版DLLのコピーと登録
+echo "64ビット版DLLのコピーと登録"
 copy /y "x64\hitomoji.dll" "%TARGET_DIR%"
 "%SYSTEM_DIR%\regsvr32.exe" /s "%TARGET_DIR%\hitomoji.dll"
 
+echo "32ビット版DLLのコピーと登録"
 if exist "%SYSTEM_DIR32%" (
 	if not exist "%TARGET_DIR32%" mkdir "%TARGET_DIR32%"
     copy /y "x86\hitomoji.dll" "%TARGET_DIR32%"
     "%SYSTEM_DIR32%\regsvr32.exe" /s "%TARGET_DIR32%\hitomoji.dll"
 )
 
-:: プロファイル登録用EXEの実行（あれば）
+echo "プロファイル登録"
 copy /y "x64\regHitomoji.exe" "%TARGET_DIR%"
 "%TARGET_DIR%\regHitomoji.exe"
 
 echo 全てのインストール工程が完了しました！
-pause
