@@ -1,30 +1,46 @@
 // ChmConfig.h
 #pragma once
 
-// Hitomoji v0.1.5 config store definition
-// 設定は immutable（変更不可）で、参照専用とする
+#include <string>
+#include <unordered_map>
+#include <variant>
+#include <windows.h>
 
-struct ChmConfigStore {
-    // BS で削除する単位
-    enum class BackspaceUnit {
-        Ascii,   // ASCII 1文字単位
-        Symbol   // 意味単位（かな・記号など）
-    };
+class ChmConfig
+{
+public:
+    // 内部表現は long / string に正規化
+    using ConfigValue = std::variant<long, std::wstring>;
+    using SectionMap  = std::unordered_map<std::wstring, ConfigValue>;
+    using ConfigMap   = std::unordered_map<std::wstring, SectionMap>;
 
-    // 表示モード
-    enum class DisplayMode {
-        Kana,        // かな表示
-        Alphabet     // ローマ字表示
-    };
+public:
+    ChmConfig(const std::wstring& fileName = L"");
+    ~ChmConfig() = default;
 
-    const BackspaceUnit backspaceUnit;
-    const DisplayMode displayMode;
+    // ini 読み込み
+    BOOL LoadFile(const std::wstring& fileName);
+    void InitConfig();
 
-    // コンストラクタ（v0.1.5 では固定値のみを想定）
-    ChmConfigStore(BackspaceUnit bs, DisplayMode dm)
-        : backspaceUnit(bs), displayMode(dm) {
-    }
+    // Getter（見つからない／型不一致は既定値）
+    BOOL         GetBool(const std::wstring& section, const std::wstring& key) const;
+    ULONG        GetLong(const std::wstring& section, const std::wstring& key) const;
+    std::wstring GetString(const std::wstring& section, const std::wstring& key) const;
+
+private:
+    BOOL _parseLine(const std::wstring& rawLine,
+                    std::wstring& currentSection,
+                    std::wstring& errorMsg);
+
+    // --- helper ---
+    static std::wstring _trim(const std::wstring& s);
+    static bool _isValidName(const std::wstring& name);
+    static bool _tryParseLong(const std::wstring& s, long& outValue);
+    static bool _tryParseBool(const std::wstring& s, long& outValue);
+
+    ConfigMap m_config;
 };
 
-// グローバル設定インスタンス（実体は ChmConfig.cpp に定義）
-extern const ChmConfigStore g_config;
+// グローバル（差し替え前提）
+extern ChmConfig* g_Config;
+
