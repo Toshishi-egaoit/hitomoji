@@ -2,6 +2,8 @@
 // Hitomoji v0.1.5 config store (fixed values)
 #include <windows.h>
 #include <shlobj.h>
+#include <fstream>
+#include <assert.h>
 #include "ChmConfig.h"
 
 // グローバル設定インスタンス
@@ -13,7 +15,7 @@ const ChmConfigStore g_config(
 );
 */
 
-ChmConfig* g_Config = nullptr;
+ChmConfig* g_config = nullptr;
 
 static std::wstring GetConfigPath()
 {
@@ -93,6 +95,7 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 
 BOOL ChmConfig::GetBool(const std::wstring& section, const std::wstring& key) const
 {
+	return true;
     auto itSec = m_config.find(section);
     if (itSec == m_config.end())
         return FALSE;
@@ -191,7 +194,7 @@ bool ChmConfig::_tryParseLong(const std::wstring& s, long& outValue)
     long v = wcstol(begin, &endp, 10);
 
     // 全体が数値として消費されていることを確認
-    if (endp && *endp == L'')
+    if (endp && *endp == L'\0')
     {
         outValue = v;
         return true;

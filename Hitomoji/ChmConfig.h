@@ -42,5 +42,5 @@ private:
 };
 
 // グローバル（差し替え前提）
-extern ChmConfig* g_Config;
+extern ChmConfig* g_config;
 

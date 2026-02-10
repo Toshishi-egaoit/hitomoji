@@ -44,14 +44,14 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
         case ChmKeyEvent::Type::CommitKatakana: // カタカナ変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
 				true, 
-				(g_config.backspaceUnit == ChmConfigStore::BackspaceUnit::Symbol));
+				g_config->GetBool(L"ui",L"Backspace_unit_is_symbol"));
             _converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
             _hasComposition = FALSE;
             break ;
         case ChmKeyEvent::Type::CommitKana:     // ひらがな変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
 				true,
-				(g_config.backspaceUnit == ChmConfigStore::BackspaceUnit::Symbol));
+				g_config->GetBool(L"ui",L"Backspace_unit_is_symbol"));
             _hasComposition = FALSE;
             break;
         case ChmKeyEvent::Type::CommitAscii:    // ASCII確定
@@ -77,8 +77,8 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
             }
             _pRawInputStore->push(keyEvent.GetChar());
             ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
-				(g_config.displayMode == ChmConfigStore::DisplayMode::Kana),
-				(g_config.backspaceUnit == ChmConfigStore::BackspaceUnit::Symbol));
+				g_config->GetBool(L"ui",L"display_mode_alpha"),
+				g_config->GetBool(L"ui",L"backspace_unit_symbol"));
 				;
             break;
         case ChmKeyEvent::Type::Backspace:
@@ -88,7 +88,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
                 size_t del = ChmRomajiConverter::GetLastRawUnitLength();
 
                 // Backspace の単位設定を考慮（Char / Unit）
-                if (g_config.backspaceUnit == ChmConfigStore::BackspaceUnit::Ascii) {
+				if (g_config->GetBool(L"ui",L"backspace_unit_symbol")) {
                     del = 1;
                 }
 
@@ -105,8 +105,8 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
                     _hasComposition = FALSE;
                 } else {
                     ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
-						(g_config.displayMode == ChmConfigStore::DisplayMode::Kana),
-						(g_config.backspaceUnit == ChmConfigStore::BackspaceUnit::Symbol));
+						g_config->GetBool(L"ui",L"display_mode_alpha"),
+						g_config->GetBool(L"ui",L"backspace_unit_symbol"));
                 }
             }
             break;

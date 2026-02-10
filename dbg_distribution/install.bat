@@ -1,0 +1,1 @@
+../distribution/install.bat
