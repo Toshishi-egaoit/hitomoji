@@ -9,6 +9,7 @@
 #include "TsfIf.h"
 #include "DisplayAttribute.h"
 #include "ChmLangBar.h"
+#include "ChmConfig.h"
 #include <objbase.h>
 
 class CEditSession : public ITfEditSession , public ITfCompositionSink{
@@ -231,6 +232,12 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 		OutputDebugStringWithInt(L"THeadFocusCookie:%x",_dwThreadFocusSinkCookie);
         pSource->Release();
     }
+	// configì«Ç›çûÇ›
+	if (g_config != nullptr){
+		delete g_config;
+		g_config = new ChmConfig();
+	}
+
     return S_OK;
 }
 

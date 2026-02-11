@@ -46,6 +46,7 @@ void ChmConfig::InitConfig()
 
 BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 {
+	OutputDebugString(L"[Hitomoji] ChmConfig::LoadFile");
     std::wstring path = fileName.empty() ? GetConfigPath() : fileName;
 
     // ファイル存在確認
@@ -95,7 +96,7 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 
 BOOL ChmConfig::GetBool(const std::wstring& section, const std::wstring& key) const
 {
-	return true;
+	//return true;
     auto itSec = m_config.find(section);
     if (itSec == m_config.end())
         return FALSE;
@@ -171,6 +172,7 @@ bool ChmConfig::_tryParseBool(const std::wstring& s, long& outValue)
     v.reserve(s.size());
     for (wchar_t c : s)
         v.push_back((c >= L'A' && c <= L'Z') ? (c - L'A' + L'a') : c);
+		v.
 
     if (v == L"true" || v == L"yes" || v == L"on" || v == L"1")
     {
@@ -325,4 +327,3 @@ BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSec
     m_config[currentSection][key] = rawValue;
     return TRUE;
 }
-

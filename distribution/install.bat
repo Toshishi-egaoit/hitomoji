@@ -10,6 +10,8 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
+set INI_DIR=%APPDATA%\Hitomoji
+
 set SYSTEM_DIR=%SystemRoot%\System32
 set TARGET_DIR=%SYSTEM_DIR%\hitomoji
 set TARGET_DLL=%TARGET_DIR%\Hitomoji.dll
@@ -41,19 +43,23 @@ if exist "%TARGET_DLL32%" (
 
 echo 管理者権限で実行中...
 
-echo "64ビット版DLLのコピーと登録"
+echo 64ビット版DLLのコピーと登録
 copy /y "x64\hitomoji.dll" "%TARGET_DIR%"
 "%SYSTEM_DIR%\regsvr32.exe" /s "%TARGET_DIR%\hitomoji.dll"
 
-echo "32ビット版DLLのコピーと登録"
+echo 32ビット版DLLのコピーと登録
 if exist "%SYSTEM_DIR32%" (
 	if not exist "%TARGET_DIR32%" mkdir "%TARGET_DIR32%"
     copy /y "x86\hitomoji.dll" "%TARGET_DIR32%"
     "%SYSTEM_DIR32%\regsvr32.exe" /s "%TARGET_DIR32%\hitomoji.dll"
 )
 
-echo "プロファイル登録"
+echo プロファイル登録
 copy /y "x64\regHitomoji.exe" "%TARGET_DIR%"
 "%TARGET_DIR%\regHitomoji.exe"
+
+echo iniファイルのコピー
+if not exist "%INI_DIR%" mkdir "%INI_DIR%"
+copy /y "Hitomoji.ini" "%INI_DIR%"
 
 echo 全てのインストール工程が完了しました！

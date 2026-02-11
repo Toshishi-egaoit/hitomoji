@@ -16,6 +16,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ソリューション項目
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "distribution", "distribution", "{DDB4EF12-CC4E-5E88-E6FC-71A802F4DE97}"
 	ProjectSection(SolutionItems) = preProject
+		distribution\Hitomoji.ini = distribution\Hitomoji.ini
 		distribution\install.bat = distribution\install.bat
 		distribution\Readme.md = distribution\Readme.md
 		distribution\Usage.md = distribution\Usage.md
