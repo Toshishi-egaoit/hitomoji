@@ -99,9 +99,7 @@
       <ModuleDefinitionFile>Hitomoji.def</ModuleDefinitionFile>
     </Link>
     <PostBuildEvent>
-      <Command>:: DLLのコピー
-
-copy /y "$(TargetPath)" "$(SolutionDir)dbg_distribution\x86\"
+      <Command>copy /y "$(TargetPath)" "$(SolutionDir)dbg_distribution\x86\"
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -123,9 +121,7 @@ copy /y "$(TargetPath)" "$(SolutionDir)dbg_distribution\x86\"
       <EnableUAC>false</EnableUAC>
     </Link>
     <PostBuildEvent>
-      <Command>:: DLLのコピー
-
-copy /y "$(TargetPath)" "$(SolutionDir)distribution\x86\"
+      <Command>copy /y "$(TargetPath)" "$(SolutionDir)distribution\x86\"
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -146,9 +142,7 @@ copy /y "$(TargetPath)" "$(SolutionDir)distribution\x86\"
       <ModuleDefinitionFile>Hitomoji.def</ModuleDefinitionFile>
     </Link>
     <PostBuildEvent>
-      <Command>:: DLLのコピー
-
-copy /y "$(TargetPath)" "$(SolutionDir)dbg_distribution\x64\"
+      <Command>copy /y "$(TargetPath)" "$(SolutionDir)dbg_distribution\x64\"
 
 </Command>
     </PostBuildEvent>
@@ -172,9 +166,7 @@ copy /y "$(TargetPath)" "$(SolutionDir)dbg_distribution\x64\"
       <ModuleDefinitionFile>Hitomoji.def</ModuleDefinitionFile>
     </Link>
     <PostBuildEvent>
-      <Command>:: DLLのコピー
-
-copy /y "$(TargetPath)" "$(SolutionDir)distribution\x64\"
+      <Command>copy /y "$(TargetPath)" "$(SolutionDir)distribution\x64\"
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
