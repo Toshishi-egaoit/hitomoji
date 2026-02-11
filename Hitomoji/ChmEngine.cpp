@@ -88,7 +88,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
                 size_t del = ChmRomajiConverter::GetLastRawUnitLength();
 
                 // Backspace の単位設定を考慮（Char / Unit）
-				if (g_config->GetBool(L"ui",L"backspace_unit_symbol")) {
+				if (g_config->GetBool(L"ui",L"backspace_unit_symbol") == FALSE) {
                     del = 1;
                 }
 
