@@ -235,8 +235,9 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 	// configì«Ç›çûÇ›
 	if (g_config != nullptr){
 		delete g_config;
-		g_config = new ChmConfig();
+		g_config = nullptr;
 	}
+	g_config = new ChmConfig();
 
     return S_OK;
 }

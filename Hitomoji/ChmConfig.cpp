@@ -1,19 +1,9 @@
 // ChmConfig.cpp
-// Hitomoji v0.1.5 config store (fixed values)
 #include <windows.h>
 #include <shlobj.h>
 #include <fstream>
 #include <assert.h>
 #include "ChmConfig.h"
-
-// グローバル設定インスタンス
-// v0.1.5 では固定値のみ（永続化・変更なし）
-/*
-const ChmConfigStore g_config(
-    ChmConfigStore::BackspaceUnit::Symbol,
-    ChmConfigStore::DisplayMode::Kana 
-);
-*/
 
 ChmConfig* g_config = nullptr;
 
@@ -44,9 +34,10 @@ void ChmConfig::InitConfig()
     m_config.clear();
 }
 
+// internal error storage is filled during LoadFile
+
 BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 {
-	OutputDebugString(L"[Hitomoji] ChmConfig::LoadFile");
     std::wstring path = fileName.empty() ? GetConfigPath() : fileName;
 
     // ファイル存在確認
@@ -71,7 +62,7 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
         size_t lineNo;
         std::wstring message;
     };
-    std::vector<ParseError> errors;
+    m_errors.clear();
 
     size_t lineNo = 0;
     while (std::getline(ifs, rawLine))
@@ -80,23 +71,38 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
         std::wstring errorMsg;
         if (!_parseLine(rawLine, currentSection, errorMsg))
         {
-            errors.push_back({ lineNo, errorMsg });
+            m_errors.push_back({ lineNo, errorMsg });
         }
     }
 
     // エラーがあれば失敗扱い（ここではログ出力は行わない）
-    if (!errors.empty())
+    if (!m_errors.empty())
     {
         // TODO: errors をログ出力する仕組みを後段で実装
         return FALSE;
     }
 
+	OutputDebugString((L"[Hitomoji] Loaded config file: " + path + L"\n").c_str());
+	OutputDebugString((L"[Hitomoji] Loaded m_config:\n" + _Dump() + L"\n").c_str());
+	OutputDebugString((L"[Hitomoji] m_errors :\n" + _DumpErrors() + L"\n").c_str());
+
     return TRUE;
+}
+
+// --- debug dump ---
+
+std::wstring ChmConfig::Dump() const
+{
+    return _Dump();
+}
+
+std::wstring ChmConfig::DumpErrors() const
+{
+    return _DumpErrors();
 }
 
 BOOL ChmConfig::GetBool(const std::wstring& section, const std::wstring& key) const
 {
-	//return true;
     auto itSec = m_config.find(section);
     if (itSec == m_config.end())
         return FALSE;
@@ -165,14 +171,58 @@ std::wstring ChmConfig::GetString(const std::wstring& section, const std::wstrin
 
 // --- private helpers ---
 
-bool ChmConfig::_tryParseBool(const std::wstring& s, long& outValue)
+std::wstring ChmConfig::_Dump() const
+{
+    std::wstring out;
+    out += L"--- ChmConfig config dump ---\n";
+
+    for (const auto& sec : m_config)
+    {
+        out += L"[" + sec.first + L"]\n";
+        for (const auto& kv : sec.second)
+        {
+            out += L"  " + kv.first + L" = ";
+            if (std::holds_alternative<long>(kv.second))
+            {
+                out += std::to_wstring(std::get<long>(kv.second));
+            }
+            else
+            {
+                out += std::get<std::wstring>(kv.second);
+            }
+            out += L"\n";
+        }
+    }
+
+    return out;
+}
+
+std::wstring ChmConfig::_DumpErrors() const
+{
+    std::wstring out;
+    out += L"--- ChmConfig parse errors ---\n";
+
+    for (const auto& e : m_errors)
+    {
+        out += L"line ";
+        out += std::to_wstring(e.lineNo);
+        out += L": ";
+        out += e.message;
+        out += L"\n";
+    }
+
+    return out;
+}
+
+
+
+static bool _tryParseBool(const std::wstring& s, long& outValue)
 {
     // case-insensitive
     std::wstring v;
     v.reserve(s.size());
     for (wchar_t c : s)
         v.push_back((c >= L'A' && c <= L'Z') ? (c - L'A' + L'a') : c);
-		v.
 
     if (v == L"true" || v == L"yes" || v == L"on" || v == L"1")
     {
@@ -187,7 +237,7 @@ bool ChmConfig::_tryParseBool(const std::wstring& s, long& outValue)
     return false;
 }
 
-bool ChmConfig::_tryParseLong(const std::wstring& s, long& outValue)
+static bool _tryParseLong(const std::wstring& s, long& outValue)
 {
     if (s.empty()) return false;
 
@@ -206,7 +256,7 @@ bool ChmConfig::_tryParseLong(const std::wstring& s, long& outValue)
 
 
 
-bool ChmConfig::_isValidName(const std::wstring& name)
+static bool _isValidName(const std::wstring& name)
 {
     // allowed: [_a-zA-Z][_a-zA-Z0-9.-]*
     if (name.empty()) return false;
@@ -235,19 +285,24 @@ bool ChmConfig::_isValidName(const std::wstring& name)
 
 
 
-std::wstring ChmConfig::_trim(const std::wstring& s)
+static inline std::wstring _normalize(const std::wstring& s)
 {
-    // whitespace characters: space(0x20), tab(0x09), CR(0x0D), LF(0x0A)
-    const wchar_t* ws = L" \t\r\n";
+    // trim + to lower
+	const wchar_t* ws = L" \t\n\r";
     size_t start = s.find_first_not_of(ws);
     if (start == std::wstring::npos) return L"";
     size_t end = s.find_last_not_of(ws);
-    return s.substr(start, end - start + 1);
+    std::wstring out = s.substr(start, end - start + 1);
+    for (auto& c : out)
+    {
+        if (c >= L'A' && c <= L'Z') c = c - L'A' + L'a';
+    }
+    return out;
 }
 
 BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSection, std::wstring& errorMsg)
 {
-    std::wstring s = _trim(rawLine);
+    std::wstring s = _normalize(rawLine);
     if (s.empty()) return TRUE;
 
     // コメント行
@@ -257,7 +312,7 @@ BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSec
     if (s.front() == L'[' && s.back() == L']')
     {
         // ブラケット([])内の空白を_trimで除去
-        std::wstring section = _trim(s.substr(1, s.size() - 2));
+        std::wstring section = _normalize(s.substr(1, s.size() - 2));
         if (!_isValidName(section))
         {
             errorMsg = L"invalid section name";
@@ -288,9 +343,9 @@ BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSec
         return FALSE;
     }
 
-    std::wstring key = _trim(s.substr(0, pos));
+    std::wstring key = _normalize(s.substr(0, pos));
     std::wstring rawValue = s.substr(pos + 1); // valueは改行以外すべて許可
-    std::wstring v = _trim(rawValue);           // 型判定用（trim後）
+    std::wstring v = _normalize(rawValue);           // 型判定用（trim後）
 
     if (key.empty())
     {

@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <variant>
+#include <vector>
 #include <windows.h>
 
 class ChmConfig
@@ -13,6 +14,12 @@ public:
     using ConfigValue = std::variant<long, std::wstring>;
     using SectionMap  = std::unordered_map<std::wstring, ConfigValue>;
     using ConfigMap   = std::unordered_map<std::wstring, SectionMap>;
+
+    struct ParseError
+    {
+        size_t lineNo;
+        std::wstring message;
+    };
 
 public:
     ChmConfig(const std::wstring& fileName = L"");
@@ -27,18 +34,21 @@ public:
     ULONG        GetLong(const std::wstring& section, const std::wstring& key) const;
     std::wstring GetString(const std::wstring& section, const std::wstring& key) const;
 
+    // debug dump
+    std::wstring Dump() const;
+    std::wstring DumpErrors() const;
+
 private:
     BOOL _parseLine(const std::wstring& rawLine,
                     std::wstring& currentSection,
                     std::wstring& errorMsg);
 
-    // --- helper ---
-    static std::wstring _trim(const std::wstring& s);
-    static bool _isValidName(const std::wstring& name);
-    static bool _tryParseLong(const std::wstring& s, long& outValue);
-    static bool _tryParseBool(const std::wstring& s, long& outValue);
+    std::wstring _Dump() const;
+    std::wstring _DumpErrors() const;
 
+private:
     ConfigMap m_config;
+    std::vector<ParseError> m_errors;
 };
 
 // グローバル（差し替え前提）

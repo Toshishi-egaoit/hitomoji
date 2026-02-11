@@ -22,14 +22,14 @@ public:
     static void convert(const std::wstring& rawInput,
                         std::wstring& converted,
                         std::wstring& pending,
-						bool isSybolMode,
+						bool isDispAlpha,
 					    bool isBsSymbol);
 
     // 1ユニットだけ変換できるか試みる（v0.1.5 用）
     static bool TryConvertOne(const std::wstring& rawInput,
                               size_t pos,
 							  Unit& out,
-							  bool isSymbolMode);
+							  bool isDispAlpha);
 
 	static size_t GetLastRawUnitLength() {
 		return _lastRawUnitLength;
@@ -143,7 +143,7 @@ inline const std::unordered_set<wchar_t>& ChmRomajiConverter::sokuonConsonants()
 bool ChmRomajiConverter::TryConvertOne(const std::wstring& rawInput,
                                         size_t pos,
                                         Unit& out,
-										bool isDispSymbol)
+										bool isDispAlpha)
 {
 	// TODO: この かんすうをユニットのもじすうをもとめるきのうとレンダリングきのうにわける。
 	// それによって、DisplayModeをConvertに とじこめる
@@ -165,11 +165,11 @@ bool ChmRomajiConverter::TryConvertOne(const std::wstring& rawInput,
         auto key = lowerInput.substr(pos, len);
         auto it = table().find(key);
         if (it != table().end()) {
-			if (isDispSymbol) {
-				out.output = it->second;
-			} else {
+			if (isDispAlpha) {
 				std::wstring sub = rawInput.substr(pos,len);
 				out.output = std::wstring(sub.begin(), sub.end());
+			} else {
+				out.output = it->second;
 			}
             out.rawLength = len;
             return true;
@@ -221,7 +221,7 @@ size_t ChmRomajiConverter::_lastRawUnitLength = 0;
 void ChmRomajiConverter::convert(const std::wstring& rawInput,
                                  std::wstring& converted,
                                  std::wstring& pending,
-								 bool isDispSymbol,
+								 bool isDispAlpha,
 								 bool isBsSymbol)
 {
     converted.clear();
@@ -232,7 +232,7 @@ void ChmRomajiConverter::convert(const std::wstring& rawInput,
     Unit unit;
 
 	while (pos < rawInput.size()) {
-		if (TryConvertOne(rawInput, pos, unit,isDispSymbol)) {
+		if (TryConvertOne(rawInput, pos, unit,isDispAlpha)) {
 			converted += unit.output;
 			_lastRawUnitLength = unit.rawLength;
 			pos += unit.rawLength;
