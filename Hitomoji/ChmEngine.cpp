@@ -25,6 +25,11 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
 	// 文字入力なら、常にIMEが食う
 	if (ev.GetType() == ChmKeyEvent::Type::CharInput) return TRUE;
 
+#ifdef _DEBUG
+	// バージョン情報キーもIMEが食う
+	if (ev.GetType() == ChmKeyEvent::Type::VersionInfo) return TRUE;
+#endif
+
 	// Compositonが存在する状態の特殊キーはIMEが食う
 	if (_hasComposition && ev.GetType() != ChmKeyEvent::Type::None ) return TRUE;
 
@@ -40,7 +45,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 #ifdef _DEBUG
         case ChmKeyEvent::Type::VersionInfo: // 無変換確定
             _converted = L"HITOMOJI" HITOMOJI_VERSION L"(" __DATE__ __TIME__ L")";
-            _hasComposition = FALSE;
+			_hasComposition = TRUE;// 確定はさせない（ESCでキャンセルできるように）
 			break;
 #endif
         case ChmKeyEvent::Type::CommitNonConvert: // 無変換確定
