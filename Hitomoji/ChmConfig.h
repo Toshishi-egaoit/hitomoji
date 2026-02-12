@@ -9,10 +9,16 @@
 class ChmConfig
 {
 public:
+	struct ParseError {
+        size_t lineNo;
+        std::wstring message;
+    };
+
     // 内部表現は long / string に正規化
     using ConfigValue = std::variant<long, std::wstring>;
     using SectionMap  = std::unordered_map<std::wstring, ConfigValue>;
     using ConfigMap   = std::unordered_map<std::wstring, SectionMap>;
+	using ErrorMap    = std::vector<ParseError>;
 
 public:
     ChmConfig(const std::wstring& fileName = L"");
@@ -33,12 +39,15 @@ private:
                     std::wstring& errorMsg);
 
     // --- helper ---
-    static std::wstring _trim(const std::wstring& s);
+    static std::wstring _normalize(const std::wstring& s);
+	std::wstring _Dump() const;
+	std::wstring _DumpErrors() const;
     static bool _isValidName(const std::wstring& name);
     static bool _tryParseLong(const std::wstring& s, long& outValue);
     static bool _tryParseBool(const std::wstring& s, long& outValue);
 
     ConfigMap m_config;
+    ErrorMap  m_errors;
 };
 
 // グローバル（差し替え前提）
