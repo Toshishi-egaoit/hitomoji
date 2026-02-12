@@ -233,19 +233,20 @@ void ChmRomajiConverter::convert(const std::wstring& rawInput,
 
 	while (pos < rawInput.size()) {
 		if (TryConvertOne(rawInput, pos, unit,isDispAlpha)) {
-			converted += unit.output;
+			converted += pending + unit.output;
+			pending.clear();
 			_lastRawUnitLength = unit.rawLength;
 			pos += unit.rawLength;
 		}
 		else if (pos + 2 >= rawInput.size()) { // 残り2文字以下なら pending に回す
 			// TODO:この かんがえかたは ローマじかなへんかんでのみりようかのう。ConvertMgrではつかえない。
-			pending = rawInput.substr(pos);
+			pending = pending + rawInput.substr(pos);
 			_lastRawUnitLength = pending.length();
 			// ループ終了
 			break;
 		}
 		else { // 未確定部分がまだある場合、1文字進めて再試行}
-			converted += rawInput[pos]; // 未確定文字をそのまま出力に追加
+			pending += rawInput[pos]; // 未確定文字をそのまま出力に追加
 			_lastRawUnitLength = 1;
 			pos ++;
 		}
