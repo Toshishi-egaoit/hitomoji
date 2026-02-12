@@ -8,6 +8,7 @@
 #include <combaseapi.h>
 #include <string>
 #include "TsfIf.h"
+#include "Hitomoji.h"
 
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "uuid.lib")
@@ -37,6 +38,7 @@ HRESULT RegisterCLSID(const wchar_t* dllPath) {
 }
 
 int main() {
+	wprintf(L"register hitomoji for v" HM_VERSION L"\n");
     CoInitialize(NULL);
 
     // 自分のDLLのフルパスを取得（RegisterApp.exeと同じフォルダにある想定）
@@ -57,8 +59,8 @@ int main() {
     if (SUCCEEDED(hr)) {
         hr = pProfiles->Register(CLSID_Hitomoji);
         if (SUCCEEDED(hr)) {
-            hr = pProfiles->AddLanguageProfile(CLSID_Hitomoji, 0x0411, GUID_HmProfile, L"ひともじ", 4, 
-				pathStr.c_str(), pathStr.length(), 0);
+            hr = pProfiles->AddLanguageProfile(CLSID_Hitomoji, 0x0411, GUID_HmProfile, 
+				L"ひともじ" HM_VERSION L"(" __DATE__ L")", 4, pathStr.c_str(), pathStr.length(), 0);
             
             ITfCategoryMgr* pCategoryMgr = nullptr;
             if (SUCCEEDED(CoCreateInstance(CLSID_TF_CategoryMgr, NULL, CLSCTX_INPROC_SERVER, IID_ITfCategoryMgr, (void**)&pCategoryMgr))) {
@@ -68,7 +70,7 @@ int main() {
                 pCategoryMgr->RegisterCategory(CLSID_Hitomoji, GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT, CLSID_Hitomoji);
                 pCategoryMgr->Release();
             }
-            printf("Successfully registered 'Hitomoji'!\n");
+            printf("  registered 'Hitomoji'\n");
         }
         pProfiles->Release();
     }

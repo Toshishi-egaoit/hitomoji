@@ -181,6 +181,7 @@ copy /y "$(TargetPath)" "$(SolutionDir)distribution\x64\"
   <ItemGroup>
     <ClInclude Include="ChmEngine.h" />
     <ClInclude Include="ChmRomajiConverter.h" />
+    <ClInclude Include="Hitomoji.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="TsfIf.h" />
     <ClInclude Include="utils.h" />

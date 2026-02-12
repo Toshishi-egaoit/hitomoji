@@ -6,6 +6,7 @@
 #include "ChmEngine.h"
 #include "ChmRomajiConverter.h"
 #include "ChmConfig.h"
+#include "Hitomoji.h"
 
 ChmEngine::ChmEngine() 
 	: _isON(FALSE), _hasComposition(FALSE),_converted(L""), _pending(L"") {
@@ -25,6 +26,10 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
 	// 文字入力なら、常にIMEが食う
 	if (ev.GetType() == ChmKeyEvent::Type::CharInput) return TRUE;
 
+#ifdef _DEBUG
+    if (ev.GetType() == ChmKeyEvent::Type::VersionInfo) return TRUE;
+#endif
+  
 	// Compositonが存在する状態の特殊キーはIMEが食う
 	if (_hasComposition && ev.GetType() != ChmKeyEvent::Type::None ) return TRUE;
 
@@ -37,7 +42,14 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 
 	// 確定キー
 	switch (_type) {
-        case ChmKeyEvent::Type::CommitNonConvert: // 無変換確定
+#ifdef _DEBUG
+      case ChmKeyEvent::Type::VersionInfo:
+            _converted = HM_VERSION L"(" __DATE__ L" " __TIME__ L")";
+            _pending = L"";
+            _hasComposition = TRUE;
+            break;
+#endif
+      case ChmKeyEvent::Type::CommitNonConvert: // 無変換確定
 			// 未変換部分も含めて全確定
             _hasComposition = FALSE;
 			break ;
@@ -253,6 +265,9 @@ static const ChmKeyEvent::FuncKeyDef g_functionKeyTable[] = {
     { 'I',         false, true,  false, ChmKeyEvent::Type::CommitAscii    },
     { 'I',         true,  true,  false, ChmKeyEvent::Type::CommitAsciiWide},
     { 'M',         false, true,  false, ChmKeyEvent::Type::CommitKana     },
+#ifdef _DEBUG
+    { 'V',         true,  true,  false, ChmKeyEvent::Type::VersionInfo    },
+#endif
 };
 
 ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/)

@@ -23,6 +23,7 @@ public:
         Cancel,             // ESC
         Backspace,          // BS
         Uncommit,           // 確定取消（将来）
+        VersionInfo,        // CTRL+SHIFT+V (debug)
     };
 
     struct FuncKeyDef {
@@ -117,4 +118,3 @@ private:
 	std::wstring _converted; // かな変換できた部分
 	std::wstring _pending; // かなに変換できていない部分（残り）
 };
-

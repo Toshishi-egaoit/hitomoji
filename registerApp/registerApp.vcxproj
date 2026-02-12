@@ -119,7 +119,7 @@
     </Link>
     <PostBuildEvent>
       <Command>
-</Command>
+      </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -135,9 +135,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>:: Installerのコピー
-
-copy /y "$(TargetPath)" "$(SolutionDir)dbg_distribution\x64\"
+      <Command>copy /y "$(TargetPath)" "$(SolutionDir)dbg_distribution\x64\"
 
 </Command>
     </PostBuildEvent>
@@ -157,9 +155,7 @@ copy /y "$(TargetPath)" "$(SolutionDir)dbg_distribution\x64\"
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>:: Installerのコピー
-
-copy /y "$(TargetPath)" "$(SolutionDir)distribution\x64\"
+      <Command>copy /y "$(TargetPath)" "$(SolutionDir)distribution\x64\"
 
 </Command>
     </PostBuildEvent>
