@@ -84,10 +84,15 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
         }
     }
 
-    // エラーがあれば失敗扱い（ここではログ出力は行わない）
+#ifdef _DEBUG
+	// デバッグ用ダンプ出力
+	OutputDebugString(_Dump().c_str());
+#endif
+    // エラーがあれば失敗扱い
     if (!m_errors.empty())
     {
-        // TODO: errors をログ出力する仕組みを後段で実装
+        // TODO: errors をログファイルに出力する仕組みを後段で実装
+		OutputDebugString(_DumpErrors().c_str());
         return FALSE;
     }
 
