@@ -51,7 +51,7 @@ private:
 // --- DLLエクスポート関数 ---
 
 BOOL WINAPI DllMain(HINSTANCE hInst, DWORD dwReason, LPVOID pvReserved) {
-	wchar_t * str;
+	wchar_t str[100];
 	wsprintf(str, L"[Hitomoji] dllMain (%08x/%08x) : %s",
 		GetCurrentProcessId(),
 		GetCurrentThreadId(),
