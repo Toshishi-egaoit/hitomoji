@@ -3,17 +3,24 @@
 #include <windows.h>
 #include <shlobj.h>
 #include <fstream>
+#include <sstream>
+#include <algorithm>
 #include <assert.h>
 #include "ChmConfig.h"
 
-// グローバル設定インスタンス
-// v0.1.5 では固定値のみ（永続化・変更なし）
-/*
-const ChmConfigStore g_config(
-    ChmConfigStore::BackspaceUnit::Symbol,
-    ChmConfigStore::DisplayMode::Kana 
-);
-*/
+#ifdef _DEBUG
+#define CONFIG_ASSERT(cond, msg)                                   \
+    do {                                                            \
+        if (!(cond)) {                                              \
+            OutputDebugStringW(L"[ChmConfig] ");                  \
+            OutputDebugStringW(msg);                                \
+            OutputDebugStringW(L"\n");                           \
+            assert(cond);                                           \
+        }                                                           \
+    } while (0)
+#else
+#define CONFIG_ASSERT(cond, msg) ((void)0)
+#endif
 
 ChmConfig* g_config = nullptr;
 
@@ -62,6 +69,8 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
         return FALSE;
     }
 
+    InitConfig();
+
     std::wstring rawLine;
     std::wstring currentSection; // 現在のセクション名
 
@@ -97,10 +106,14 @@ BOOL ChmConfig::GetBool(const std::wstring& section, const std::wstring& key) co
 {
 	return true;
     auto itSec = m_config.find(section);
+    CONFIG_ASSERT(itSec != m_config.end(),
+                  (L"Missing section: " + section).c_str());
     if (itSec == m_config.end())
         return FALSE;
 
     auto itKey = itSec->second.find(key);
+    CONFIG_ASSERT(itKey != itSec->second.end(),
+                  (L"Missing key: " + section + L"." + key).c_str());
     if (itKey == itSec->second.end())
         return FALSE;
 
@@ -110,20 +123,23 @@ BOOL ChmConfig::GetBool(const std::wstring& section, const std::wstring& key) co
         return std::get<long>(itKey->second) != 0 ? TRUE : FALSE;
     }
 
-#ifdef _DEBUG
-    // 型不一致（string を bool として取得）
-    assert(false);
-#endif
-    return FALSE;
+	CONFIG_ASSERT(false,
+				  (L"Type mismatch (expected long/bool) for key: " +
+				   section + L"." + key).c_str());
+	return FALSE;
 }
 
 ULONG ChmConfig::GetLong(const std::wstring& section, const std::wstring& key) const
 {
     auto itSec = m_config.find(section);
+    CONFIG_ASSERT(itSec != m_config.end(),
+                  (L"Missing section: " + section).c_str());
     if (itSec == m_config.end())
         return 0;
 
     auto itKey = itSec->second.find(key);
+    CONFIG_ASSERT(itKey != itSec->second.end(),
+                  (L"Missing key: " + section + L"." + key).c_str());
     if (itKey == itSec->second.end())
         return 0;
 
@@ -132,20 +148,23 @@ ULONG ChmConfig::GetLong(const std::wstring& section, const std::wstring& key) c
         return static_cast<ULONG>(std::get<long>(itKey->second));
     }
 
-#ifdef _DEBUG
-    // 型不一致（string を long として取得）
-    assert(false);
-#endif
-    return 0;
+	CONFIG_ASSERT(false,
+				  (L"Type mismatch (expected long/bool) for key: " +
+				   section + L"." + key).c_str());
+	return 0;
 }
 
 std::wstring ChmConfig::GetString(const std::wstring& section, const std::wstring& key) const
 {
     auto itSec = m_config.find(section);
+    CONFIG_ASSERT(itSec != m_config.end(),
+                  (L"Missing section: " + section).c_str());
     if (itSec == m_config.end())
         return L"";
 
     auto itKey = itSec->second.find(key);
+    CONFIG_ASSERT(itKey != itSec->second.end(),
+                  (L"Missing key: " + section + L"." + key).c_str());
     if (itKey == itSec->second.end())
         return L"";
 
@@ -154,11 +173,10 @@ std::wstring ChmConfig::GetString(const std::wstring& section, const std::wstrin
         return std::get<std::wstring>(itKey->second);
     }
 
-#ifdef _DEBUG
-    // 型不一致（数値を string として取得）
-    assert(false);
-#endif
-    return L"";
+	CONFIG_ASSERT(false,
+				  (L"Type mismatch (expected string) for key: " +
+				   section + L"." + key).c_str());
+	return L"";
 }
 
 
