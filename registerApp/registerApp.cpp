@@ -8,6 +8,7 @@
 #include <combaseapi.h>
 #include <string>
 #include "TsfIf.h"
+#include "hitomoji.h"
 
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "uuid.lib")
@@ -37,6 +38,7 @@ HRESULT RegisterCLSID(const wchar_t* dllPath) {
 }
 
 int main() {
+	wprintf(L"Hitomoji " HITOMOJI_VERSION L" Registration\n");
     CoInitialize(NULL);
 
     // 自分のDLLのフルパスを取得（RegisterApp.exeと同じフォルダにある想定）
@@ -57,7 +59,7 @@ int main() {
     if (SUCCEEDED(hr)) {
         hr = pProfiles->Register(CLSID_Hitomoji);
         if (SUCCEEDED(hr)) {
-            hr = pProfiles->AddLanguageProfile(CLSID_Hitomoji, 0x0411, GUID_HmProfile, L"ひともじ", 4, 
+            hr = pProfiles->AddLanguageProfile(CLSID_Hitomoji, 0x0411, GUID_HmProfile, L"ひともじ " HITOMOJI_VERSION L"(" __DATE__ L")", 4,
 				pathStr.c_str(), pathStr.length(), 0);
             
             ITfCategoryMgr* pCategoryMgr = nullptr;

@@ -37,6 +37,12 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 
 	// 確定キー
 	switch (_type) {
+#ifdef _DEBUG
+        case ChmKeyEvent::Type::VersionInfo: // 無変換確定
+            _converted = L"HITOMOJI" HITOMOJI_VERSION L"(" __DATE__ __TIME__ L")";
+            _hasComposition = FALSE;
+			break;
+#endif
         case ChmKeyEvent::Type::CommitNonConvert: // 無変換確定
 			// 未変換部分も含めて全確定
             _hasComposition = FALSE;
@@ -253,6 +259,7 @@ static const ChmKeyEvent::FuncKeyDef g_functionKeyTable[] = {
     { 'I',         false, true,  false, ChmKeyEvent::Type::CommitAscii    },
     { 'I',         true,  true,  false, ChmKeyEvent::Type::CommitAsciiWide},
     { 'M',         false, true,  false, ChmKeyEvent::Type::CommitKana     },
+    { 'V',         true,  true,  false, ChmKeyEvent::Type::VersionInfo    },
 };
 
 ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/)

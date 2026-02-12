@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string>
 #include "utils.h"
+#include "hitomoji.h"
 
 class ChmRawInputStore;
 
@@ -23,6 +24,7 @@ public:
         Cancel,             // ESC
         Backspace,          // BS
         Uncommit,           // 確定取消（将来）
+		VersionInfo,        // バージョン表示
     };
 
     struct FuncKeyDef {

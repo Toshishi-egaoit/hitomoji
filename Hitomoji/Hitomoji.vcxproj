@@ -176,6 +176,7 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="TsfIf.h" />
     <ClInclude Include="utils.h" />
+    <ClInclude Include="hitomoji.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ChmConfig.cpp" />

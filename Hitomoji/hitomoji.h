@@ -1,0 +1,1 @@
+#define HITOMOJI_VERSION L"v0.2"
