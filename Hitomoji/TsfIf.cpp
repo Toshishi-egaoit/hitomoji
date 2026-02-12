@@ -6,10 +6,11 @@
 #include <string>
 #include <cctype>
 #include <initguid.h> // GUID‚ÌŽÀ‘Ì’è‹`—p
+#include <objbase.h>
 #include "TsfIf.h"
 #include "DisplayAttribute.h"
 #include "ChmLangBar.h"
-#include <objbase.h>
+#include "ChmConfig.h"
 
 class CEditSession : public ITfEditSession , public ITfCompositionSink{
 
@@ -228,9 +229,18 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
     if (SUCCEEDED(_pThreadMgr->QueryInterface(IID_ITfSource, (void**)&pSource))) {
         HRESULT hr = pSource->AdviseSink(IID_ITfThreadFocusSink, (ITfThreadFocusSink*)this,&_dwThreadFocusSinkCookie);
 		OUTPUT_HR_ON_ERROR(L"Activate.AdviceSink",hr);
-		OutputDebugStringWithInt(L"THeadFocusCookie:%x",_dwThreadFocusSinkCookie);
+		OutputDebugStringWithInt(L"   > THeadFocusCookie:%x",_dwThreadFocusSinkCookie);
         pSource->Release();
     }
+
+	// ChmConfig‚Ì‰Šú‰»
+	if (g_config != nullptr) {
+		delete g_config;
+		g_config = nullptr;
+		OutputDebugString(L"   > clear g_config");
+	}
+	g_config = new ChmConfig();
+
     return S_OK;
 }
 

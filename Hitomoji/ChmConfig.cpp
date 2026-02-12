@@ -38,7 +38,11 @@ static std::wstring GetConfigPath()
 
 ChmConfig::ChmConfig(const std::wstring& fileName)
 {
-    if (!LoadFile(fileName))
+	std::wstring configFile = fileName;
+	if (configFile.empty()) {
+		configFile = GetConfigPath();
+	}
+    if (!LoadFile(configFile))
     {
         InitConfig();
     }
