@@ -133,7 +133,7 @@ BOOL ChmConfig::GetBool(const std::wstring& section, const std::wstring& key) co
     return FALSE;
 }
 
-ULONG ChmConfig::GetLong(const std::wstring& section, const std::wstring& key) const
+LONG ChmConfig::GetLong(const std::wstring& section, const std::wstring& key) const
 {
     auto itSec = m_config.find(section);
     CONFIG_ASSERT(itSec != m_config.end(),

@@ -29,9 +29,10 @@ public:
     void InitConfig();
 
     // GetteriŒ©‚Â‚©‚ç‚È‚¢^Œ^•sˆê’v‚ÍŠù’è’lj
-    BOOL         GetBool(const std::wstring& section, const std::wstring& key) const;
-    ULONG        GetLong(const std::wstring& section, const std::wstring& key) const;
+    BOOL GetBool(const std::wstring& section, const std::wstring& key) const;
+    LONG GetLong(const std::wstring& section, const std::wstring& key) const;
     std::wstring GetString(const std::wstring& section, const std::wstring& key) const;
+	// TODO: GetUnusedKeys() ‚ÌÀ‘•
 
 private:
     BOOL _parseLine(const std::wstring& rawLine,
