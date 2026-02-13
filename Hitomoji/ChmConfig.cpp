@@ -184,13 +184,16 @@ std::wstring ChmConfig::GetString(const std::wstring& section, const std::wstrin
 }
 
 
+std::wstring ChmConfig::DumpErrors() const
+{
+	return _DumpErrors();
+}
+
 // --- private helpers ---
 
 std::wstring ChmConfig::_Dump() const
 {
     std::wstring out;
-    out += L"--- ChmConfig config dump ---\n";
-
     for (const auto& sec : m_config)
     {
         out += L"[" + sec.first + L"]\n";
@@ -215,8 +218,6 @@ std::wstring ChmConfig::_Dump() const
 std::wstring ChmConfig::_DumpErrors() const
 {
     std::wstring out;
-    out += L"--- ChmConfig parse errors ---\n";
-
     for (const auto& e : m_errors)
     {
         out += std::to_wstring(e.lineNo);

@@ -32,6 +32,8 @@ public:
     BOOL GetBool(const std::wstring& section, const std::wstring& key) const;
     LONG GetLong(const std::wstring& section, const std::wstring& key) const;
     std::wstring GetString(const std::wstring& section, const std::wstring& key) const;
+	std::wstring DumpErrors() const;
+
 	// TODO: GetUnusedKeys() ‚ÌŽÀ‘•
 
 private:
