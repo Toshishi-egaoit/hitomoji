@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <assert.h>
 #include "ChmConfig.h"
+#include "utils.h"
 
 #ifdef _DEBUG
 #define CONFIG_ASSERT(cond, msg)                                   \
@@ -56,6 +57,7 @@ void ChmConfig::InitConfig()
 
 BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 {
+	OutputDebugString(L"[Hitomoji] ChmConfig::LoadFile called\n");
     std::wstring path = fileName.empty() ? GetConfigPath() : fileName;
 
     // ファイル存在確認
@@ -63,12 +65,14 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
     if (attr == INVALID_FILE_ATTRIBUTES || (attr & FILE_ATTRIBUTE_DIRECTORY))
     {
         // ファイルが存在しない、またはディレクトリ
+		OutputDebugString(L"   > File not found \n");
         return FALSE;
     }
 
     std::wifstream ifs(path);
     if (!ifs.is_open())
     {
+		OutputDebugString(L"   > cannot open \n");
         return FALSE;
     }
 
@@ -303,6 +307,7 @@ static std::wstring _trim(const std::wstring& s)
     if (start == std::wstring::npos) return L"";
     size_t end = s.find_last_not_of(ws);
     std::wstring out = s.substr(start, end - start + 1);
+	return out;
 }
 
 std::wstring ChmConfig::_normalize(const std::wstring& s)
@@ -317,6 +322,7 @@ std::wstring ChmConfig::_normalize(const std::wstring& s)
 
 BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSection, std::wstring& errorMsg)
 {
+	OutputDebugStringWithString(L"_parseLine: %s", rawLine.c_str());
     std::wstring s = _normalize(rawLine);
     if (s.empty()) return TRUE;
 
