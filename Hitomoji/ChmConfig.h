@@ -33,6 +33,7 @@ public:
     LONG GetLong(const std::wstring& section, const std::wstring& key) const;
     std::wstring GetString(const std::wstring& section, const std::wstring& key) const;
 	std::wstring DumpErrors() const;
+	BOOL HasErrors() const { return ! m_errors.empty() ; }
 
 	// TODO: GetUnusedKeys() ‚ÌŽÀ‘•
 
