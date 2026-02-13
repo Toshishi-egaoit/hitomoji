@@ -21,11 +21,11 @@ public:
 	using ErrorMap    = std::vector<ParseError>;
 
 public:
-    ChmConfig(const std::wstring& fileName = L"");
+    ChmConfig();
     ~ChmConfig() = default;
 
     // ini “Ç‚İ‚İ
-    BOOL LoadFile(const std::wstring& fileName);
+    BOOL LoadFile(const std::wstring& fileName=L"");
     void InitConfig();
 
     // GetteriŒ©‚Â‚©‚ç‚È‚¢^Œ^•sˆê’v‚ÍŠù’è’lj

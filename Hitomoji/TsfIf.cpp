@@ -234,12 +234,19 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
     }
 
 	// ChmConfig‚Ì‰Šú‰»
-	if (g_config != nullptr) {
-		delete g_config;
-		g_config = nullptr;
-		OutputDebugString(L"   > clear g_config");
+	ChmConfig* newConfig = new ChmConfig();
+	if ( newConfig->LoadFile() ) {
+		if (g_config != nullptr) {
+			delete g_config;
+			g_config = std::move(newConfig);
+			OutputDebugString(L"   > replace g_config");
+		}
+	} else {
+		if ( g_config == nullptr ) {
+			g_config = newConfig;
+		}
+		OutputDebugString(L"   > Load config file failed, using current config");
 	}
-	g_config = new ChmConfig();
 
     return S_OK;
 }

@@ -37,16 +37,9 @@ static std::wstring GetConfigPath()
     return result;
 }
 
-ChmConfig::ChmConfig(const std::wstring& fileName)
+ChmConfig::ChmConfig()
 {
-	std::wstring configFile = fileName;
-	if (configFile.empty()) {
-		configFile = GetConfigPath();
-	}
-    if (!LoadFile(configFile))
-    {
-        InitConfig();
-    }
+	InitConfig();
 }
 
 void ChmConfig::InitConfig()
@@ -57,6 +50,14 @@ void ChmConfig::InitConfig()
 
 BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 {
+	std::wstring configName ;
+	if (fileName.empty()) {
+		configName = GetConfigPath();
+	} else 
+	{
+		configName = fileName ;
+	}
+
 	OutputDebugString(L"[Hitomoji] ChmConfig::LoadFile called\n");
     std::wstring path = fileName.empty() ? GetConfigPath() : fileName;
 
