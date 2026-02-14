@@ -1,5 +1,5 @@
 #pragma once
-#include <Windows.h>
+#include "utils.h"
 
 // debug support functions
 void OutputDebugStringWithInt(wchar_t const* format, ULONG lvalue)
@@ -35,3 +35,32 @@ void OutputDebugStringWithGuid(wchar_t const* format, const IID iid)
     OutputDebugStringW(buff);
     return;
 }
+
+void ChmLogger::_Output(const std::wstring& level, const std::wstring& msg)
+{
+#ifdef _DEBUG
+    std::wstring line = L"[Hitomoji][" + level + L"] " + msg + L"\n";
+    OutputDebugStringW(line.c_str());
+#endif
+}
+
+void ChmLogger::Info(const std::wstring& msg)
+{
+    _Output(L"INFO", msg);
+}
+
+void ChmLogger::Warn(const std::wstring& msg)
+{
+    _Output(L"WARN", msg);
+}
+
+void ChmLogger::Error(const std::wstring& msg)
+{
+    _Output(L"ERROR", msg);
+}
+
+void ChmLogger::Debug(const std::wstring& msg)
+{
+    _Output(L"DEBUG", msg);
+}
+
