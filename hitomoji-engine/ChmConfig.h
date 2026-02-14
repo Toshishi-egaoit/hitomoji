@@ -15,7 +15,7 @@ public:
     };
 
     // “à•”•\Œ»‚Í long / string ‚É³‹K‰»
-    using ConfigValue = std::variant<long, std::wstring>;
+    using ConfigValue = std::variant<bool, long, std::wstring>;
     using SectionMap  = std::unordered_map<std::wstring, ConfigValue>;
     using ConfigMap   = std::unordered_map<std::wstring, SectionMap>;
 	using ErrorMap    = std::vector<ParseError>;

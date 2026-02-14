@@ -100,8 +100,8 @@ BOOL ChmConfig::GetBool(const std::wstring& section, const std::wstring& key) co
     if (itKey == itSec->second.end())
         return FALSE;
 
-    if (std::holds_alternative<long>(itKey->second))
-        return std::get<long>(itKey->second) != 0 ? TRUE : FALSE;
+        if (std::holds_alternative<bool>(itKey->second))
+        return std::get<bool>(itKey->second) ? TRUE : FALSE;
 
     return FALSE;
 }
@@ -119,7 +119,7 @@ LONG ChmConfig::GetLong(const std::wstring& section, const std::wstring& key) co
     if (itKey == itSec->second.end())
         return 0;
 
-    if (std::holds_alternative<long>(itKey->second))
+        if (std::holds_alternative<long>(itKey->second))
         return std::get<long>(itKey->second);
 
     return 0;
@@ -160,7 +160,11 @@ std::wstring ChmConfig::_Dump() const
         for (const auto& kv : sec.second)
         {
             out += L"  " + kv.first + L" = ";
-            if (std::holds_alternative<long>(kv.second))
+                        if (std::holds_alternative<bool>(kv.second))
+            {
+                out += std::get<bool>(kv.second) ? L"true" : L"false";
+            }
+            else if (std::holds_alternative<long>(kv.second))
             {
                 out += std::to_wstring(std::get<long>(kv.second));
             }
@@ -355,9 +359,9 @@ BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSec
 
     // value 型判定（内部は long / string に正規化）
     long n = 0;
-    if (_tryParseBool(v, n))
+        if (_tryParseBool(v, n))
     {
-        m_config[currentSection][key] = n; // boolは 0/1 の long
+        m_config[currentSection][key] = (n != 0); // boolとして保存
         return TRUE;
     }
     if (_tryParseLong(v, n))
@@ -366,7 +370,9 @@ BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSec
         return TRUE;
     }
 
-        // それ以外は string（rawTrim から再抽出して trim）
+    // それ以外は string（rawTrim から再抽出して trim）
+	// TODO:現状ではTRUEを文字列として扱うことができない（=true は bool として解釈される）。クオート処理が必要。
+	// TODO:同様にStringの先頭に空白記号を入れることもできない。クオート処理が必要。
     size_t rawPos = rawTrim.find(L'=');
     if (rawPos != std::wstring::npos)
     {
