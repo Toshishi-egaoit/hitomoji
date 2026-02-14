@@ -18,11 +18,13 @@ TEST(ConfigTest, LoadValidFile)
     EXPECT_FALSE(config.GetBool(L"Bools", L"Bool_False_3"));
     EXPECT_FALSE(config.GetBool(L"bools", L"bool_false_4"));
 
-    EXPECT_EQ(123u, config.GetLong(L"numbers", L"long_1"));
-    EXPECT_EQ(-789u, config.GetLong(L"NUMBERS", L"Long_2"));
-    EXPECT_EQ(210000000u, config.GetLong(L"numbers", L"long_3"));
+    EXPECT_EQ(123, config.GetLong(L"numbers", L"long_1"));
+    EXPECT_EQ(-789, config.GetLong(L"NUMBERS", L"Long_2"));
+    EXPECT_EQ(2100000000, config.GetLong(L"numbers", L"long_3"));
 
-    EXPECT_EQ(L"hitomoji", config.GetString(L"strings", L"string_1"));
+    EXPECT_EQ(L"Hitomoji", config.GetString(L"strings", L"string_1"));
+    EXPECT_NE(L"hitomoji", config.GetString(L"strings", L"string_1"));
+    EXPECT_NE(L"hITOMOJI", config.GetString(L"strings", L"string_1"));
     EXPECT_EQ(L"C:\\temp\\FILE.txt", config.GetString(L"strings", L"valid_key_9"));
 }
 
@@ -35,5 +37,27 @@ TEST(ConfigTest, WhitespaceLine)
     EXPECT_FALSE(config.GetBool(L"undefined", L"not_exist_bool_key"));
     EXPECT_EQ(0, config.GetLong(L"undefined", L"not_exist_long_key"));
     EXPECT_EQ(L"", config.GetString(L"undefined", L"not_exist_string_key"));
+}
+
+TEST(ConfigTest, LoadInvalidFile)
+{
+    ChmConfig config;
+    EXPECT_TRUE(config.LoadFile(L".\\testdata\\invalid.ini"));
+
+    EXPECT_TRUE(config.HasErrors());
+
+    std::wstring errors = config.DumpErrors();
+
+    // ïîï™àÍívÇ≈å©ÇÈÅiëSï∂àÍívÇÕâÛÇÍÇ‚Ç∑Ç¢Åj
+    EXPECT_NE(std::wstring::npos, errors.find(L"missing_bracket"));
+    EXPECT_NE(std::wstring::npos, errors.find(L"missing_key"));
+    EXPECT_NE(std::wstring::npos, errors.find(L"bad_bool"));
+    EXPECT_NE(std::wstring::npos, errors.find(L"bad_long"));
+}
+
+TEST(ConfigTest, FileNotFound)
+{
+    ChmConfig config;
+    EXPECT_FALSE(config.LoadFile(L".\\testdata\\no_such_file.ini"));
 }
 
