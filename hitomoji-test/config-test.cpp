@@ -25,7 +25,20 @@ TEST(ConfigTest, LoadValidFile)
     EXPECT_EQ(L"Hitomoji", config.GetString(L"strings", L"string_1"));
     EXPECT_NE(L"hitomoji", config.GetString(L"strings", L"string_1"));
     EXPECT_NE(L"hITOMOJI", config.GetString(L"strings", L"string_1"));
+    EXPECT_NE(L"hitomoji", config.GetString(L"strings", L"string_2"));
     EXPECT_EQ(L"C:\\temp\\FILE.txt", config.GetString(L"strings", L"valid_key_9"));
+
+	// BOOL値をLongやStringで取ろうとした場合
+    EXPECT_EQ(0,config.GetLong(L"bools", L"bool_true_1"));
+	EXPECT_EQ(L"", config.GetString(L"bools", L"bool_true_1"));
+
+	// long値をBoolやStringで取ろうとした場合
+    EXPECT_FALSE(config.GetBool(L"numbers", L"long_1"));
+	EXPECT_EQ(L"", config.GetString(L"numbers", L"long_1"));
+
+	// string値をBoolやlongで取ろうとした場合
+    EXPECT_FALSE(config.GetBool(L"strings", L"string_1"));
+	EXPECT_EQ(0, config.GetLong(L"strings", L"string_1"));
 }
 
 TEST(ConfigTest, WhitespaceLine)
@@ -52,9 +65,15 @@ TEST(ConfigTest, LoadInvalidFile)
     EXPECT_NE(std::wstring::npos, errors.find(L"missing ']'"));
     EXPECT_NE(std::wstring::npos, errors.find(L"empty key name"));
 
-    EXPECT_FALSE(config.GetBool(L"valid_section", L"bad_bool"));
-    EXPECT_EQ(0L,config.GetLong(L"valid_section", L"bad_long"));
+	// Get系でセクションが間違っているパターン（全部デフォルト値）
+    EXPECT_FALSE(config.GetBool(L"bad_section", L"bad_bool"));
+    EXPECT_EQ(0L,config.GetLong(L"bad_section", L"bad_long"));
+    EXPECT_EQ(L"", config.GetString(L"bad_section", L"bad_string"));
 
+	// Get系でキー名が間違っているパターン（全部デフォルト値）
+    EXPECT_FALSE(config.GetBool(L"valid_section", L"not_exists_bool"));
+    EXPECT_EQ(0L,config.GetLong(L"valid_section", L"not_exists_long"));
+    EXPECT_EQ(L"", config.GetString(L"valid_section", L"not_exists_string"));
 }
 
 TEST(ConfigTest, FileNotFound)
