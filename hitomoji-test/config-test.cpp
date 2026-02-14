@@ -32,7 +32,7 @@ TEST(ConfigTest, WhitespaceLine)
 {
     ChmConfig config;
 	
-	EXPECT_TRUE(config.LoadFile(L".\\testdata\\ChmConfig.null.ini"));
+	EXPECT_TRUE(config.LoadFile(L".\\testdata\\null.ini"));
 
     EXPECT_FALSE(config.GetBool(L"undefined", L"not_exist_bool_key"));
     EXPECT_EQ(0, config.GetLong(L"undefined", L"not_exist_long_key"));
@@ -42,17 +42,19 @@ TEST(ConfigTest, WhitespaceLine)
 TEST(ConfigTest, LoadInvalidFile)
 {
     ChmConfig config;
-    EXPECT_TRUE(config.LoadFile(L".\\testdata\\invalid.ini"));
+    EXPECT_FALSE(config.LoadFile(L".\\testdata\\invalid.ini"));
 
     EXPECT_TRUE(config.HasErrors());
 
     std::wstring errors = config.DumpErrors();
 
     // ïîï™àÍívÇ≈å©ÇÈÅiëSï∂àÍívÇÕâÛÇÍÇ‚Ç∑Ç¢Åj
-    EXPECT_NE(std::wstring::npos, errors.find(L"missing_bracket"));
-    EXPECT_NE(std::wstring::npos, errors.find(L"missing_key"));
-    EXPECT_NE(std::wstring::npos, errors.find(L"bad_bool"));
-    EXPECT_NE(std::wstring::npos, errors.find(L"bad_long"));
+    EXPECT_NE(std::wstring::npos, errors.find(L"missing ']'"));
+    EXPECT_NE(std::wstring::npos, errors.find(L"empty key name"));
+
+    EXPECT_FALSE(config.GetBool(L"valid_section", L"bad_bool"));
+    EXPECT_EQ(0L,config.GetLong(L"valid_section", L"bad_long"));
+
 }
 
 TEST(ConfigTest, FileNotFound)

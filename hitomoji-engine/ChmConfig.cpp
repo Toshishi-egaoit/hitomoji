@@ -47,12 +47,12 @@ BOOL ChmConfig::LoadFromStream(std::wistream& is)
     }
 
 #ifdef _DEBUG
-    OutputDebugString((L"=== Configs ===\n" + _Dump()).c_str());
+    OutputDebugString((std::wstring(L"=== Configs ===\n") + _Dump()).c_str());
 #endif
 
     if (!m_errors.empty())
     {
-        OutputDebugString((L"===ERRORS===\n" + _DumpErrors()).c_str());
+        OutputDebugString((std::wstring(L"===ERRORS===\n") + _DumpErrors()).c_str());
         return FALSE;
     }
 
@@ -273,7 +273,8 @@ static std::wstring _trim(const std::wstring& s)
 
 std::wstring ChmConfig::_normalize(const std::wstring& s)
 {
-	std::wstring out =_trim(s);
+    // 小文字化のみ（trimは行わない）
+    std::wstring out = s;
     for (auto& c : out)
     {
         if (c >= L'A' && c <= L'Z') c = c - L'A' + L'a';
@@ -283,18 +284,24 @@ std::wstring ChmConfig::_normalize(const std::wstring& s)
 
 BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSection, std::wstring& errorMsg)
 {
-	OutputDebugStringWithString(L"_parseLine: %s", rawLine.c_str());
-    std::wstring s = _normalize(rawLine);
-    if (s.empty()) return TRUE;
+    OutputDebugStringWithString(L"_parseLine: %s", rawLine.c_str());
+
+    // まず trim
+    std::wstring rawTrim = _trim(rawLine);
+    if (rawTrim.empty()) return TRUE;
+
+    // 解析用に小文字化（trimはしない）
+    std::wstring normalizedLine = _normalize(rawTrim);
+    if (normalizedLine.empty()) return TRUE;
 
     // コメント行
-    if (s[0] == L';' || s[0] == L'#') return TRUE;
+    if (normalizedLine[0] == L';' || normalizedLine[0] == L'#') return TRUE;
 
-    // セクション行 [Section]
-    if (s.front() == L'[' && s.back() == L']')
+        // セクション行 [Section]
+    if (normalizedLine.front() == L'[' && normalizedLine.back() == L']')
     {
-        // ブラケット([])内の空白を_normalizeで除去し、小文字化
-        std::wstring section = _normalize(s.substr(1, s.size() - 2));
+        // [] 内を取り出して trim（前後空白許容）
+        std::wstring section = _trim(normalizedLine.substr(1, normalizedLine.size() - 2));
         if (!_isValidName(section))
         {
             errorMsg = L"invalid section name";
@@ -305,16 +312,16 @@ BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSec
     }
 
     // key=value パース
-    size_t pos = s.find(L'=');
+    size_t pos = normalizedLine.find(L'=');
     if (pos == std::wstring::npos)
     {
-        // おせっかいチェック：セクション書きかけ
-        if (s.front() == L'[' && s.back() != L']')
+        // おせっかいチェック：セクション書きかけかも
+        if (normalizedLine.front() == L'[' && normalizedLine.back() != L']')
         {
             errorMsg = L"missing ']' at end of section header";
             return FALSE;
         }
-        if (s.front() != L'[' && s.back() == L']')
+        if (normalizedLine.front() != L'[' && normalizedLine.back() == L']')
         {
             errorMsg = L"missing '[' at beginning of section header";
             return FALSE;
@@ -325,9 +332,8 @@ BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSec
         return FALSE;
     }
 
-    std::wstring key = _normalize(s.substr(0, pos));
-    std::wstring rawValue = s.substr(pos + 1); // valueは改行以外すべて許可
-    std::wstring v = _normalize(rawValue);     // 型判定用（trim後）
+        std::wstring key = _trim(normalizedLine.substr(0, pos));
+    std::wstring v = _trim(normalizedLine.substr(pos + 1)); // 型判定用
 
     if (key.empty())
     {
@@ -360,7 +366,16 @@ BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSec
         return TRUE;
     }
 
-    // それ以外は string（rawValue をそのまま保持）
-    m_config[currentSection][key] = rawValue;
+        // それ以外は string（rawTrim から再抽出して trim）
+    size_t rawPos = rawTrim.find(L'=');
+    if (rawPos != std::wstring::npos)
+    {
+        std::wstring rawValue = _trim(rawTrim.substr(rawPos + 1));
+        m_config[currentSection][key] = rawValue;
+    }
+    else
+    {
+        m_config[currentSection][key] = L"";
+    }
     return TRUE;
 }
