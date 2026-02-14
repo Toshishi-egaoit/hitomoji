@@ -130,6 +130,8 @@ https://github.com/toshishi-egaoit/hitomoji
 
 目的：利用者の利便性向上と、エラーハンドリング強化
 
+- テストプロジェクト(hitomoji-test)の追加
+- テスト対象コードだけを分離し、hitomoji-engineプロジェクトを追加
 - LoadFileのエラーハンドリング強化
 - エラーをログファイルに出力
   ChmLoggerクラスの実装
