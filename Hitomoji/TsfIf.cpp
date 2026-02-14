@@ -235,17 +235,17 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 
 	// ChmConfig‚Ì‰Šú‰»
 	ChmConfig* newConfig = new ChmConfig();
-	if ( newConfig->LoadFile() ) {
-		if (g_config != nullptr) {
-			delete g_config;
-			g_config = newConfig;
-			OutputDebugString(L"   > replace g_config");
-		}
+	BOOL bSuccess = newConfig->LoadFile();
+	if (!bSuccess && g_config) {
+		delete newConfig;
+		OutputDebugString(L"   > keeping old g_config");
 	} else {
-		if ( g_config == nullptr ) {
-			g_config = newConfig;
+		if (!bSuccess) {
+			newConfig->InitConfig();
+			OutputDebugString(L"   > using empty config");
 		}
-		OutputDebugString(L"   > Load config file failed, using current config");
+		delete g_config;
+		g_config = newConfig;
 	}
 
     return S_OK;
@@ -347,6 +347,7 @@ STDMETHODIMP ChmTsfInterface::OnTestKeyDown(ITfContext* pic, WPARAM wp, LPARAM l
 
 STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten)
 {
+	OutputDebugString(L"[Hitomoji] OnKeyDown");
 	*pfEaten = _pEngine->IsKeyEaten(wp);
     if (*pfEaten) {
 
