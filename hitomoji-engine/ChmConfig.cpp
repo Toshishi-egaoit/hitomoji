@@ -7,20 +7,6 @@
 #include "ChmConfig.h"
 #include "utils.h"
 
-#ifdef _DEBUG
-#define CONFIG_ASSERT(cond, msg)                                   \
-    do {                                                            \
-        if (!(cond)) {                                              \
-            OutputDebugStringW(L"[ChmConfig] ");                  \
-            OutputDebugStringW(msg);                                \
-            OutputDebugStringW(L"\n");                           \
-            assert(cond);                                           \
-        }                                                           \
-    } while (0)
-#else
-#define CONFIG_ASSERT(cond, msg) ((void)0)
-#endif
-
 ChmConfig* g_config = nullptr;
 
 static std::wstring GetConfigPath()
@@ -39,43 +25,18 @@ static std::wstring GetConfigPath()
 
 ChmConfig::ChmConfig()
 {
-	InitConfig();
+    InitConfig();
 }
 
-void ChmConfig::InitConfig()
+BOOL ChmConfig::LoadFromStream(std::wistream& is)
 {
-    m_config.clear();
-    m_errors.clear();
-}
-
-BOOL ChmConfig::LoadFile(const std::wstring& fileName)
-{
-	OutputDebugString(L"[Hitomoji] ChmConfig::LoadFile called\n");
-    std::wstring path = fileName.empty() ? GetConfigPath() : fileName;
-
-    // ファイル存在確認
-    DWORD attr = GetFileAttributesW(path.c_str());
-    if (attr == INVALID_FILE_ATTRIBUTES || (attr & FILE_ATTRIBUTE_DIRECTORY))
-    {
-        // ファイルが存在しない、またはディレクトリ
-		OutputDebugString(L"   > File not found \n");
-        return FALSE;
-    }
-
-    std::wifstream ifs(path);
-    if (!ifs.is_open())
-    {
-		OutputDebugString(L"   > cannot open \n");
-        return FALSE;
-    }
-
     InitConfig();
 
     std::wstring rawLine;
-    std::wstring currentSection; // 現在のセクション名
-
+    std::wstring currentSection;
     size_t lineNo = 0;
-    while (std::getline(ifs, rawLine))
+
+    while (std::getline(is, rawLine))
     {
         ++lineNo;
         std::wstring errorMsg;
@@ -86,96 +47,102 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
     }
 
 #ifdef _DEBUG
-	// デバッグ用ダンプ出力
-	OutputDebugString(_Dump().c_str());
+    OutputDebugString((L"=== Configs ===\n" + _Dump()).c_str());
 #endif
-    // エラーがあれば失敗扱い
+
     if (!m_errors.empty())
     {
-        // TODO: errors をログファイルに出力する仕組みを後段で実装
-		OutputDebugString(_DumpErrors().c_str());
+        OutputDebugString((L"===ERRORS===\n" + _DumpErrors()).c_str());
         return FALSE;
     }
 
     return TRUE;
 }
 
+void ChmConfig::InitConfig()
+{
+    m_config.clear();
+    m_errors.clear();
+}
+
+BOOL ChmConfig::LoadFile(const std::wstring& fileName)
+{
+    OutputDebugStringWithString(L"[Hitomoji] ChmConfig::LoadFile(%s) called", fileName.c_str());
+    std::wstring path = fileName.empty() ? GetConfigPath() : fileName;
+
+    DWORD attr = GetFileAttributesW(path.c_str());
+    if (attr == INVALID_FILE_ATTRIBUTES || (attr & FILE_ATTRIBUTE_DIRECTORY))
+    {
+        OutputDebugStringWithString(L"   > File not found(%s)", path.c_str());
+        return FALSE;
+    }
+
+    std::wifstream ifs(path);
+    if (!ifs.is_open())
+    {
+        OutputDebugStringWithString(L"   > cannot open(%s)", path.c_str());
+        return FALSE;
+    }
+
+    return LoadFromStream(ifs);
+}
+
 BOOL ChmConfig::GetBool(const std::wstring& section, const std::wstring& key) const
 {
-    auto itSec = m_config.find(section);
-    CONFIG_ASSERT(itSec != m_config.end(),
-                  (L"Missing section: " + section).c_str());
+    std::wstring sec = _normalize(section);
+    std::wstring k   = _normalize(key);
+
+    auto itSec = m_config.find(sec);
     if (itSec == m_config.end())
         return FALSE;
 
-    auto itKey = itSec->second.find(key);
-    CONFIG_ASSERT(itKey != itSec->second.end(),
-                  (L"Missing key: " + section + L"." + key).c_str());
+    auto itKey = itSec->second.find(k);
     if (itKey == itSec->second.end())
         return FALSE;
 
-    // 内部は long / string
     if (std::holds_alternative<long>(itKey->second))
-    {
         return std::get<long>(itKey->second) != 0 ? TRUE : FALSE;
-    }
 
-	CONFIG_ASSERT(false,
-				  (L"Type mismatch (expected long/bool) for key: " +
-				   section + L"." + key).c_str());
     return FALSE;
 }
 
 LONG ChmConfig::GetLong(const std::wstring& section, const std::wstring& key) const
 {
-    auto itSec = m_config.find(section);
-    CONFIG_ASSERT(itSec != m_config.end(),
-                  (L"Missing section: " + section).c_str());
+    std::wstring sec = _normalize(section);
+    std::wstring k   = _normalize(key);
+
+    auto itSec = m_config.find(sec);
     if (itSec == m_config.end())
         return 0;
 
-    auto itKey = itSec->second.find(key);
-    CONFIG_ASSERT(itKey != itSec->second.end(),
-                  (L"Missing key: " + section + L"." + key).c_str());
+    auto itKey = itSec->second.find(k);
     if (itKey == itSec->second.end())
         return 0;
 
     if (std::holds_alternative<long>(itKey->second))
-    {
-        return static_cast<LONG>(std::get<long>(itKey->second));
-    }
+        return std::get<long>(itKey->second);
 
-	CONFIG_ASSERT(false,
-				  (L"Type mismatch (expected long/bool) for key: " +
-				   section + L"." + key).c_str());
     return 0;
 }
 
 std::wstring ChmConfig::GetString(const std::wstring& section, const std::wstring& key) const
 {
-    auto itSec = m_config.find(section);
-    CONFIG_ASSERT(itSec != m_config.end(),
-                  (L"Missing section: " + section).c_str());
+    std::wstring sec = _normalize(section);
+    std::wstring k   = _normalize(key);
+
+    auto itSec = m_config.find(sec);
     if (itSec == m_config.end())
         return L"";
 
-    auto itKey = itSec->second.find(key);
-    CONFIG_ASSERT(itKey != itSec->second.end(),
-                  (L"Missing key: " + section + L"." + key).c_str());
+    auto itKey = itSec->second.find(k);
     if (itKey == itSec->second.end())
         return L"";
 
     if (std::holds_alternative<std::wstring>(itKey->second))
-    {
         return std::get<std::wstring>(itKey->second);
-    }
 
-	CONFIG_ASSERT(false,
-				  (L"Type mismatch (expected string) for key: " +
-				   section + L"." + key).c_str());
     return L"";
 }
-
 
 std::wstring ChmConfig::DumpErrors() const
 {
@@ -397,4 +364,3 @@ BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSec
     m_config[currentSection][key] = rawValue;
     return TRUE;
 }
-

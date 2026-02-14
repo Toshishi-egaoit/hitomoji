@@ -25,6 +25,7 @@ public:
     ~ChmConfig() = default;
 
     // ini ì«Ç›çûÇ›
+	BOOL LoadFromStream(std::wistream& is);
     BOOL LoadFile(const std::wstring& fileName=L"");
     void InitConfig();
 
