@@ -50,14 +50,6 @@ void ChmConfig::InitConfig()
 
 BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 {
-	std::wstring configName ;
-	if (fileName.empty()) {
-		configName = GetConfigPath();
-	} else 
-	{
-		configName = fileName ;
-	}
-
 	OutputDebugString(L"[Hitomoji] ChmConfig::LoadFile called\n");
     std::wstring path = fileName.empty() ? GetConfigPath() : fileName;
 
@@ -150,7 +142,7 @@ LONG ChmConfig::GetLong(const std::wstring& section, const std::wstring& key) co
 
     if (std::holds_alternative<long>(itKey->second))
     {
-        return static_cast<ULONG>(std::get<long>(itKey->second));
+        return static_cast<LONG>(std::get<long>(itKey->second));
     }
 
 	CONFIG_ASSERT(false,

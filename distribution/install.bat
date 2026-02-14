@@ -66,3 +66,4 @@ echo "設定ファイルのコピー"
 copy /y "hitomoji.ini" "%CONFIG_DIR%"
 
 echo 全てのインストール工程が完了しました
+pause

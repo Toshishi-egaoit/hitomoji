@@ -238,7 +238,7 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 	if ( newConfig->LoadFile() ) {
 		if (g_config != nullptr) {
 			delete g_config;
-			g_config = std::move(newConfig);
+			g_config = newConfig;
 			OutputDebugString(L"   > replace g_config");
 		}
 	} else {
