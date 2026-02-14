@@ -7,6 +7,7 @@
 #include "utils.h"
 
 class ChmRawInputStore;
+class ChmConfig;
 
 #define VK_HITOMOJI 0 // 仮想キーコード: マウスイベントなどの特殊用途
 
@@ -44,7 +45,7 @@ public:
 	const std::wstring toString() const { 
 		wchar_t buff[80];
 		wchar_t ch = GetChar();
-		wsprintf(buff, L"Type:%d ch=%d(%c) %s %s %s",
+		wsprintf(buff, L" Type:%d ch=%d(%c) %s %s %s",
 			_type,
 			ch , 
 			((ch < 0x20) ? L'-' : ch & 0x7f),
@@ -94,6 +95,9 @@ class ChmEngine {
 public:
     ChmEngine();
     ~ChmEngine();
+
+    // g_configの初期化処理
+	static void InitConfig();
     
     // キーをIMEで処理すべきか判定
     BOOL IsKeyEaten(WPARAM wp);
@@ -111,6 +115,9 @@ public:
 private:
     // ASCII -> 全角 変換（v0.1.3 簡易実装）
     static std::wstring AsciiToWide(const std::wstring& src);
+
+	// --- static members ---
+	static ChmConfig* _pConfig;
 
     BOOL _isON;
 	BOOL _hasComposition;

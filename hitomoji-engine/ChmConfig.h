@@ -33,6 +33,7 @@ public:
     BOOL GetBool(const std::wstring& section, const std::wstring& key) const;
     LONG GetLong(const std::wstring& section, const std::wstring& key) const;
     std::wstring GetString(const std::wstring& section, const std::wstring& key) const;
+	std::wstring Dump() const;
 	std::wstring DumpErrors() const;
 	BOOL HasErrors() const { return ! m_errors.empty() ; }
 
@@ -54,7 +55,4 @@ private:
     ConfigMap m_config;
     ErrorMap  m_errors;
 };
-
-// グローバル（差し替え前提）
-extern ChmConfig* g_config;
 

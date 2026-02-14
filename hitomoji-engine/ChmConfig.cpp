@@ -7,8 +7,6 @@
 #include "ChmConfig.h"
 #include "utils.h"
 
-ChmConfig* g_config = nullptr;
-
 static std::wstring GetConfigPath()
 {
     PWSTR path = nullptr;
@@ -44,16 +42,6 @@ BOOL ChmConfig::LoadFromStream(std::wistream& is)
         {
             m_errors.push_back({ lineNo, errorMsg });
         }
-    }
-
-#ifdef _DEBUG
-    OutputDebugString((std::wstring(L"=== Configs ===\n") + _Dump()).c_str());
-#endif
-
-    if (!m_errors.empty())
-    {
-        OutputDebugString((std::wstring(L"===ERRORS===\n") + _DumpErrors()).c_str());
-        return FALSE;
     }
 
     return TRUE;
@@ -142,6 +130,11 @@ std::wstring ChmConfig::GetString(const std::wstring& section, const std::wstrin
         return std::get<std::wstring>(itKey->second);
 
     return L"";
+}
+
+std::wstring ChmConfig::Dump() const
+{
+	return _Dump();
 }
 
 std::wstring ChmConfig::DumpErrors() const

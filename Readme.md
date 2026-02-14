@@ -130,12 +130,12 @@ https://github.com/toshishi-egaoit/hitomoji
 
 目的：利用者の利便性向上と、エラーハンドリング強化
 
+- LoadFileのエラーハンドリング強化
+- バージョン確認コマンド(CTRL+SHIFT+V)の実装（デバッグ版のみ）
 - テストプロジェクト(hitomoji-test)の追加
 - テスト対象コードだけを分離し、hitomoji-engineプロジェクトを追加
-- LoadFileのエラーハンドリング強化
 - エラーをログファイルに出力
-  ChmLoggerクラスの実装
-- バージョン確認コマンド(CTRL+SHIFT+V)の実装（デバッグ版のみ）
+  ChmLoggerクラスの作成。ただし現状はOutputDebugStringを用いる。
 
 ### v0.2.2
 

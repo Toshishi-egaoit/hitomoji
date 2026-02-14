@@ -234,19 +234,7 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
     }
 
 	// ChmConfig‚Ì‰Šú‰»
-	ChmConfig* newConfig = new ChmConfig();
-	BOOL bSuccess = newConfig->LoadFile();
-	if (!bSuccess && g_config) {
-		delete newConfig;
-		OutputDebugString(L"   > keeping old g_config");
-	} else {
-		if (!bSuccess) {
-			newConfig->InitConfig();
-			OutputDebugString(L"   > using empty config");
-		}
-		delete g_config;
-		g_config = newConfig;
-	}
+	ChmEngine::InitConfig();
 
     return S_OK;
 }
