@@ -51,21 +51,11 @@ private:
 // --- DLLエクスポート関数 ---
 
 BOOL WINAPI DllMain(HINSTANCE hInst, DWORD dwReason, LPVOID pvReserved) {
-	wchar_t str[100];
-	wsprintf(str, L"[Hitomoji] dllMain (%08x/%08x) : %s",
-		GetCurrentProcessId(),
-		GetCurrentThreadId(),
-		dwReason == 1 ? L">> DLL_PROCESS_ATTACH" : 
-		dwReason == 2 ? L">> DLL_THREAD_ATTACH" :
-		dwReason == 3 ? L"<< DLL_THREAD_DETTACH" :
-		dwReason == 0 ? L"<< DLL_PROCESS_DETTACH" :
-		L"?? UNKNOWN"
-	);
-	OutputDebugString(str);
 
     if (dwReason == DLL_PROCESS_ATTACH) {
         g_hInst = hInst;
         DisableThreadLibraryCalls(hInst);
+		OutputDebugString(L"[Hitomoji] dllmain(PROCESS_ATTACH");
     }
     return TRUE;
 }
