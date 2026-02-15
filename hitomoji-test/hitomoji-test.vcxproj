@@ -121,6 +121,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="config-test.cpp" />
+    <ClCompile Include="convert-test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
