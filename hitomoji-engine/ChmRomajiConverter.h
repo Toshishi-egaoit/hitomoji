@@ -22,8 +22,8 @@ public:
     static void convert(const std::wstring& rawInput,
                         std::wstring& converted,
                         std::wstring& pending,
-						bool isSybolMode,
-					    bool isBsSymbol);
+						bool isDisplayKana,
+					    bool isBackspaceSymbol);
 
     // 1ユニットだけ変換できるか試みる（v0.1.5 用）
     static bool TryConvertOne(const std::wstring& rawInput,
@@ -221,8 +221,8 @@ size_t ChmRomajiConverter::_lastRawUnitLength = 0;
 void ChmRomajiConverter::convert(const std::wstring& rawInput,
                                  std::wstring& converted,
                                  std::wstring& pending,
-								 bool isDispSymbol,
-								 bool isBsSymbol)
+								 bool isDisplayKana,
+								 bool isBackspaceSymbol)
 {
     converted.clear();
     pending.clear();
@@ -232,7 +232,7 @@ void ChmRomajiConverter::convert(const std::wstring& rawInput,
     Unit unit;
 
 	while (pos < rawInput.size()) {
-		if (TryConvertOne(rawInput, pos, unit,isDispSymbol)) {
+		if (TryConvertOne(rawInput, pos, unit,isDisplayKana)) {
 			converted += unit.output;
 			_lastRawUnitLength = unit.rawLength;
 			pos += unit.rawLength;
@@ -251,7 +251,7 @@ void ChmRomajiConverter::convert(const std::wstring& rawInput,
 		}
 	}
 	// ただし、bsUnitがASCIIの場合は、最後のユニット長を1にする
-	if (!isBsSymbol) {
+	if (!isBackspaceSymbol) {
 		_lastRawUnitLength = 1;
 	}
 }
