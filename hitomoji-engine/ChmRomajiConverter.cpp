@@ -1,12 +1,15 @@
 ﻿#include "ChmRomajiConverter.h"
-#include <cctype>
+#include <cwctype>
 
-// ---- static member ----
 size_t ChmRomajiConverter::_lastRawUnitLength = 0;
 
-// ---- table implementation ----
-const std::unordered_map<std::wstring, std::wstring>& ChmRomajiConverter::table() {
-    static const std::unordered_map<std::wstring, std::wstring> tbl = {
+// ---- static member ----
+
+// Override table (Configから追加される)
+static std::unordered_map<std::wstring, std::wstring> _overrideTable;
+
+// Base table (固定のconst)
+static const std::unordered_map<std::wstring, std::wstring> _baseTable = {
         {L"a", L"あ"}, {L"i", L"い"}, {L"u", L"う"}, {L"e", L"え"}, {L"o", L"お"},
         {L"ka", L"か"}, {L"ki", L"き"}, {L"ku", L"く"}, {L"ke", L"け"}, {L"ko", L"こ"},
         {L"ga", L"が"}, {L"gi", L"ぎ"}, {L"gu", L"ぐ"}, {L"ge", L"げ"}, {L"go", L"ご"},
@@ -22,8 +25,7 @@ const std::unordered_map<std::wstring, std::wstring>& ChmRomajiConverter::table(
         {L"ya", L"や"}, {L"yu", L"ゆ"}, {L"yo", L"よ"},
         {L"ra", L"ら"}, {L"ri", L"り"}, {L"ru", L"る"}, {L"re", L"れ"}, {L"ro", L"ろ"},
         {L"wa", L"わ"}, {L"wi", L"ゐ"}, {L"we", L"ゑ"}, {L"wo", L"を"},
-        {L".", L"。"}, {L",", L"、"}, {L"?", L"？"}, {L"!", L"！"},
-        {L"[", L"「"}, {L"]", L"」"}, {L"-", L"ー"},
+        // --- 以下元テーブル続き（省略なし） ---
         // --- 拗音の清音（y系） ---
 		{L"kya", L"きゃ"}, {L"kyu", L"きゅ"}, {L"kyo", L"きょ"}, 
 		{L"sya", L"しゃ"}, {L"syu", L"しゅ"}, {L"sye", L"しぇ"}, {L"syo", L"しょ"}, 
@@ -64,17 +66,28 @@ const std::unordered_map<std::wstring, std::wstring>& ChmRomajiConverter::table(
 		{L"dhi", L"でぃ"}, {L"dhu", L"でゅ"},
         {L"whi", L"うぃ"}, {L"whe", L"うぇ"}, {L"who", L"うぉ"},
         // --- 役物、記号類
+        {L".", L"。"}, {L",", L"、"}, {L"?", L"？"}, {L"!", L"！"},
+        {L"[", L"「"}, {L"]", L"」"}, 
         {L"-", L"ー"},
-
-    };
-    return tbl;
-}
+};
 
 const std::unordered_set<wchar_t>& ChmRomajiConverter::sokuonConsonants() {
     static const std::unordered_set<wchar_t> set = {
         L'b',L'c',L'd',L'f',L'g',L'h',L'j',L'k',L'm',L'p',L'q',L'r',L's',L't',L'v',L'w',L'y',L'z'
     };
     return set;
+}
+
+// Find: override優先 → base
+static const std::wstring* FindEntry(const std::wstring& key)
+{
+    auto itO = _overrideTable.find(key);
+    if (itO != _overrideTable.end()) return &itO->second;
+
+    auto itB = _baseTable.find(key);
+    if (itB != _baseTable.end()) return &itB->second;
+
+    return nullptr;
 }
 
 bool ChmRomajiConverter::TryConvertOne(const std::wstring& rawInput,
@@ -89,14 +102,14 @@ bool ChmRomajiConverter::TryConvertOne(const std::wstring& rawInput,
     std::wstring lowerInput;
     lowerInput.reserve(rawInput.size());
     for (wchar_t c : rawInput)
-        lowerInput.push_back(static_cast<wchar_t>(std::tolower(c)));
+        lowerInput.push_back(static_cast<wchar_t>(std::towlower(c)));
 
     for (int len = 3; len >= 1; --len) {
         if (pos + len > lowerInput.size()) continue;
         auto key = lowerInput.substr(pos, len);
-        auto it = table().find(key);
-        if (it != table().end()) {
-            if (isDispSymbol) out.output = it->second;
+        auto val = FindEntry(key);
+        if (val) {
+            if (isDispSymbol) out.output = *val;
             else out.output = rawInput.substr(pos, len);
             out.rawLength = len;
             return true;
@@ -104,7 +117,7 @@ bool ChmRomajiConverter::TryConvertOne(const std::wstring& rawInput,
     }
 
     wchar_t cur = lowerInput[pos];
-    if (!std::isalpha(cur)) {
+    if (!std::iswalpha(cur)) {
         out.output.push_back(rawInput[pos]);
         out.rawLength = 1;
         return true;
