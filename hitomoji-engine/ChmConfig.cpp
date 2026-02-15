@@ -75,33 +75,33 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
     return LoadFromStream(ifs);
 }
 
-BOOL ChmConfig::GetBool(const std::wstring& section, const std::wstring& key) const
+BOOL ChmConfig::GetBool(const std::wstring& section, const std::wstring& key, const BOOL bDefault) const
 {
     std::wstring sec = _normalize(section);
     std::wstring k   = _normalize(key);
 
     auto itSec = m_config.find(sec);
     if (itSec == m_config.end())
-        return FALSE;
+		return bDefault;
 
     auto itKey = itSec->second.find(k);
     if (itKey == itSec->second.end())
-        return FALSE;
+		return bDefault;
 
-        if (std::holds_alternative<bool>(itKey->second))
-        return std::get<bool>(itKey->second) ? TRUE : FALSE;
+	if (std::holds_alternative<bool>(itKey->second))
+		return std::get<bool>(itKey->second) ? TRUE : FALSE; // 値が bool 型ならその値を返す
 
-    return FALSE;
+	return bDefault;
 }
 
-LONG ChmConfig::GetLong(const std::wstring& section, const std::wstring& key) const
+LONG ChmConfig::GetLong(const std::wstring& section, const std::wstring& key, const LONG lDefault) const
 {
     std::wstring sec = _normalize(section);
     std::wstring k   = _normalize(key);
 
     auto itSec = m_config.find(sec);
     if (itSec == m_config.end())
-        return 0;
+		return 0; // セクションが見つからない場合は既定値 0
 
     auto itKey = itSec->second.find(k);
     if (itKey == itSec->second.end())

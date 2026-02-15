@@ -9,6 +9,10 @@
 class ChmConfig
 {
 public:
+	// セクションやキーが見つからない／型不一致の場合の既定値
+	static constexpr BOOL GetBool_default = TRUE;  // FALSE だとネガティブ値がデフォルトとなるため
+	static constexpr LONG GetLong_default = 0;
+
 	struct ParseError {
         size_t lineNo;
         std::wstring message;
@@ -30,8 +34,8 @@ public:
     void InitConfig();
 
     // Getter（見つからない／型不一致は既定値）
-    BOOL GetBool(const std::wstring& section, const std::wstring& key) const;
-    LONG GetLong(const std::wstring& section, const std::wstring& key) const;
+    BOOL GetBool(const std::wstring& section, const std::wstring& key, const BOOL bDefault=GetBool_default) const;
+    LONG GetLong(const std::wstring& section, const std::wstring& key, const LONG lDefault=GetLong_default) const;
     std::wstring GetString(const std::wstring& section, const std::wstring& key) const;
 	std::wstring Dump() const;
 	std::wstring DumpErrors() const;
