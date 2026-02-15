@@ -154,6 +154,9 @@ https://github.com/toshishi-egaoit/hitomoji
 -- ファイルOpenは既定のエディタで開く
 -ｰ ファイルRereadは、ファイルの再読み込みを行う。再読み込みでは、致命的エラーが出ると捨てる。エラーがなければ、新たなオブジェクトに切り替える。
 -- エラーログOpenは既定のエディタで開く
+- OnSetFocus / OnSetThreadFocus でのCompositionの初期化処理を改善
+-- _ｂNeedTerminateCompositionを定義
+-- 実際のTerminate処理をDoEditSessionに閉じ込める
 
 ## v0.3系統
 

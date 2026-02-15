@@ -141,6 +141,7 @@
   <ItemGroup>
     <ClCompile Include="ChmConfig.cpp" />
     <ClCompile Include="ChmEngine.cpp" />
+    <ClCompile Include="ChmRomajiConverter.cpp" />
     <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
