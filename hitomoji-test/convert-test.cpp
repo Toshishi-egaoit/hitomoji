@@ -89,10 +89,10 @@ TEST(ConvertTest, BackspaceMode)
     EXPECT_EQ(1, ChmRomajiConverter::GetLastRawUnitLength());
     EXPECT_EQ(L":ky", ConvertWithPending(L"ky"));
     EXPECT_EQ(2, ChmRomajiConverter::GetLastRawUnitLength());
-    EXPECT_EQ(L":chm", ConvertWithPending(L"chm"));
-    EXPECT_EQ(3, ChmRomajiConverter::GetLastRawUnitLength());
-    EXPECT_EQ(L"chÇ‹:", ConvertWithPending(L"chma"));
+    EXPECT_EQ(L"dcÇ†:", ConvertWithPending(L"dca"));
     EXPECT_EQ(1, ChmRomajiConverter::GetLastRawUnitLength());
+    EXPECT_EQ(L"chÇ‹:", ConvertWithPending(L"chma"));
+    EXPECT_EQ(2, ChmRomajiConverter::GetLastRawUnitLength());
     EXPECT_EQ(L"Ç¡:t", ConvertWithPending(L"tt"));
     EXPECT_EQ(1, ChmRomajiConverter::GetLastRawUnitLength());
 
@@ -100,13 +100,14 @@ TEST(ConvertTest, BackspaceMode)
     EXPECT_EQ(1, ChmRomajiConverter::GetLastRawUnitLength());
 }
 
-//
-// RawLengthåüèÿ
-//
-TEST(ConvertTest, RawLengthNormal)
+TEST(ConvertTest, RawLengthConverted)
 {
-    ConvertWithPending(L"ka");
+    ConvertWithPending(L"a");
     EXPECT_EQ(1, ChmRomajiConverter::GetLastRawUnitLength());
+    ConvertWithPending(L"ka");
+    EXPECT_EQ(2, ChmRomajiConverter::GetLastRawUnitLength());
+    ConvertWithPending(L"cha");
+    EXPECT_EQ(3, ChmRomajiConverter::GetLastRawUnitLength());
 }
 
 TEST(ConvertTest, RawLengthPending)
@@ -115,4 +116,8 @@ TEST(ConvertTest, RawLengthPending)
     EXPECT_EQ(1, ChmRomajiConverter::GetLastRawUnitLength());
     ConvertWithPending(L"ch");
     EXPECT_EQ(2, ChmRomajiConverter::GetLastRawUnitLength());
+    EXPECT_EQ(L":chm", ConvertWithPending(L"chm"));
+    EXPECT_EQ(3, ChmRomajiConverter::GetLastRawUnitLength());
+    EXPECT_EQ(L"chÇ‹:t", ConvertWithPending(L"chmat"));
+    EXPECT_EQ(1, ChmRomajiConverter::GetLastRawUnitLength());
 }

@@ -47,7 +47,7 @@ TEST(ConfigTest, WhitespaceLine)
 	
 	EXPECT_TRUE(config.LoadFile(L".\\testdata\\null.ini"));
 
-    EXPECT_FALSE(config.GetBool(L"undefined", L"not_exist_bool_key"));
+    EXPECT_TRUE(config.GetBool(L"undefined", L"not_exist_bool_key"));
     EXPECT_EQ(0, config.GetLong(L"undefined", L"not_exist_long_key"));
     EXPECT_EQ(L"", config.GetString(L"undefined", L"not_exist_string_key"));
 }
@@ -55,7 +55,7 @@ TEST(ConfigTest, WhitespaceLine)
 TEST(ConfigTest, LoadInvalidFile)
 {
     ChmConfig config;
-    EXPECT_FALSE(config.LoadFile(L".\\testdata\\invalid.ini"));
+    EXPECT_TRUE(config.LoadFile(L".\\testdata\\invalid.ini"));
 
     EXPECT_TRUE(config.HasErrors());
 
@@ -66,14 +66,18 @@ TEST(ConfigTest, LoadInvalidFile)
     EXPECT_NE(std::wstring::npos, errors.find(L"empty key name"));
 
 	// Get系でセクションが間違っているパターン（全部デフォルト値）
-    EXPECT_FALSE(config.GetBool(L"bad_section", L"bad_bool"));
+    EXPECT_TRUE(config.GetBool(L"bad_section", L"bad_bool"));
     EXPECT_EQ(0L,config.GetLong(L"bad_section", L"bad_long"));
     EXPECT_EQ(L"", config.GetString(L"bad_section", L"bad_string"));
 
 	// Get系でキー名が間違っているパターン（全部デフォルト値）
-    EXPECT_FALSE(config.GetBool(L"valid_section", L"not_exists_bool"));
+    EXPECT_TRUE(config.GetBool(L"valid_section", L"not_exists_bool"));
     EXPECT_EQ(0L,config.GetLong(L"valid_section", L"not_exists_long"));
     EXPECT_EQ(L"", config.GetString(L"valid_section", L"not_exists_string"));
+
+	// Get系でのエラーで、デフォルト値が指定されていた場合
+    EXPECT_FALSE(config.GetBool(L"valid_section", L"not_exists_bool",FALSE));
+    EXPECT_EQ(1234,config.GetLong(L"valid_section", L"not_exists_long",1234));
 }
 
 TEST(ConfigTest, FileNotFound)

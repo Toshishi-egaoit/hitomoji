@@ -164,18 +164,14 @@ void ChmRomajiConverter::convert(const std::wstring& rawInput,
 
     while (pos < rawInput.size()) {
         if (TryConvertOne(rawInput, pos, unit, isDisplayKana)) {
-            converted += unit.output;
+            converted += pending + unit.output;
+			pending = L"";
             _lastRawUnitLength = unit.rawLength;
             pos += unit.rawLength;
         }
-        else if (pos + 2 >= rawInput.size()) {
-            pending = rawInput.substr(pos);
-            _lastRawUnitLength = pending.length();
-            break;
-        }
         else {
-            converted += rawInput[pos];
-            _lastRawUnitLength = 1;
+            pending += rawInput[pos];
+            _lastRawUnitLength = pending.length();
             pos++;
         }
     }

@@ -91,7 +91,7 @@ BOOL ChmConfig::GetBool(const std::wstring& section, const std::wstring& key, co
 	if (std::holds_alternative<bool>(itKey->second))
 		return std::get<bool>(itKey->second) ? TRUE : FALSE; // 値が bool 型ならその値を返す
 
-	return bDefault;
+	return FALSE; // 型が合わない場合はbDefaultではなくFALSEを返す
 }
 
 LONG ChmConfig::GetLong(const std::wstring& section, const std::wstring& key, const LONG lDefault) const
@@ -101,16 +101,16 @@ LONG ChmConfig::GetLong(const std::wstring& section, const std::wstring& key, co
 
     auto itSec = m_config.find(sec);
     if (itSec == m_config.end())
-		return 0; // セクションが見つからない場合は既定値 0
+		return lDefault; // セクションが見つからない場合は既定値 0
 
     auto itKey = itSec->second.find(k);
     if (itKey == itSec->second.end())
-        return 0;
+        return lDefault;
 
         if (std::holds_alternative<long>(itKey->second))
         return std::get<long>(itKey->second);
 
-    return 0;
+    return lDefault;
 }
 
 std::wstring ChmConfig::GetString(const std::wstring& section, const std::wstring& key) const
