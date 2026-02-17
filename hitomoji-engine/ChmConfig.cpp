@@ -1,9 +1,11 @@
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
 #include <windows.h>
 #include <shlobj.h>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
-#include <assert.h>
+#include <locale>
+#include <codecvt>
 #include "ChmConfig.h"
 #include "ChmRomajiConverter.h"
 #include "utils.h"
@@ -93,6 +95,11 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
         OutputDebugStringWithString(L"   > cannot open(%s)", path.c_str());
         return FALSE;
     }
+
+	ifs.imbue(std::locale(
+		ifs.getloc(),
+		new std::codecvt_utf8<wchar_t>
+	));
 
     return LoadFromStream(ifs);
 }
