@@ -1,4 +1,4 @@
-@echo off
+rem @echo off
 setlocal
 cd /d %~dp0
 
@@ -10,7 +10,7 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
-set CONFIG_DIR=%appdata%Hitomoji
+set CONFIG_DIR=%appdata%\Hitomoji
 
 set SYSTEM_DIR=%SystemRoot%\System32
 set TARGET_DIR=%SYSTEM_DIR%\hitomoji
