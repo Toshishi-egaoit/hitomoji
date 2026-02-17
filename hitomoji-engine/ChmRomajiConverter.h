@@ -5,6 +5,10 @@
 #include <unordered_set>
 #include "ChmConfig.h"
 
+
+extern const std::unordered_map<std::wstring, std::wstring> _baseTable ;
+extern std::unordered_map<std::wstring, std::wstring> _overrideTable;
+
 // rawInput (ASCII) を走査して、ひらがなへ変換するクラス
 class ChmRomajiConverter {
 public:
@@ -31,6 +35,29 @@ public:
 private:
     static size_t _lastRawUnitLength;
 
-    static const std::unordered_map<std::wstring, std::wstring>& table();
     static const std::unordered_set<wchar_t>& sokuonConsonants();
 };
+
+class ChmKeytableParser {
+public:
+
+	static bool ParseLine(const std::wstring& line,
+                                  std::wstring& left,
+                                  std::wstring& right,
+                                  std::wstring& error);
+
+	static void RegisterOverrideTable(const std::wstring& key,
+											  const std::wstring& value)
+	{
+		_overrideTable[key] = value;
+	}
+
+	static void ClearOverrideTable()
+	{
+		_overrideTable.clear();
+	}
+
+private:
+    static std::wstring Trim(const std::wstring& s);
+};
+

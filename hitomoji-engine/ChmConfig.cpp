@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <assert.h>
 #include "ChmConfig.h"
+#include "ChmRomajiConverter.h"
 #include "utils.h"
 
 static std::wstring GetConfigPath()
@@ -34,11 +35,32 @@ BOOL ChmConfig::LoadFromStream(std::wistream& is)
     std::wstring currentSection;
     size_t lineNo = 0;
 
+	ChmKeytableParser::ClearOverrideTable();
     while (std::getline(is, rawLine))
     {
         ++lineNo;
         std::wstring errorMsg;
-        if (!_parseLine(rawLine, currentSection, errorMsg))
+		bool bRet = false;
+
+		// key-table セクション処理
+		if (currentSection == L"key-table")
+		{
+			std::wstring k, v;
+
+			bRet = ChmKeytableParser::ParseLine(rawLine, k, v, errorMsg);
+			if (bRet) 
+			{
+				ChmKeytableParser::RegisterOverrideTable(k, v);
+			}
+			else if (errorMsg == L"reserved line") {
+				// 予約行は無視
+				bRet = true;
+			}
+		} else {
+			bRet = _parseLine(rawLine, currentSection, errorMsg);
+		}
+
+		if (!bRet)
         {
             m_errors.push_back({ lineNo, errorMsg });
         }
