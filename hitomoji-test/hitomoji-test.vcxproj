@@ -124,6 +124,7 @@
     <ClCompile Include="convert-test.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="override.ini" />
     <None Include="packages.config" />
     <None Include="testdata\null.ini" />
     <None Include="testdata\valid.ini" />

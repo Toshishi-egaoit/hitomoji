@@ -1,6 +1,13 @@
 #include "gtest/gtest.h"
 #include "ChmRomajiConverter.h"
 
+class ConvertOverrideTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        ChmKeytableParser::ClearOverrideTable();
+    }
+};
+
 static std::wstring ConvertWithPending(const std::wstring& input,
                                        bool disp = true,
                                        bool bs = true)
@@ -120,4 +127,34 @@ TEST(ConvertTest, RawLengthPending)
     EXPECT_EQ(3, ChmRomajiConverter::GetLastRawUnitLength());
     EXPECT_EQ(L"chま:t", ConvertWithPending(L"chmat"));
     EXPECT_EQ(1, ChmRomajiConverter::GetLastRawUnitLength());
+}
+
+//
+// override
+//
+TEST_F(ConvertOverrideTest, OverrideLongestMatch)
+{
+    ChmKeytableParser::RegisterOverrideTable(L"wi", L"うぃ");
+    ChmKeytableParser::RegisterOverrideTable(L"wwi", L"ゐ");
+
+    EXPECT_EQ(L"ゐ:", ConvertWithPending(L"wwi"));
+    EXPECT_EQ(L"うぃ:", ConvertWithPending(L"wi"));
+}
+
+TEST_F(ConvertOverrideTest, OverrideSymbols)
+{
+    ChmKeytableParser::RegisterOverrideTable(L"<<", L"《");
+    ChmKeytableParser::RegisterOverrideTable(L">>", L"》");
+
+    EXPECT_EQ(L"《:", ConvertWithPending(L"<<"));
+    EXPECT_EQ(L"》:", ConvertWithPending(L">>"));
+}
+
+TEST_F(ConvertOverrideTest, OverrideFallbackToBase)
+{
+    ChmKeytableParser::RegisterOverrideTable(L"ka", L"X");
+    EXPECT_EQ(L"X:", ConvertWithPending(L"ka"));
+
+    // base still works for others
+    EXPECT_EQ(L"あ:", ConvertWithPending(L"a"));
 }

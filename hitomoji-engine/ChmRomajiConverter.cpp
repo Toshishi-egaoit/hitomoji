@@ -5,6 +5,9 @@ size_t ChmRomajiConverter::_lastRawUnitLength = 0;
 
 // ---- static member ----
 
+// 最大キー長（v0.2.2 固定値）
+static constexpr int MAX_KEY_LENGTH = 3;
+
 // Override table (Configから追加される)
 std::unordered_map<std::wstring, std::wstring> _overrideTable;
 
@@ -104,7 +107,7 @@ bool ChmRomajiConverter::TryConvertOne(const std::wstring& rawInput,
     for (wchar_t c : rawInput)
         lowerInput.push_back(static_cast<wchar_t>(std::towlower(c)));
 
-    for (int len = 3; len >= 1; --len) {
+    for (int len = MAX_KEY_LENGTH ; len >= 1; --len) {
         if (pos + len > lowerInput.size()) continue;
         auto key = lowerInput.substr(pos, len);
         auto val = FindEntry(key);
@@ -224,6 +227,11 @@ bool ChmKeytableParser::ParseLine(const std::wstring& line,
         error = L"left side empty";
         return false;
     }
+
+	if (left.length() > MAX_KEY_LENGTH) {
+        error = L"left side too large";
+        return false;
+	}
 
     // 予約行（将来用）はTrueをかえす
     if (left == L"algorithm") {
