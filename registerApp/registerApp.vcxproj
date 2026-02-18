@@ -92,7 +92,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..\hitomoji</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\hitomoji-engine;..\hitomoji</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -111,7 +111,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..\hitomoji</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\hitomoji-engine;..\hitomoji</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -119,7 +119,7 @@
     </Link>
     <PostBuildEvent>
       <Command>
-</Command>
+      </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -128,16 +128,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..\hitomoji</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\hitomoji-engine;..\hitomoji</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>:: Installerのコピー
-
-copy /y "$(TargetPath)" "$(SolutionDir)dbg_distribution\x64\"
+      <Command>copy /y "$(TargetPath)" "$(SolutionDir)dbg_distribution\x64\"
 
 </Command>
     </PostBuildEvent>
@@ -150,16 +148,14 @@ copy /y "$(TargetPath)" "$(SolutionDir)dbg_distribution\x64\"
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..\hitomoji</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\hitomoji-engine;..\hitomoji</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>:: Installerのコピー
-
-copy /y "$(TargetPath)" "$(SolutionDir)distribution\x64\"
+      <Command>copy /y "$(TargetPath)" "$(SolutionDir)distribution\x64\"
 
 </Command>
     </PostBuildEvent>

@@ -1,11 +1,14 @@
-// ChmConfig.cpp
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
 #include <windows.h>
 #include <shlobj.h>
 #include <fstream>
-#include <assert.h>
+#include <sstream>
+#include <algorithm>
+#include <locale>
+#include <codecvt>
 #include "ChmConfig.h"
-
-ChmConfig* g_config = nullptr;
+#include "ChmRomajiConverter.h"
+#include "utils.h"
 
 static std::wstring GetConfigPath()
 {
@@ -21,168 +24,169 @@ static std::wstring GetConfigPath()
     return result;
 }
 
-ChmConfig::ChmConfig(const std::wstring& fileName)
+ChmConfig::ChmConfig()
 {
-    if (!LoadFile(fileName))
+    InitConfig();
+}
+
+BOOL ChmConfig::LoadFromStream(std::wistream& is)
+{
+    InitConfig();
+
+    std::wstring rawLine;
+    std::wstring currentSection;
+    size_t lineNo = 0;
+
+	ChmKeytableParser::ClearOverrideTable();
+    while (std::getline(is, rawLine))
     {
-        InitConfig();
+        ++lineNo;
+        std::wstring errorMsg;
+		bool bRet = false;
+
+		// key-table セクション処理
+		if (currentSection == L"key-table")
+		{
+			std::wstring k, v;
+
+			bRet = ChmKeytableParser::ParseLine(rawLine, k, v, errorMsg);
+			if (bRet) 
+			{
+				ChmKeytableParser::RegisterOverrideTable(k, v);
+			}
+			else if (errorMsg == L"reserved line") {
+				// 予約行は無視
+				bRet = true;
+			}
+		} else {
+			bRet = _parseLine(rawLine, currentSection, errorMsg);
+		}
+
+		if (!bRet)
+        {
+            m_errors.push_back({ lineNo, errorMsg });
+        }
     }
+
+    return TRUE;
 }
 
 void ChmConfig::InitConfig()
 {
     m_config.clear();
+    m_errors.clear();
 }
-
-// internal error storage is filled during LoadFile
 
 BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 {
+    OutputDebugStringWithString(L"[Hitomoji] ChmConfig::LoadFile(%s) called", fileName.c_str());
     std::wstring path = fileName.empty() ? GetConfigPath() : fileName;
 
-    // ファイル存在確認
     DWORD attr = GetFileAttributesW(path.c_str());
     if (attr == INVALID_FILE_ATTRIBUTES || (attr & FILE_ATTRIBUTE_DIRECTORY))
     {
-        // ファイルが存在しない、またはディレクトリ
+        OutputDebugStringWithString(L"   > File not found(%s)", path.c_str());
         return FALSE;
     }
 
     std::wifstream ifs(path);
     if (!ifs.is_open())
     {
+        OutputDebugStringWithString(L"   > cannot open(%s)", path.c_str());
         return FALSE;
     }
 
-    std::wstring rawLine;
-    std::wstring currentSection; // 現在のセクション名
+	ifs.imbue(std::locale(
+		ifs.getloc(),
+		new std::codecvt_utf8<wchar_t>
+	));
 
-    struct ParseError
-    {
-        size_t lineNo;
-        std::wstring message;
-    };
-    m_errors.clear();
-
-    size_t lineNo = 0;
-    while (std::getline(ifs, rawLine))
-    {
-        ++lineNo;
-        std::wstring errorMsg;
-        if (!_parseLine(rawLine, currentSection, errorMsg))
-        {
-            m_errors.push_back({ lineNo, errorMsg });
-        }
-    }
-
-    // エラーがあれば失敗扱い（ここではログ出力は行わない）
-    if (!m_errors.empty())
-    {
-        // TODO: errors をログ出力する仕組みを後段で実装
-        return FALSE;
-    }
-
-	OutputDebugString((L"[Hitomoji] Loaded config file: " + path + L"\n").c_str());
-	OutputDebugString((L"[Hitomoji] Loaded m_config:\n" + _Dump() + L"\n").c_str());
-	OutputDebugString((L"[Hitomoji] m_errors :\n" + _DumpErrors() + L"\n").c_str());
-
-    return TRUE;
+    return LoadFromStream(ifs);
 }
 
-// --- debug dump ---
-
-std::wstring ChmConfig::Dump() const
+BOOL ChmConfig::GetBool(const std::wstring& section, const std::wstring& key, const BOOL bDefault) const
 {
-    return _Dump();
-}
+    std::wstring sec = _normalize(section);
+    std::wstring k   = _normalize(key);
 
-std::wstring ChmConfig::DumpErrors() const
-{
-    return _DumpErrors();
-}
-
-BOOL ChmConfig::GetBool(const std::wstring& section, const std::wstring& key) const
-{
-    auto itSec = m_config.find(section);
+    auto itSec = m_config.find(sec);
     if (itSec == m_config.end())
-        return FALSE;
+		return bDefault;
 
-    auto itKey = itSec->second.find(key);
+    auto itKey = itSec->second.find(k);
     if (itKey == itSec->second.end())
-        return FALSE;
+		return bDefault;
 
-    // 内部は long / string
-    if (std::holds_alternative<long>(itKey->second))
-    {
-        return std::get<long>(itKey->second) != 0 ? TRUE : FALSE;
-    }
+	if (std::holds_alternative<bool>(itKey->second))
+		return std::get<bool>(itKey->second) ? TRUE : FALSE; // 値が bool 型ならその値を返す
 
-#ifdef _DEBUG
-    // 型不一致（string を bool として取得）
-    assert(false);
-#endif
-    return FALSE;
+	return FALSE; // 型が合わない場合はbDefaultではなくFALSEを返す
 }
 
-ULONG ChmConfig::GetLong(const std::wstring& section, const std::wstring& key) const
+LONG ChmConfig::GetLong(const std::wstring& section, const std::wstring& key, const LONG lDefault) const
 {
-    auto itSec = m_config.find(section);
+    std::wstring sec = _normalize(section);
+    std::wstring k   = _normalize(key);
+
+    auto itSec = m_config.find(sec);
     if (itSec == m_config.end())
-        return 0;
+		return lDefault; // セクションが見つからない場合は既定値 0
 
-    auto itKey = itSec->second.find(key);
+    auto itKey = itSec->second.find(k);
     if (itKey == itSec->second.end())
-        return 0;
+        return lDefault;
 
-    if (std::holds_alternative<long>(itKey->second))
-    {
-        return static_cast<ULONG>(std::get<long>(itKey->second));
-    }
+        if (std::holds_alternative<long>(itKey->second))
+        return std::get<long>(itKey->second);
 
-#ifdef _DEBUG
-    // 型不一致（string を long として取得）
-    assert(false);
-#endif
-    return 0;
+    return lDefault;
 }
 
 std::wstring ChmConfig::GetString(const std::wstring& section, const std::wstring& key) const
 {
-    auto itSec = m_config.find(section);
+    std::wstring sec = _normalize(section);
+    std::wstring k   = _normalize(key);
+
+    auto itSec = m_config.find(sec);
     if (itSec == m_config.end())
         return L"";
 
-    auto itKey = itSec->second.find(key);
+    auto itKey = itSec->second.find(k);
     if (itKey == itSec->second.end())
         return L"";
 
     if (std::holds_alternative<std::wstring>(itKey->second))
-    {
         return std::get<std::wstring>(itKey->second);
-    }
 
-#ifdef _DEBUG
-    // 型不一致（数値を string として取得）
-    assert(false);
-#endif
     return L"";
 }
 
+std::wstring ChmConfig::Dump() const
+{
+	return _Dump();
+}
+
+std::wstring ChmConfig::DumpErrors() const
+{
+	return _DumpErrors();
+}
 
 // --- private helpers ---
 
 std::wstring ChmConfig::_Dump() const
 {
     std::wstring out;
-    out += L"--- ChmConfig config dump ---\n";
-
     for (const auto& sec : m_config)
     {
         out += L"[" + sec.first + L"]\n";
         for (const auto& kv : sec.second)
         {
             out += L"  " + kv.first + L" = ";
-            if (std::holds_alternative<long>(kv.second))
+                        if (std::holds_alternative<bool>(kv.second))
+            {
+                out += std::get<bool>(kv.second) ? L"true" : L"false";
+            }
+            else if (std::holds_alternative<long>(kv.second))
             {
                 out += std::to_wstring(std::get<long>(kv.second));
             }
@@ -200,11 +204,8 @@ std::wstring ChmConfig::_Dump() const
 std::wstring ChmConfig::_DumpErrors() const
 {
     std::wstring out;
-    out += L"--- ChmConfig parse errors ---\n";
-
     for (const auto& e : m_errors)
     {
-        out += L"line ";
         out += std::to_wstring(e.lineNo);
         out += L": ";
         out += e.message;
@@ -216,7 +217,7 @@ std::wstring ChmConfig::_DumpErrors() const
 
 
 
-static bool _tryParseBool(const std::wstring& s, long& outValue)
+bool ChmConfig::_tryParseBool(const std::wstring& s, long& outValue)
 {
     // case-insensitive
     std::wstring v;
@@ -237,7 +238,7 @@ static bool _tryParseBool(const std::wstring& s, long& outValue)
     return false;
 }
 
-static bool _tryParseLong(const std::wstring& s, long& outValue)
+bool ChmConfig::_tryParseLong(const std::wstring& s, long& outValue)
 {
     if (s.empty()) return false;
 
@@ -256,7 +257,7 @@ static bool _tryParseLong(const std::wstring& s, long& outValue)
 
 
 
-static bool _isValidName(const std::wstring& name)
+bool ChmConfig::_isValidName(const std::wstring& name)
 {
     // allowed: [_a-zA-Z][_a-zA-Z0-9.-]*
     if (name.empty()) return false;
@@ -285,14 +286,21 @@ static bool _isValidName(const std::wstring& name)
 
 
 
-static inline std::wstring _normalize(const std::wstring& s)
+static std::wstring _trim(const std::wstring& s)
 {
-    // trim + to lower
-	const wchar_t* ws = L" \t\n\r";
+    // whitespace characters: space(0x20), tab(0x09), CR(0x0D), LF(0x0A)
+    const wchar_t* ws = L" \t\r\n";
     size_t start = s.find_first_not_of(ws);
     if (start == std::wstring::npos) return L"";
     size_t end = s.find_last_not_of(ws);
     std::wstring out = s.substr(start, end - start + 1);
+	return out;
+}
+
+std::wstring ChmConfig::_normalize(const std::wstring& s)
+{
+    // 小文字化のみ（trimは行わない）
+    std::wstring out = s;
     for (auto& c : out)
     {
         if (c >= L'A' && c <= L'Z') c = c - L'A' + L'a';
@@ -302,17 +310,24 @@ static inline std::wstring _normalize(const std::wstring& s)
 
 BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSection, std::wstring& errorMsg)
 {
-    std::wstring s = _normalize(rawLine);
-    if (s.empty()) return TRUE;
+    OutputDebugStringWithString(L"_parseLine: %s", rawLine.c_str());
+
+    // まず trim
+    std::wstring rawTrim = _trim(rawLine);
+    if (rawTrim.empty()) return TRUE;
+
+    // 解析用に小文字化（trimはしない）
+    std::wstring normalizedLine = _normalize(rawTrim);
+    if (normalizedLine.empty()) return TRUE;
 
     // コメント行
-    if (s[0] == L';' || s[0] == L'#') return TRUE;
+    if (normalizedLine[0] == L';' || normalizedLine[0] == L'#') return TRUE;
 
-    // セクション行 [Section]
-    if (s.front() == L'[' && s.back() == L']')
+        // セクション行 [Section]
+    if (normalizedLine.front() == L'[' && normalizedLine.back() == L']')
     {
-        // ブラケット([])内の空白を_trimで除去
-        std::wstring section = _normalize(s.substr(1, s.size() - 2));
+        // [] 内を取り出して trim（前後空白許容）
+        std::wstring section = _trim(normalizedLine.substr(1, normalizedLine.size() - 2));
         if (!_isValidName(section))
         {
             errorMsg = L"invalid section name";
@@ -323,16 +338,16 @@ BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSec
     }
 
     // key=value パース
-    size_t pos = s.find(L'=');
+    size_t pos = normalizedLine.find(L'=');
     if (pos == std::wstring::npos)
     {
-        // おせっかいチェック：セクション書きかけ
-        if (s.front() == L'[' && s.back() != L']')
+        // おせっかいチェック：セクション書きかけかも
+        if (normalizedLine.front() == L'[' && normalizedLine.back() != L']')
         {
             errorMsg = L"missing ']' at end of section header";
             return FALSE;
         }
-        if (s.front() != L'[' && s.back() == L']')
+        if (normalizedLine.front() != L'[' && normalizedLine.back() == L']')
         {
             errorMsg = L"missing '[' at beginning of section header";
             return FALSE;
@@ -343,9 +358,8 @@ BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSec
         return FALSE;
     }
 
-    std::wstring key = _normalize(s.substr(0, pos));
-    std::wstring rawValue = s.substr(pos + 1); // valueは改行以外すべて許可
-    std::wstring v = _normalize(rawValue);           // 型判定用（trim後）
+        std::wstring key = _trim(normalizedLine.substr(0, pos));
+    std::wstring v = _trim(normalizedLine.substr(pos + 1)); // 型判定用
 
     if (key.empty())
     {
@@ -367,9 +381,9 @@ BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSec
 
     // value 型判定（内部は long / string に正規化）
     long n = 0;
-    if (_tryParseBool(v, n))
+        if (_tryParseBool(v, n))
     {
-        m_config[currentSection][key] = n; // boolは 0/1 の long
+        m_config[currentSection][key] = (n != 0); // boolとして保存
         return TRUE;
     }
     if (_tryParseLong(v, n))
@@ -378,7 +392,18 @@ BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSec
         return TRUE;
     }
 
-    // それ以外は string（rawValue をそのまま保持）
-    m_config[currentSection][key] = rawValue;
+    // それ以外は string（rawTrim から再抽出して trim）
+	// TODO:現状ではTRUEを文字列として扱うことができない（=true は bool として解釈される）。クオート処理が必要。
+	// TODO:同様にStringの先頭に空白記号を入れることもできない。クオート処理が必要。
+    size_t rawPos = rawTrim.find(L'=');
+    if (rawPos != std::wstring::npos)
+    {
+        std::wstring rawValue = _trim(rawTrim.substr(rawPos + 1));
+        m_config[currentSection][key] = rawValue;
+    }
+    else
+    {
+        m_config[currentSection][key] = L"";
+    }
     return TRUE;
 }

@@ -6,6 +6,9 @@
 #include "ChmEngine.h"
 #include "ChmRomajiConverter.h"
 #include "ChmConfig.h"
+#include "Hitomoji.h"
+
+ChmConfig* ChmEngine::_pConfig = nullptr;
 
 ChmEngine::ChmEngine() 
 	: _isON(FALSE), _hasComposition(FALSE),_converted(L""), _pending(L"") {
@@ -14,6 +17,30 @@ ChmEngine::ChmEngine()
 
 ChmEngine::~ChmEngine() {
 	if (_pRawInputStore) delete _pRawInputStore;
+}
+
+void ChmEngine::InitConfig() {
+	// ChmConfigの初期化
+	ChmConfig* newConfig = new ChmConfig();
+	BOOL bSuccess = newConfig->LoadFile();
+	if (!bSuccess && _pConfig) {
+		delete newConfig;
+		OutputDebugString(L"   > keeping old _pConfig");
+	} else {
+		if (!bSuccess) {
+			newConfig->InitConfig();
+			OutputDebugString(L"   > using empty config");
+		}
+		delete _pConfig;
+		_pConfig = newConfig;
+		ChmLogger::Info((std::wstring(L"=== Configs ===\n") + _pConfig->Dump()).c_str());
+		if (_pConfig->HasErrors())
+		{
+			ChmLogger::Warn((std::wstring(L"===ERRORS===\n") + _pConfig->DumpErrors()).c_str());
+		}
+	}
+
+	return ;
 }
 
 BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
@@ -43,26 +70,27 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 	// 確定キー
 	switch (_type) {
 #ifdef _DEBUG
-        case ChmKeyEvent::Type::VersionInfo: // 無変換確定
-            _converted = L"HITOMOJI" HITOMOJI_VERSION L"(" __DATE__ __TIME__ L")";
-			_hasComposition = TRUE;// 確定はさせない（ESCでキャンセルできるように）
-			break;
+      case ChmKeyEvent::Type::VersionInfo:
+            _converted = HM_VERSION L"(" __DATE__ L" " __TIME__ L")";
+            _pending = L"";
+            _hasComposition = TRUE;
+            break;
 #endif
-        case ChmKeyEvent::Type::CommitNonConvert: // 無変換確定
+      case ChmKeyEvent::Type::CommitNonConvert: // 無変換確定
 			// 未変換部分も含めて全確定
             _hasComposition = FALSE;
 			break ;
         case ChmKeyEvent::Type::CommitKatakana: // カタカナ変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
-				false, 
-				g_config->GetBool(L"ui",L"backspace_unit_symbol"));
+				true, 
+				_pConfig->GetBool(L"ui",L"Backspace_unit_symbol"));
             _converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
             _hasComposition = FALSE;
             break ;
         case ChmKeyEvent::Type::CommitKana:     // ひらがな変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
-				false,
-				g_config->GetBool(L"ui",L"backspace_unit_symbol"));
+				true,
+				_pConfig->GetBool(L"ui",L"Backspace_unit_symbol"));
             _hasComposition = FALSE;
             break;
         case ChmKeyEvent::Type::CommitAscii:    // ASCII確定
@@ -88,8 +116,8 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
             }
             _pRawInputStore->push(keyEvent.GetChar());
             ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
-				g_config->GetBool(L"ui",L"display_mode_alpha"),
-				g_config->GetBool(L"ui",L"backspace_unit_symbol"));
+				_pConfig->GetBool(L"ui",L"display_mode_kana"),
+				_pConfig->GetBool(L"ui",L"backspace_unit_symbol"));
 				;
             break;
         case ChmKeyEvent::Type::Backspace:
@@ -99,7 +127,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
                 size_t del = ChmRomajiConverter::GetLastRawUnitLength();
 
                 // Backspace の単位設定を考慮（Char / Unit）
-				if (g_config->GetBool(L"ui",L"backspace_unit_symbol") == FALSE) {
+				if (!_pConfig->GetBool(L"ui",L"backspace_unit_symbol")) {
                     del = 1;
                 }
 
@@ -116,8 +144,8 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
                     _hasComposition = FALSE;
                 } else {
                     ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
-						g_config->GetBool(L"ui",L"display_mode_alpha"),
-						g_config->GetBool(L"ui",L"backspace_unit_symbol"));
+						_pConfig->GetBool(L"ui",L"display_mode_kana"),
+						_pConfig->GetBool(L"ui",L"backspace_unit_symbol"));
                 }
             }
             break;
@@ -264,7 +292,9 @@ static const ChmKeyEvent::FuncKeyDef g_functionKeyTable[] = {
     { 'I',         false, true,  false, ChmKeyEvent::Type::CommitAscii    },
     { 'I',         true,  true,  false, ChmKeyEvent::Type::CommitAsciiWide},
     { 'M',         false, true,  false, ChmKeyEvent::Type::CommitKana     },
+#ifdef _DEBUG
     { 'V',         true,  true,  false, ChmKeyEvent::Type::VersionInfo    },
+#endif
 };
 
 ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/)

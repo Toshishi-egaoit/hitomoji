@@ -139,8 +139,24 @@ https://github.com/toshishi-egaoit/hitomoji
 
 目的：キー定義の外出し
 
-- 機能キー定義の外出し
+### v0.2.1
+
+目的：利用者の利便性向上と、エラーハンドリング強化
+
+- LoadFileのエラーハンドリング強化
+- バージョン確認コマンド(CTRL+SHIFT+V)の実装（デバッグ版のみ）
+- テストプロジェクト(hitomoji-test)の追加
+- テスト対象コードだけを分離し、hitomoji-engineプロジェクトを追加
+- エラーをログファイルに出力
+  ChmLoggerクラスの作成。ただし現状はOutputDebugStringを用いる。
+
+### v0.2.2
+
+目的：キー定義の外出し
+
 - ローマ字かな変換テーブルの外出し
+-- 例外のみを外だしとする。ベースは内部に持たせる
+- 機能キー定義の外出し
 - 複数のconfig項目の追加（主に風互換）
 
 ### v0.2.3
@@ -152,6 +168,9 @@ https://github.com/toshishi-egaoit/hitomoji
 -- ファイルOpenは既定のエディタで開く
 -ｰ ファイルRereadは、ファイルの再読み込みを行う。再読み込みでは、致命的エラーが出ると捨てる。エラーがなければ、新たなオブジェクトに切り替える。
 -- エラーログOpenは既定のエディタで開く
+- OnSetFocus / OnSetThreadFocus でのCompositionの初期化処理を改善
+-- _ｂNeedTerminateCompositionを定義
+-- 実際のTerminate処理をDoEditSessionに閉じ込める
 
 ## v0.3系統
 

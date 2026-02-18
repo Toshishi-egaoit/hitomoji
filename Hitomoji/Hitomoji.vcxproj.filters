@@ -18,15 +18,6 @@
     <ClInclude Include="TsfIf.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="ChmRomajiConverter.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="ChmEngine.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="utils.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="resource.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -45,21 +36,6 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
     <ClCompile Include="DisplayAttribute.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="ChmRawInputStore.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="ChmEngine.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="utils.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="ChmConfig.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="ChmConfig.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="ChmLangBar.h">

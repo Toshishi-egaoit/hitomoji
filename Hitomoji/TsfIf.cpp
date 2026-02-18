@@ -6,11 +6,11 @@
 #include <string>
 #include <cctype>
 #include <initguid.h> // GUID‚ÌŽÀ‘Ì’è‹`—p
+#include <objbase.h>
 #include "TsfIf.h"
 #include "DisplayAttribute.h"
 #include "ChmLangBar.h"
 #include "ChmConfig.h"
-#include <objbase.h>
 
 class CEditSession : public ITfEditSession , public ITfCompositionSink{
 
@@ -229,15 +229,12 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
     if (SUCCEEDED(_pThreadMgr->QueryInterface(IID_ITfSource, (void**)&pSource))) {
         HRESULT hr = pSource->AdviseSink(IID_ITfThreadFocusSink, (ITfThreadFocusSink*)this,&_dwThreadFocusSinkCookie);
 		OUTPUT_HR_ON_ERROR(L"Activate.AdviceSink",hr);
-		OutputDebugStringWithInt(L"THeadFocusCookie:%x",_dwThreadFocusSinkCookie);
+		OutputDebugStringWithInt(L"   > THeadFocusCookie:%x",_dwThreadFocusSinkCookie);
         pSource->Release();
     }
-	// config“Ç‚Ýž‚Ý
-	if (g_config != nullptr){
-		delete g_config;
-		g_config = nullptr;
-	}
-	g_config = new ChmConfig();
+
+	// ChmConfig‚Ì‰Šú‰»
+	ChmEngine::InitConfig();
 
     return S_OK;
 }
@@ -338,6 +335,7 @@ STDMETHODIMP ChmTsfInterface::OnTestKeyDown(ITfContext* pic, WPARAM wp, LPARAM l
 
 STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten)
 {
+	OutputDebugString(L"[Hitomoji] OnKeyDown");
 	*pfEaten = _pEngine->IsKeyEaten(wp);
     if (*pfEaten) {
 

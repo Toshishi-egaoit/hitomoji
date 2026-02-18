@@ -19,4 +19,7 @@ Release/
 /distribution/.Usage.md.swp
 /archives
 /dbg_distribution/x64/regHitomoji.exe
-*_test.exe
+/dbg_distribution/64_tsftest.exe
+/packages/Microsoft.googletest.v140.windesktop.msvcstl.dyn.rt-dyn.1.8.1.7
+/packages/Microsoft.googletest.v140.windesktop.msvcstl.static.rt-static.1.8.1.7
+/packages/Microsoft.googletest.v140.windesktop.msvcstl.dyn.rt-dyn.1.8.1.8
