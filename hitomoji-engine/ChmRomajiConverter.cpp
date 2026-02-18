@@ -95,8 +95,7 @@ static const std::wstring* FindEntry(const std::wstring& key)
 
 bool ChmRomajiConverter::TryConvertOne(const std::wstring& rawInput,
                                        size_t pos,
-                                       Unit& out,
-                                       bool isDispSymbol)
+                                       Unit& out)
 {
     out.output.clear();
     out.rawLength = 0;
@@ -112,8 +111,7 @@ bool ChmRomajiConverter::TryConvertOne(const std::wstring& rawInput,
         auto key = lowerInput.substr(pos, len);
         auto val = FindEntry(key);
         if (val) {
-            if (isDispSymbol) out.output = *val;
-            else out.output = rawInput.substr(pos, len);
+            out.output = *val;
             out.rawLength = len;
             return true;
         }
@@ -155,7 +153,6 @@ size_t ChmRomajiConverter::GetLastRawUnitLength() {
 void ChmRomajiConverter::convert(const std::wstring& rawInput,
                                  std::wstring& converted,
                                  std::wstring& pending,
-                                 bool isDisplayKana,
                                  bool isBackspaceSymbol)
 {
     converted.clear();
@@ -166,7 +163,7 @@ void ChmRomajiConverter::convert(const std::wstring& rawInput,
     Unit unit;
 
     while (pos < rawInput.size()) {
-        if (TryConvertOne(rawInput, pos, unit, isDisplayKana)) {
+        if (TryConvertOne(rawInput, pos, unit)) {
             converted += pending + unit.output;
 			pending = L"";
             _lastRawUnitLength = unit.rawLength;

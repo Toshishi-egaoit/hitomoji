@@ -83,14 +83,14 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
         case ChmKeyEvent::Type::CommitKatakana: // カタカナ変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
 				true, 
-				_pConfig->GetBool(L"ui",L"Backspace_unit_symbol"));
+				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
             _converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
             _hasComposition = FALSE;
             break ;
         case ChmKeyEvent::Type::CommitKana:     // ひらがな変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
 				true,
-				_pConfig->GetBool(L"ui",L"Backspace_unit_symbol"));
+				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
             _hasComposition = FALSE;
             break;
         case ChmKeyEvent::Type::CommitAscii:    // ASCII確定
@@ -116,8 +116,8 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
             }
             _pRawInputStore->push(keyEvent.GetChar());
             ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
-				_pConfig->GetBool(L"ui",L"display_mode_kana"),
-				_pConfig->GetBool(L"ui",L"backspace_unit_symbol"));
+				true,
+				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
 				;
             break;
         case ChmKeyEvent::Type::Backspace:
@@ -127,7 +127,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
                 size_t del = ChmRomajiConverter::GetLastRawUnitLength();
 
                 // Backspace の単位設定を考慮（Char / Unit）
-				if (!_pConfig->GetBool(L"ui",L"backspace_unit_symbol")) {
+				if (!_pConfig->GetBool(L"ui",L"backspace-unit-symbol")) {
                     del = 1;
                 }
 
@@ -144,8 +144,8 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
                     _hasComposition = FALSE;
                 } else {
                     ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
-						_pConfig->GetBool(L"ui",L"display_mode_kana"),
-						_pConfig->GetBool(L"ui",L"backspace_unit_symbol"));
+						true,
+						_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
                 }
             }
             break;

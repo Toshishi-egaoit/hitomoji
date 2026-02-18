@@ -20,13 +20,11 @@ public:
     static void convert(const std::wstring& rawInput,
                         std::wstring& converted,
                         std::wstring& pending,
-                        bool isDisplayKana,
                         bool isBackspaceSymbol);
 
     static bool TryConvertOne(const std::wstring& rawInput,
                               size_t pos,
-                              Unit& out,
-                              bool isSymbolMode);
+                              Unit& out);
 
     static size_t GetLastRawUnitLength();
 
