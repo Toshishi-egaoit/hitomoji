@@ -10,7 +10,7 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
-set INI_DIR=%APPDATA%\Hitomoji
+set CONFIG_DIR=%appdata%\Hitomoji
 
 set SYSTEM_DIR=%SystemRoot%\System32
 set TARGET_DIR=%SYSTEM_DIR%\hitomoji
@@ -29,6 +29,10 @@ if exist "%TARGET_DLL32%.old" (
 )
 
 :: 2. フォルダがなければ作成
+if not exist "%CONFIG_DIR%" (
+    mkdir "%CONFIG_DIR%"
+)
+
 if not exist "%TARGET_DIR%" (
     mkdir "%TARGET_DIR%"
 )
@@ -58,8 +62,8 @@ echo プロファイル登録
 copy /y "x64\regHitomoji.exe" "%TARGET_DIR%"
 "%TARGET_DIR%\regHitomoji.exe"
 
-echo iniファイルのコピー
-if not exist "%INI_DIR%" mkdir "%INI_DIR%"
-copy /y "Hitomoji.ini" "%INI_DIR%"
+echo "設定ファイルのコピー"
+copy /y "hitomoji.ini" "%CONFIG_DIR%"
 
-echo 全てのインストール工程が完了しました！
+echo 全てのインストール工程が完了しました
+pause
