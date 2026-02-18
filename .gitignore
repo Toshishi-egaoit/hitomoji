@@ -28,3 +28,5 @@ Release/
 /distribution/Hitomoji.ini
 /dbg_distribution/Hitomoji.ini
 /dbg_distribution/Hitomoji.ini
+/dbg_distribution/32_tsftest.exe
+/packages/Microsoft.googletest.v140.windesktop.msvcstl.static.rt-dyn.1.8.1.8
