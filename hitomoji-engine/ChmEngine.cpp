@@ -82,14 +82,12 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			break ;
         case ChmKeyEvent::Type::CommitKatakana: // カタカナ変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
-				true, 
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
             _converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
             _hasComposition = FALSE;
             break ;
         case ChmKeyEvent::Type::CommitKana:     // ひらがな変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
-				true,
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
             _hasComposition = FALSE;
             break;
@@ -116,7 +114,6 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
             }
             _pRawInputStore->push(keyEvent.GetChar());
             ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
-				true,
 				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
 				;
             break;
@@ -144,7 +141,6 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
                     _hasComposition = FALSE;
                 } else {
                     ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
-						true,
 						_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
                 }
             }

@@ -9,13 +9,12 @@ protected:
 };
 
 static std::wstring ConvertWithPending(const std::wstring& input,
-                                       bool disp = true,
                                        bool bs = true)
 {
     std::wstring converted;
     std::wstring pending;
 
-    ChmRomajiConverter::convert(input, converted, pending, disp, bs);
+    ChmRomajiConverter::convert(input, converted, pending, bs);
     return converted + L":" + pending;
 }
 
@@ -80,16 +79,9 @@ TEST(ConvertTest, PendingCases)
 //
 // ÉtÉâÉOç∑ï™
 //
-TEST(ConvertTest, DisplayOff)
-{
-    // isDisplayKana = false Å® ê∂ï∂éöèoóÕ
-    EXPECT_EQ(L"ka:", ConvertWithPending(L"ka", false));
-    EXPECT_EQ(L"ka:k", ConvertWithPending(L"kak", false));
-}
-
 TEST(ConvertTest, BackspaceMode)
 {
-    ConvertWithPending(L"ka", true, true);
+    ConvertWithPending(L"ka", true);
     EXPECT_EQ(2, ChmRomajiConverter::GetLastRawUnitLength());
 
     EXPECT_EQ(L":k", ConvertWithPending(L"k"));
@@ -103,7 +95,7 @@ TEST(ConvertTest, BackspaceMode)
     EXPECT_EQ(L"Ç¡:t", ConvertWithPending(L"tt"));
     EXPECT_EQ(1, ChmRomajiConverter::GetLastRawUnitLength());
 
-    EXPECT_EQ(L":ky", ConvertWithPending(L"ky",true,false));
+    EXPECT_EQ(L":ky", ConvertWithPending(L"ky",false));
     EXPECT_EQ(1, ChmRomajiConverter::GetLastRawUnitLength());
 }
 
