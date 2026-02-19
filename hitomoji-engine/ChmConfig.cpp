@@ -44,6 +44,8 @@ BOOL ChmConfig::LoadFromStream(std::wistream& is)
         std::wstring errorMsg;
 		bool bRet = false;
 
+        // iniファイル全体での共通処理      
+      
 		// key-table セクション処理
 		if (currentSection == L"key-table")
 		{
@@ -106,8 +108,8 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 
 BOOL ChmConfig::GetBool(const std::wstring& section, const std::wstring& key, const BOOL bDefault) const
 {
-    std::wstring sec = _normalize(section);
-    std::wstring k   = _normalize(key);
+    std::wstring sec = Canonize(section);
+    std::wstring k   = Canonize(key);
 
     auto itSec = m_config.find(sec);
     if (itSec == m_config.end())
@@ -125,8 +127,8 @@ BOOL ChmConfig::GetBool(const std::wstring& section, const std::wstring& key, co
 
 LONG ChmConfig::GetLong(const std::wstring& section, const std::wstring& key, const LONG lDefault) const
 {
-    std::wstring sec = _normalize(section);
-    std::wstring k   = _normalize(key);
+    std::wstring sec = Canonize(section);
+    std::wstring k   = Canonize(key);
 
     auto itSec = m_config.find(sec);
     if (itSec == m_config.end())
@@ -144,8 +146,8 @@ LONG ChmConfig::GetLong(const std::wstring& section, const std::wstring& key, co
 
 std::wstring ChmConfig::GetString(const std::wstring& section, const std::wstring& key) const
 {
-    std::wstring sec = _normalize(section);
-    std::wstring k   = _normalize(key);
+    std::wstring sec = Canonize(section);
+    std::wstring k   = Canonize(key);
 
     auto itSec = m_config.find(sec);
     if (itSec == m_config.end())
@@ -170,6 +172,29 @@ std::wstring ChmConfig::DumpErrors() const
 {
 	return _DumpErrors();
 }
+
+// --- public helpers ---
+std::wstring Trim(const std::wstring& s)
+{
+    // whitespace characters: space(0x20), tab(0x09), CR(0x0D), LF(0x0A)
+    const wchar_t* ws = L" \t\r\n";
+    size_t start = s.find_first_not_of(ws);
+    if (start == std::wstring::npos) return L"";
+    size_t end = s.find_last_not_of(ws);
+    std::wstring out = s.substr(start, end - start + 1);
+	return out;
+}
+
+
+std::wstring ChmConfig::Canonize(const std::wstring& s)
+{
+    std::wstring result = s;
+    std::transform(result.begin(), result.end(),
+                   result.begin(),
+                   towlower);
+    return result;
+}
+
 
 // --- private helpers ---
 
@@ -259,24 +284,15 @@ bool ChmConfig::_tryParseLong(const std::wstring& s, long& outValue)
 
 bool ChmConfig::_isValidName(const std::wstring& name)
 {
-    // allowed: [_a-zA-Z][_a-zA-Z0-9.-]*
+    // allowed: [-a-z0-9]* (Canonize後を前提)
     if (name.empty()) return false;
 
-    wchar_t c0 = name[0];
-    if (!( (c0 >= L'a' && c0 <= L'z') ||
-           (c0 >= L'A' && c0 <= L'Z') ||
-           c0 == L'_' ))
-    {
-        return false;
-    }
-
-    for (size_t i = 1; i < name.size(); ++i)
+    for (size_t i = 0; i < name.size(); ++i)
     {
         wchar_t c = name[i];
-        if (!( (c >= L'a' && c <= L'z') ||
-               (c >= L'A' && c <= L'Z') ||
-               (c >= L'0' && c <= L'9') ||
-               c == L'_' || c == L'-' || c == L'.' ))
+        if (!((c >= L'a' && c <= L'z') ||
+              (c >= L'0' && c <= L'9') ||
+              c == L'-'))
         {
             return false;
         }
@@ -284,40 +300,16 @@ bool ChmConfig::_isValidName(const std::wstring& name)
     return true;
 }
 
-
-
-static std::wstring _trim(const std::wstring& s)
-{
-    // whitespace characters: space(0x20), tab(0x09), CR(0x0D), LF(0x0A)
-    const wchar_t* ws = L" \t\r\n";
-    size_t start = s.find_first_not_of(ws);
-    if (start == std::wstring::npos) return L"";
-    size_t end = s.find_last_not_of(ws);
-    std::wstring out = s.substr(start, end - start + 1);
-	return out;
-}
-
-std::wstring ChmConfig::_normalize(const std::wstring& s)
-{
-    // 小文字化のみ（trimは行わない）
-    std::wstring out = s;
-    for (auto& c : out)
-    {
-        if (c >= L'A' && c <= L'Z') c = c - L'A' + L'a';
-    }
-    return out;
-}
-
 BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSection, std::wstring& errorMsg)
 {
     OutputDebugStringWithString(L"_parseLine: %s", rawLine.c_str());
 
     // まず trim
-    std::wstring rawTrim = _trim(rawLine);
+    std::wstring rawTrim = Trim(rawLine);
     if (rawTrim.empty()) return TRUE;
 
     // 解析用に小文字化（trimはしない）
-    std::wstring normalizedLine = _normalize(rawTrim);
+    std::wstring normalizedLine = Canonize(rawTrim);
     if (normalizedLine.empty()) return TRUE;
 
     // コメント行
@@ -327,7 +319,7 @@ BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSec
     if (normalizedLine.front() == L'[' && normalizedLine.back() == L']')
     {
         // [] 内を取り出して trim（前後空白許容）
-        std::wstring section = _trim(normalizedLine.substr(1, normalizedLine.size() - 2));
+        std::wstring section = Trim(normalizedLine.substr(1, normalizedLine.size() - 2));
         if (!_isValidName(section))
         {
             errorMsg = L"invalid section name";
@@ -358,8 +350,8 @@ BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSec
         return FALSE;
     }
 
-        std::wstring key = _trim(normalizedLine.substr(0, pos));
-    std::wstring v = _trim(normalizedLine.substr(pos + 1)); // 型判定用
+        std::wstring key = Trim(normalizedLine.substr(0, pos));
+    std::wstring v = Trim(normalizedLine.substr(pos + 1)); // 型判定用
 
     if (key.empty())
     {
@@ -398,7 +390,7 @@ BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSec
     size_t rawPos = rawTrim.find(L'=');
     if (rawPos != std::wstring::npos)
     {
-        std::wstring rawValue = _trim(rawTrim.substr(rawPos + 1));
+        std::wstring rawValue = Trim(rawTrim.substr(rawPos + 1));
         m_config[currentSection][key] = rawValue;
     }
     else
@@ -407,3 +399,4 @@ BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSec
     }
     return TRUE;
 }
+
