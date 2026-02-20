@@ -37,34 +37,57 @@ BOOL ChmConfig::LoadFromStream(std::wistream& is)
     std::wstring currentSection;
     size_t lineNo = 0;
 
-	ChmKeytableParser::ClearOverrideTable();
+    ChmKeytableParser::ClearOverrideTable();
+
     while (std::getline(is, rawLine))
     {
         ++lineNo;
         std::wstring errorMsg;
-		bool bRet = false;
+        bool bRet = true;
 
-        // iniファイル全体での共通処理      
-      
-		// key-table セクション処理
-		if (currentSection == L"key-table")
-		{
-			std::wstring k, v;
+        // ---- 共通前処理（ここに集約） ----
+        std::wstring rawTrim = Trim(rawLine);
 
-			bRet = ChmKeytableParser::ParseLine(rawLine, k, v, errorMsg);
-			if (bRet) 
-			{
-				ChmKeytableParser::RegisterOverrideTable(k, v);
-			}
-			else if (errorMsg == L"reserved line") {
-				// 予約行は無視
-				bRet = true;
-			}
-		} else {
-			bRet = _parseLine(rawLine, currentSection, errorMsg);
-		}
+        // 空行
+        if (rawTrim.empty())
+            continue;
 
-		if (!bRet)
+        // コメント行
+        if (rawTrim[0] == L';' || rawTrim[0] == L'#')
+            continue;
+
+        // セクション処理
+        if (_parseSection(rawTrim, currentSection, errorMsg))
+            continue;
+
+        if (!errorMsg.empty())
+        {
+            m_errors.push_back({ lineNo, errorMsg });
+            continue;
+        }
+
+        // ---- セクション別ディスパッチ ----
+
+        if (currentSection == L"key-table")
+        {
+            std::wstring k, v;
+            bRet = ChmKeytableParser::ParseLine(rawLine, k, v, errorMsg);
+
+            if (bRet)
+            {
+                ChmKeytableParser::RegisterOverrideTable(k, v);
+            }
+            else if (errorMsg == L"reserved line")
+            {
+                bRet = true; // 予約行は無視
+            }
+        }
+        else
+        {
+            bRet = _parseKeyValue(rawTrim, currentSection, errorMsg);
+        }
+
+        if (!bRet)
         {
             m_errors.push_back({ lineNo, errorMsg });
         }
@@ -174,7 +197,7 @@ std::wstring ChmConfig::DumpErrors() const
 }
 
 // --- public helpers ---
-std::wstring Trim(const std::wstring& s)
+std::wstring ChmConfig::Trim(const std::wstring& s)
 {
     // whitespace characters: space(0x20), tab(0x09), CR(0x0D), LF(0x0A)
     const wchar_t* ws = L" \t\r\n";
@@ -185,13 +208,17 @@ std::wstring Trim(const std::wstring& s)
 	return out;
 }
 
-
+//  大文字の小文字化　＋　'_'の'-'化
 std::wstring ChmConfig::Canonize(const std::wstring& s)
 {
     std::wstring result = s;
     std::transform(result.begin(), result.end(),
                    result.begin(),
-                   towlower);
+                   [](wchar_t c)
+                   {
+                       if (c == L'_') return L'-';   // unify '_' to '-'
+                       return (wchar_t)towlower(c);
+                   });
     return result;
 }
 
@@ -240,27 +267,24 @@ std::wstring ChmConfig::_DumpErrors() const
     return out;
 }
 
-
-
-bool ChmConfig::_tryParseBool(const std::wstring& s, long& outValue)
+bool ChmConfig::_tryParseBool(const std::wstring& s, bool& outValue)
 {
     // case-insensitive
-    std::wstring v;
-    v.reserve(s.size());
-    for (wchar_t c : s)
-        v.push_back((c >= L'A' && c <= L'Z') ? (c - L'A' + L'a') : c);
+    std::wstring v = Canonize(s);
 
     if (v == L"true" || v == L"yes" || v == L"on" || v == L"1")
     {
-        outValue = 1;
-        return true;
+        outValue = true;
     }
-    if (v == L"false" || v == L"no" || v == L"off" || v == L"0")
+    else if (v == L"false" || v == L"no" || v == L"off" || v == L"0")
     {
-        outValue = 0;
-        return true;
+        outValue = false;
     }
-    return false;
+	else 
+	{
+		return false;
+	}
+	return true;
 }
 
 bool ChmConfig::_tryParseLong(const std::wstring& s, long& outValue)
@@ -300,58 +324,60 @@ bool ChmConfig::_isValidName(const std::wstring& name)
     return true;
 }
 
-BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSection, std::wstring& errorMsg)
+BOOL ChmConfig::_parseSection(const std::wstring& rawTrim,
+                              std::wstring& currentSection,
+                              std::wstring& errorMsg)
 {
-    OutputDebugStringWithString(L"_parseLine: %s", rawLine.c_str());
+  // おせっかいチェック
+  if ( rawTrim.front() != L'[' && rawTrim.back() == L']')
+  {
+    errorMsg = L"missing '[' at section header";
+    return FALSE;
+  }
+  if ( rawTrim.front() == L'[' && rawTrim.back() != L']')
+  {
+    errorMsg = L"missing ']' at end of section header";
+    return FALSE;
+  }
 
-    // まず trim
-    std::wstring rawTrim = Trim(rawLine);
-    if (rawTrim.empty()) return TRUE;
+  if ( rawTrim.front() == L'[' && rawTrim.back() == L']')
+  {
+      std::wstring section = Trim(rawTrim.substr(1, rawTrim.size() - 2));
+      section = Canonize(section);
 
-    // 解析用に小文字化（trimはしない）
-    std::wstring normalizedLine = Canonize(rawTrim);
-    if (normalizedLine.empty()) return TRUE;
+      if (!_isValidName(section))
+      {
+          errorMsg = L"invalid section name";
+          return FALSE;
+      }
 
-    // コメント行
-    if (normalizedLine[0] == L';' || normalizedLine[0] == L'#') return TRUE;
+      currentSection = section;
+      return TRUE;
+  }
 
-        // セクション行 [Section]
-    if (normalizedLine.front() == L'[' && normalizedLine.back() == L']')
-    {
-        // [] 内を取り出して trim（前後空白許容）
-        std::wstring section = Trim(normalizedLine.substr(1, normalizedLine.size() - 2));
-        if (!_isValidName(section))
-        {
-            errorMsg = L"invalid section name";
-            return FALSE;
-        }
-        currentSection = section;
-        return TRUE;
-    }
+  // みしょりのケース
+  return FALSE;
+}
 
-    // key=value パース
-    size_t pos = normalizedLine.find(L'=');
+BOOL ChmConfig::_parseKeyValue(const std::wstring& rawTrim,
+                               const std::wstring& currentSection,
+                               std::wstring& errorMsg)
+{
+    size_t pos = rawTrim.find(L'=');
     if (pos == std::wstring::npos)
     {
-        // おせっかいチェック：セクション書きかけかも
-        if (normalizedLine.front() == L'[' && normalizedLine.back() != L']')
-        {
-            errorMsg = L"missing ']' at end of section header";
-            return FALSE;
-        }
-        if (normalizedLine.front() != L'[' && normalizedLine.back() == L']')
-        {
-            errorMsg = L"missing '[' at beginning of section header";
-            return FALSE;
-        }
-
-        // '=' がない行は文法エラー
         errorMsg = L"missing '=' in key-value pair";
         return FALSE;
     }
 
-        std::wstring key = Trim(normalizedLine.substr(0, pos));
-    std::wstring v = Trim(normalizedLine.substr(pos + 1)); // 型判定用
+    if (currentSection.empty())
+    {
+        errorMsg = L"key-value pair outside of any section";
+        return FALSE;
+    }
+
+    std::wstring key = Trim(rawTrim.substr(0, pos));
+    key = Canonize(key);
 
     if (key.empty())
     {
@@ -364,39 +390,22 @@ BOOL ChmConfig::_parseLine(const std::wstring& rawLine, std::wstring& currentSec
         return FALSE;
     }
 
-    // セクション未定義の場合はエラー
-    if (currentSection.empty())
-    {
-        errorMsg = L"key-value pair outside of any section";
-        return FALSE;
-    }
+    std::wstring v = Trim(rawTrim.substr(pos + 1));
 
-    // value 型判定（内部は long / string に正規化）
-    long n = 0;
-        if (_tryParseBool(v, n))
+	bool bValue = true;
+    if (_tryParseBool(v, bValue))
     {
-        m_config[currentSection][key] = (n != 0); // boolとして保存
+        m_config[currentSection][key] = bValue;
         return TRUE;
     }
+    long n = 0;
     if (_tryParseLong(v, n))
     {
         m_config[currentSection][key] = n;
         return TRUE;
     }
 
-    // それ以外は string（rawTrim から再抽出して trim）
-	// TODO:現状ではTRUEを文字列として扱うことができない（=true は bool として解釈される）。クオート処理が必要。
-	// TODO:同様にStringの先頭に空白記号を入れることもできない。クオート処理が必要。
-    size_t rawPos = rawTrim.find(L'=');
-    if (rawPos != std::wstring::npos)
-    {
-        std::wstring rawValue = Trim(rawTrim.substr(rawPos + 1));
-        m_config[currentSection][key] = rawValue;
-    }
-    else
-    {
-        m_config[currentSection][key] = L"";
-    }
+    m_config[currentSection][key] = v;
     return TRUE;
 }
 

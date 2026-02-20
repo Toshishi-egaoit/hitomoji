@@ -46,16 +46,19 @@ public:
     static std::wstring Canonize(const std::wstring& s);
     
 private:
-    BOOL _parseLine(const std::wstring& rawLine,
-                    std::wstring& currentSection,
-                    std::wstring& errorMsg);
+	BOOL _parseSection(const std::wstring& rawTrim,
+                              std::wstring& currentSection,
+                              std::wstring& errorMsg);
+	BOOL _parseKeyValue(const std::wstring& rawTrim,
+                               const std::wstring& currentSection,
+                               std::wstring& errorMsg);
 
     // --- helper ---
     std::wstring _Dump() const;
     std::wstring _DumpErrors() const;
     static bool _isValidName(const std::wstring& name);
     static bool _tryParseLong(const std::wstring& s, long& outValue);
-    static bool _tryParseBool(const std::wstring& s, long& outValue);
+    static bool _tryParseBool(const std::wstring& s, bool& outValue);
 
     ConfigMap m_config;
     ErrorMap  m_errors;
