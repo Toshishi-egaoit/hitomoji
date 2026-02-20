@@ -6,9 +6,19 @@ TEST(ConfigTest, LoadValidFile)
     ChmConfig config;
 
 	EXPECT_TRUE(config.LoadFile(L".\\testdata\\valid.ini"));
-	OutputDebugString(config.Dump().c_str());
+    EXPECT_TRUE(config.GetBool(L"bools", L"bool-true-1"));
+
+	std::wstring dump = config.Dump();
+	OutputDebugString(L"===Tables");
+	OutputDebugString(dump.c_str());
+    EXPECT_FALSE(dump.empty());
+	EXPECT_GT(20, std::count(dump.begin(), dump.end(), L'\n'));   // 期待する行数(ややすくなめにしている)
+
+	std::wstring errors = config.DumpErrors();
 	OutputDebugString(L"===ERRORS");
-	OutputDebugString(config.DumpErrors().c_str());
+	OutputDebugString(errors.c_str());
+    EXPECT_TRUE(errors.empty());
+	
 }
 
 TEST(ConfigTest, BoolTest) 
@@ -85,6 +95,21 @@ TEST(ConfigTest, Canonize)
     EXPECT_TRUE(config.GetBool(L"canonize_2", L"bool_false_1"));
 }
 
+TEST(ConfigTest, DuplicateKey)
+{
+    ChmConfig config;
+    EXPECT_TRUE(config.LoadFile(L".\\testdata\\duplicate.ini"));
+
+    // 最後の値が有効
+    EXPECT_EQ(2, config.GetLong(L"dup", L"value"));
+
+    EXPECT_TRUE(config.HasErrors());
+
+    std::wstring errors = config.DumpErrors();
+    EXPECT_NE(std::wstring::npos, errors.find(L"duplicate key"));
+}
+
+
 TEST(ConfigTest, BlankFile)
 {
     ChmConfig config;
@@ -99,11 +124,12 @@ TEST(ConfigTest, BlankFile)
 TEST(ConfigTest, LoadInvalidFile)
 {
     ChmConfig config;
-    EXPECT_TRUE(config.LoadFile(L".\\testdata\\invalid.ini"));
+    EXPECT_FALSE(config.LoadFile(L".\\testdata\\invalid.ini"));
 
     EXPECT_TRUE(config.HasErrors());
 
     std::wstring errors = config.DumpErrors();
+	OutputDebugString(errors.c_str());
 
     // 部分一致で見る（全文一致は壊れやすい）
     EXPECT_NE(std::wstring::npos, errors.find(L"missing ']'"));

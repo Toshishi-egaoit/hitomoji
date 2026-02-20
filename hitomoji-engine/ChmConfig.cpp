@@ -42,10 +42,12 @@ BOOL ChmConfig::LoadFromStream(std::wistream& is)
     while (std::getline(is, rawLine))
     {
         ++lineNo;
-        std::wstring errorMsg;
+
+        std::wstring errorMsg ;
         bool bRet = true;
 
-        // ---- 共通前処理（ここに集約） ----
+        // ---- 共通処理 ----
+		errorMsg.clear();
         std::wstring rawTrim = Trim(rawLine);
 
         // 空行
@@ -56,26 +58,38 @@ BOOL ChmConfig::LoadFromStream(std::wistream& is)
         if (rawTrim[0] == L';' || rawTrim[0] == L'#')
             continue;
 
-        // セクション処理
-        if (_parseSection(rawTrim, currentSection, errorMsg))
+        // 
+        // ---- セクション処理----
+		if (_parseSection(rawTrim, currentSection, errorMsg)) {
+			// TRUE＝セクションとして処理したばあい
             continue;
+		}
+		else if (!errorMsg.empty()) {
+            m_errors.push_back({ lineNo, errorMsg });
+			continue ;
+		}
+		
+        // ---- キーとバリューの取得 ----
 
+		std::wstring key;
+		std::wstring value;
+		bRet = _divideRawTrim(rawTrim, key, value, errorMsg) ;
+
+        // エラー検出時はここでcontinue
         if (!errorMsg.empty())
         {
             m_errors.push_back({ lineNo, errorMsg });
             continue;
         }
-
-        // ---- セクション別ディスパッチ ----
+        // ---- 共通処理ここまで
 
         if (currentSection == L"key-table")
         {
-            std::wstring k, v;
-            bRet = ChmKeytableParser::ParseLine(rawLine, k, v, errorMsg);
+            bRet = ChmKeytableParser::ParseLine(rawLine, key, value, errorMsg);
 
             if (bRet)
             {
-                ChmKeytableParser::RegisterOverrideTable(k, v);
+                ChmKeytableParser::RegisterOverrideTable(key, value);
             }
             else if (errorMsg == L"reserved line")
             {
@@ -84,16 +98,19 @@ BOOL ChmConfig::LoadFromStream(std::wistream& is)
         }
         else
         {
-            bRet = _parseKeyValue(rawTrim, currentSection, errorMsg);
+            bRet = _parseValue(key, value, currentSection, errorMsg);
         }
 
-        if (!bRet)
+        if (!errorMsg.empty())
         {
             m_errors.push_back({ lineNo, errorMsg });
         }
+
+
+
     }
 
-    return TRUE;
+    return !HasErrors() ;
 }
 
 void ChmConfig::InitConfig()
@@ -328,28 +345,34 @@ BOOL ChmConfig::_parseSection(const std::wstring& rawTrim,
                               std::wstring& currentSection,
                               std::wstring& errorMsg)
 {
-  // おせっかいチェック
-  if ( rawTrim.front() != L'[' && rawTrim.back() == L']')
-  {
-    errorMsg = L"missing '[' at section header";
-    return FALSE;
-  }
-  if ( rawTrim.front() == L'[' && rawTrim.back() != L']')
-  {
-    errorMsg = L"missing ']' at end of section header";
-    return FALSE;
-  }
+	// おせっかいチェック
+	if ( rawTrim.front() != L'[' && rawTrim.back() == L']')
+	{
+	errorMsg = L"missing '[' at section header";
+	return FALSE;
+	}
+	if ( rawTrim.front() == L'[' && rawTrim.back() != L']')
+	{
+	errorMsg = L"missing ']' at end of section header";
+	return FALSE;
+	}
 
-  if ( rawTrim.front() == L'[' && rawTrim.back() == L']')
-  {
-      std::wstring section = Trim(rawTrim.substr(1, rawTrim.size() - 2));
-      section = Canonize(section);
+	if ( rawTrim.front() == L'[' && rawTrim.back() == L']')
+	  {
+		  std::wstring section = Trim(rawTrim.substr(1, rawTrim.size() - 2));
+		  section = Canonize(section);
 
-      if (!_isValidName(section))
-      {
-          errorMsg = L"invalid section name";
-          return FALSE;
-      }
+	if (!_isValidName(section))
+	{
+	  errorMsg = L"invalid section name";
+	  return FALSE;
+	}
+
+	if (section.empty())
+	{
+		errorMsg = L"empty section name";
+		return FALSE;
+	}
 
       currentSection = section;
       return TRUE;
@@ -359,8 +382,9 @@ BOOL ChmConfig::_parseSection(const std::wstring& rawTrim,
   return FALSE;
 }
 
-BOOL ChmConfig::_parseKeyValue(const std::wstring& rawTrim,
-                               const std::wstring& currentSection,
+BOOL ChmConfig::_divideRawTrim(const std::wstring& rawTrim,
+                               std::wstring& key,
+                               std::wstring& value,
                                std::wstring& errorMsg)
 {
     size_t pos = rawTrim.find(L'=');
@@ -370,42 +394,61 @@ BOOL ChmConfig::_parseKeyValue(const std::wstring& rawTrim,
         return FALSE;
     }
 
-    if (currentSection.empty())
-    {
-        errorMsg = L"key-value pair outside of any section";
-        return FALSE;
-    }
-
-    std::wstring key = Trim(rawTrim.substr(0, pos));
-    key = Canonize(key);
+	// ここではぶんかつだけをおこなう。canonizeはしない
+    key = Trim(rawTrim.substr(0, pos));
 
     if (key.empty())
     {
         errorMsg = L"empty key name";
         return FALSE;
     }
+
+    value = Trim(rawTrim.substr(pos + 1));
+	return TRUE;
+}
+
+BOOL ChmConfig::_parseValue(const std::wstring& keyTrim,
+                               const std::wstring& valueTrim,
+                               const std::wstring& currentSection,
+                               std::wstring& errorMsg)
+{
+    std::wstring key = Canonize(keyTrim);
+
     if (!_isValidName(key))
     {
         errorMsg = L"invalid key name";
         return FALSE;
     }
 
-    std::wstring v = Trim(rawTrim.substr(pos + 1));
+	if ( _isDuplicateKey(currentSection,key))
+	{
+		errorMsg = L"WARN: duplicate key. overwritten: " + currentSection + L"." + key;
+	}
 
 	bool bValue = true;
-    if (_tryParseBool(v, bValue))
+    if (_tryParseBool(valueTrim, bValue))
     {
         m_config[currentSection][key] = bValue;
         return TRUE;
     }
+
     long n = 0;
-    if (_tryParseLong(v, n))
+    if (_tryParseLong(valueTrim, n))
     {
         m_config[currentSection][key] = n;
         return TRUE;
     }
 
-    m_config[currentSection][key] = v;
+    m_config[currentSection][key] = valueTrim;
     return TRUE;
+}
+
+bool ChmConfig::_isDuplicateKey(const std::wstring& section, const std::wstring & canonizedKey) 
+{
+	auto sectionMap = m_config.find(section) ;
+
+	if ( sectionMap == m_config.end()) return false;
+
+	return (sectionMap->second.find(canonizedKey) != sectionMap->second.end());
 }
 
