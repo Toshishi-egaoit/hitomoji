@@ -8,6 +8,7 @@
 #include <codecvt>
 #include "ChmConfig.h"
 #include "ChmRomajiConverter.h"
+#include "ChmKeyEvent.h"
 #include "utils.h"
 
 static std::wstring GetConfigPath()
@@ -42,6 +43,7 @@ BOOL ChmConfig::LoadFromStream(std::wistream& is)
     while (std::getline(is, rawLine))
     {
         ++lineNo;
+		OutputDebugStringWithString(L"   > %s<<", rawLine.c_str());
 
         std::wstring errorMsg ;
         bool bRet = true;
@@ -96,6 +98,11 @@ BOOL ChmConfig::LoadFromStream(std::wistream& is)
                 bRet = true; // —\–ñs‚Í–³Ž‹
             }
         }
+        else if (currentSection == L"function-key")
+        {
+            // function-key ‚Í ChmKeyEvent ‘¤‚Å‰ðŽß‚·‚é
+            bRet = ChmKeyEvent::ParseFunctionKey(key, value, errorMsg);
+        }
         else
         {
             bRet = _parseValue(key, value, currentSection, errorMsg);
@@ -110,7 +117,7 @@ BOOL ChmConfig::LoadFromStream(std::wistream& is)
 
     }
 
-    return !HasErrors() ;
+    return !HasErrors();
 }
 
 void ChmConfig::InitConfig()
@@ -451,4 +458,3 @@ bool ChmConfig::_isDuplicateKey(const std::wstring& section, const std::wstring 
 
 	return (sectionMap->second.find(canonizedKey) != sectionMap->second.end());
 }
-

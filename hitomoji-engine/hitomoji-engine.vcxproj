@@ -141,12 +141,14 @@
   <ItemGroup>
     <ClCompile Include="ChmConfig.cpp" />
     <ClCompile Include="ChmEngine.cpp" />
+    <ClCompile Include="ChmKeyEvent.cpp" />
     <ClCompile Include="ChmRomajiConverter.cpp" />
     <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ChmConfig.h" />
     <ClInclude Include="ChmEngine.h" />
+    <ClInclude Include="ChmKeyEvent.h" />
     <ClInclude Include="ChmRawInputStore.h" />
     <ClInclude Include="ChmRomajiConverter.h" />
     <ClInclude Include="Hitomoji.h" />
