@@ -13,6 +13,7 @@ class ChmConfig;
 
 class ChmKeyEvent {
 public:
+	// TODO: タイプ名を実体に合うように修正
     enum class Type {
         None = 0,
         CharInput,          // 通常文字入力
@@ -60,15 +61,16 @@ public:
     ChmKeyEvent(WPARAM wp, LPARAM lp);
 	ChmKeyEvent(ChmKeyEvent::Type type); // マウスクリックなどの特殊用途（OnEndEditで使用）
 
-    // --- function-key ---
+    // --- function-key table helpers ---
     static BOOL ParseFunctionKey(const std::wstring& key,
                                  const std::wstring& value,
                                  std::wstring& errorMsg);
+	static const FuncKeyDef* GetFunctionKeyDefinition(const std::wstring& key);
 
     static void ClearFunctionKeyOverride();
 
     // --- KeyState hook (for testing) ---
-    static void SetGetKeyStateFunc(SHORT (*func)(int));
+	static void SetGetKeyStateFunc(SHORT (__stdcall *func)(int));
 
     // --- accessors ---
     Type GetType() const { return _type; }
@@ -91,8 +93,11 @@ public:
 	}
 
 private:
+    // --- KeyTable helper ---
+	static bool _ResolveActionName(const std::wstring& name, ChmKeyEvent::Type& outType);
+	static bool _ResolveKeyName(const std::wstring& name, UINT& outVk);
     // --- KeyState hook ---
-    static SHORT (*s_getKeyStateFunc)(int);
+	static SHORT (__stdcall *s_getKeyStateFunc)(int);
 
     void _TranslateByTable();
 

@@ -8,6 +8,7 @@
 #include <initguid.h> // GUID‚ÌŽÀ‘Ì’è‹`—p
 #include <objbase.h>
 #include "TsfIf.h"
+#include "ChmKeyEvent.h"
 #include "DisplayAttribute.h"
 #include "ChmLangBar.h"
 #include "ChmConfig.h"

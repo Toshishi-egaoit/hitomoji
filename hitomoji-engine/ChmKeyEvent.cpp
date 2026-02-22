@@ -1,6 +1,7 @@
 ﻿#include <Windows.h>
 #include <WinUser.h>
 #include <map>
+#include <algorithm>
 #include "ChmKeyEvent.h"
 #include "ChmConfig.h"
 
@@ -111,6 +112,24 @@ void ChmKeyEvent::ClearFunctionKeyOverride()
     s_functionKeyOverride.clear();
 }
 
+const ChmKeyEvent::FuncKeyDef*
+ChmKeyEvent::GetFunctionKeyDefinition(const std::wstring& key)
+{
+    std::wstring actionName = ChmConfig::Canonize(key);
+    if (actionName.empty())
+        return nullptr;
+
+    ChmKeyEvent::Type actionType;
+    if (!_ResolveActionName(actionName, actionType))
+        return nullptr;
+
+    auto it = s_functionKeyOverride.find(actionType);
+    if (it == s_functionKeyOverride.end())
+        return nullptr;
+
+    return &(it->second);
+}
+
 // ---- actionName → Type 変換テーブル ----
 struct ActionNameDef {
     const wchar_t* name;
@@ -131,7 +150,7 @@ static const ActionNameDef g_actionNameTable[] = {
 #endif
 };
 
-static bool _ResolveActionName(const std::wstring& name, ChmKeyEvent::Type& outType)
+bool ChmKeyEvent::_ResolveActionName(const std::wstring& name, ChmKeyEvent::Type& outType)
 {
     for (const auto& def : g_actionNameTable)
     {
@@ -166,7 +185,9 @@ static const KeyNameDef g_keyNameTable[] = {
     { L"end",      VK_END },
     { L"pageup",   VK_PRIOR },
     { L"pagedown", VK_NEXT },
+    { L"del",      VK_DELETE },
     { L"delete",   VK_DELETE },
+    { L"ins",      VK_INSERT },
     { L"insert",   VK_INSERT },
     { L"f1",  VK_F1 }, { L"f2",  VK_F2 }, { L"f3",  VK_F3 },
     { L"f4",  VK_F4 }, { L"f5",  VK_F5 }, { L"f6",  VK_F6 },
@@ -174,7 +195,7 @@ static const KeyNameDef g_keyNameTable[] = {
     { L"f10", VK_F10 },{ L"f11", VK_F11 },{ L"f12", VK_F12 },
 };
 
-static bool _ResolveKeyName(const std::wstring& name, UINT& outVk)
+bool ChmKeyEvent::_ResolveKeyName(const std::wstring& name, UINT& outVk)
 {
     for (const auto& def : g_keyNameTable)
     {
@@ -185,31 +206,18 @@ static bool _ResolveKeyName(const std::wstring& name, UINT& outVk)
         }
     }
 
-        // 1文字の表示可能ASCII (0x21-0x7e) はそのままVKコードへ
-    if (name.size() == 1)
-    {
-        wchar_t ch = name[0];
-        if (ch >= 0x21 && ch <= 0x7e)
-        {
-            // 英字は大文字に正規化（VKは大文字基準）
-            if (ch >= L'a' && ch <= L'z')
-                ch = static_cast<wchar_t>(towupper(ch));
-
-            outVk = static_cast<UINT>(ch);
-            return true;
-        }
-    }
-
+    // v0.2方針：ここでは物理キー名のみ解決する。
+    // 単文字(A-Z / 0-9)は ParseFunctionKey 側で処理する。
     return false;
 }
 
 
 
 // ---- KeyState hook は通常はWin32::GetKeyState
-extern SHORT GetKeyState(int);
-SHORT (*ChmKeyEvent::s_getKeyStateFunc)(int) = ::GetKeyState;
+// extern SHORT GetKeyState(int);
+SHORT (__stdcall *ChmKeyEvent::s_getKeyStateFunc)(int) = ::GetKeyState;
 
-void ChmKeyEvent::SetGetKeyStateFunc(SHORT (*func)(int))
+void ChmKeyEvent::SetGetKeyStateFunc(SHORT (__stdcall *func)(int))
 {
     s_getKeyStateFunc = func ;
 }
@@ -270,7 +278,10 @@ BOOL ChmKeyEvent::ParseFunctionKey(const std::wstring& key,
             start = pos + 1;
         }
 
-        token = ChmConfig::Canonize(ChmConfig::Trim(token));
+		// RHS は Canonize しない（'-' と '_' を変換しないため）
+        token = ChmConfig::Trim(token);
+        std::transform(token.begin(), token.end(), token.begin(),
+            [](wchar_t ch) { return (wchar_t)towlower(ch); });
         if (!token.empty())
             tokens.push_back(token);
     }
@@ -313,16 +324,62 @@ BOOL ChmKeyEvent::ParseFunctionKey(const std::wstring& key,
         }
     }
 
-    // 最後は必ず実キー
+        // 最後は必ず実キー
     const std::wstring& keyToken = tokens.back();
-    UINT vk;
-    if (!_ResolveKeyName(keyToken, vk))
+
+    UINT vk = 0;
+    bool isSingleChar = false;
+
+    // ① 物理キー名か？
+    if (_ResolveKeyName(keyToken, vk))
+    {
+        // OK
+    }
+    // ② 単文字か？（A-Z / 0-9 のみ許可）
+    else if (keyToken.length() == 1)
+    {
+        wchar_t ch = keyToken[0];
+
+        if ((ch >= L'a' && ch <= L'z') ||
+            (ch >= L'A' && ch <= L'Z'))
+        {
+            ch = static_cast<wchar_t>(towupper(ch));
+            vk = static_cast<UINT>(ch);
+            isSingleChar = true;
+        }
+        else if (ch >= L'0' && ch <= L'9')
+        {
+            vk = static_cast<UINT>(ch);
+            isSingleChar = true;
+        }
+        else
+        {
+            errorMsg = L"invalid key name in function-key: " + keyToken;
+            return FALSE;
+        }
+    }
+    else
     {
         errorMsg = L"invalid key name in function-key: " + keyToken;
         return FALSE;
     }
+
     def.wp = vk;
-    // 4. duplicate（後勝ち）
+
+        // 4. 単文字キー制限チェック
+    // A-Z / 0-9 を modifier なし、または SHIFT のみで
+    // 機能キーにすることは禁止（文字入力不能になるため）
+    if (isSingleChar)
+    {
+        bool onlyShiftOrNone = (!def.needCtrl && !def.needAlt);
+        if (onlyShiftOrNone)
+        {
+            errorMsg = L"printable key cannot be used as function-key without CTRL/ALT";
+            return FALSE;
+        }
+    }
+
+    // 5. duplicate（後勝ち）
     auto it = s_functionKeyOverride.find(actionType);
     if (it != s_functionKeyOverride.end())
     {
@@ -393,4 +450,3 @@ wchar_t ChmKeyEvent::GetChar() const {
 		return  '\0' ;
 	}
 }
-

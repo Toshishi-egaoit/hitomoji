@@ -20,13 +20,11 @@ Release/
 /archives
 /dbg_distribution/x64/regHitomoji.exe
 /dbg_distribution/64_tsftest.exe
-/packages/Microsoft.googletest.v140.windesktop.msvcstl.dyn.rt-dyn.1.8.1.7
-/packages/Microsoft.googletest.v140.windesktop.msvcstl.static.rt-static.1.8.1.7
 /packages/Microsoft.googletest.v140.windesktop.msvcstl.dyn.rt-dyn.1.8.1.8
 /dbg_distribution/64_test.exe
 /dbg_distribution/86_test.exe
 /distribution/Hitomoji.ini
 /dbg_distribution/Hitomoji.ini
-/dbg_distribution/Hitomoji.ini
 /dbg_distribution/32_tsftest.exe
-/packages/Microsoft.googletest.v140.windesktop.msvcstl.static.rt-dyn.1.8.1.8
+/hitomoji-test/testdata/*.swp
+/packages
