@@ -122,11 +122,13 @@
   <ItemGroup>
     <ClCompile Include="config-test.cpp" />
     <ClCompile Include="convert-test.cpp" />
+    <ClCompile Include="keyevent-test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="override.ini" />
     <None Include="packages.config" />
     <None Include="testdata\duplicate.ini" />
+    <None Include="testdata\funckey.ini" />
     <None Include="testdata\null.ini" />
     <None Include="testdata\valid.ini" />
     <None Include="testdata\invalid.ini" />

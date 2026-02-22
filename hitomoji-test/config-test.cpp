@@ -1,7 +1,26 @@
 #include "gtest/gtest.h"
 #include "ChmConfig.h"
 
+TEST(ConfigTest, LoadFunctionKeyIni)
+{
+    ChmConfig config;
+
+    EXPECT_FALSE(config.LoadFile(L".\\testdata\\funckey.ini"));
+
+    // funckey.ini には duplicate を含んでいる想定
+    EXPECT_TRUE(config.HasErrors());
+
+    std::wstring errors = config.DumpErrors();
+    OutputDebugString(L"===FUNCKEY ERRORS===");
+    OutputDebugString(errors.c_str());
+
+    // duplicate 文言が含まれていることを確認
+    EXPECT_NE(std::wstring::npos, errors.find(L"duplicate"));
+}
+
+
 TEST(ConfigTest, LoadValidFile)
+
 {
     ChmConfig config;
 
@@ -12,7 +31,7 @@ TEST(ConfigTest, LoadValidFile)
 	OutputDebugString(L"===Tables");
 	OutputDebugString(dump.c_str());
     EXPECT_FALSE(dump.empty());
-	EXPECT_GT(20, std::count(dump.begin(), dump.end(), L'\n'));   // 期待する行数(ややすくなめにしている)
+	EXPECT_EQ(22, std::count(dump.begin(), dump.end(), L'\n'));   // 期待する行数
 
 	std::wstring errors = config.DumpErrors();
 	OutputDebugString(L"===ERRORS");
@@ -98,7 +117,7 @@ TEST(ConfigTest, Canonize)
 TEST(ConfigTest, DuplicateKey)
 {
     ChmConfig config;
-    EXPECT_TRUE(config.LoadFile(L".\\testdata\\duplicate.ini"));
+    EXPECT_FALSE(config.LoadFile(L".\\testdata\\duplicate.ini"));
 
     // 最後の値が有効
     EXPECT_EQ(2, config.GetLong(L"dup", L"value"));

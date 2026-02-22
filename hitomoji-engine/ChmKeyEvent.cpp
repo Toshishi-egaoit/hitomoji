@@ -214,7 +214,6 @@ bool ChmKeyEvent::_ResolveKeyName(const std::wstring& name, UINT& outVk)
 
 
 // ---- KeyState hook は通常はWin32::GetKeyState
-// extern SHORT GetKeyState(int);
 SHORT (__stdcall *ChmKeyEvent::s_getKeyStateFunc)(int) = ::GetKeyState;
 
 void ChmKeyEvent::SetGetKeyStateFunc(SHORT (__stdcall *func)(int))
