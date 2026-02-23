@@ -16,6 +16,10 @@ TEST(ConfigTest, LoadFunctionKeyIni)
 
     // duplicate 文言が含まれていることを確認
     EXPECT_NE(std::wstring::npos, errors.find(L"duplicate"));
+
+    // unknown やinvalid が含まれていないことを確認
+    EXPECT_EQ(std::wstring::npos, errors.find(L"unknown"));
+    EXPECT_EQ(std::wstring::npos, errors.find(L"invalid"));
 }
 
 
