@@ -30,6 +30,17 @@ ChmConfig::ChmConfig()
     InitConfig();
 }
 
+void ChmConfig::InitConfig()
+{
+    m_config.clear();
+    m_errors.clear();
+	// function-key テーブルを初期化
+	ChmKeyEvent::InitFunctionKey();
+	// key-table テーブルを初期化
+    ChmKeytableParser::ClearOverrideTable();
+
+}
+
 BOOL ChmConfig::LoadFromStream(std::wistream& is)
 {
     InitConfig();
@@ -37,8 +48,6 @@ BOOL ChmConfig::LoadFromStream(std::wistream& is)
     std::wstring rawLine;
     std::wstring currentSection;
     size_t lineNo = 0;
-
-    ChmKeytableParser::ClearOverrideTable();
 
     while (std::getline(is, rawLine))
     {
@@ -89,18 +98,9 @@ BOOL ChmConfig::LoadFromStream(std::wistream& is)
         {
             bRet = ChmKeytableParser::ParseLine(rawLine, key, value, errorMsg);
 
-            if (bRet)
-            {
-                ChmKeytableParser::RegisterOverrideTable(key, value);
-            }
-            else if (errorMsg == L"reserved line")
-            {
-                bRet = true; // 予約行は無視
-            }
         }
         else if (currentSection == L"function-key")
         {
-            // function-key は ChmKeyEvent 側で解釈する
             bRet = ChmKeyEvent::ParseFunctionKey(key, value, errorMsg);
         }
         else
@@ -118,12 +118,6 @@ BOOL ChmConfig::LoadFromStream(std::wistream& is)
     }
 
     return !HasErrors();
-}
-
-void ChmConfig::InitConfig()
-{
-    m_config.clear();
-    m_errors.clear();
 }
 
 BOOL ChmConfig::LoadFile(const std::wstring& fileName)

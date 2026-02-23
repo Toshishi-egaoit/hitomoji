@@ -328,20 +328,29 @@ BOOL ChmKeyEvent::ParseFunctionKey(const std::wstring& key,
         {
             vk = static_cast<UINT>(ch);
         }
-        else
+        // 英字・数字は CTRL または ALT を含まない場合はエラー
+        if (vk !=0 && !needCtrl && !needAlt)
         {
-            errorMsg = L"invalid key name: " + keyToken;
+            errorMsg = L"alphabet/digit requires CTRL or ALT modifier";
             return FALSE;
-        }
+        }    
     }
-    else
+    if ( vk == 0) 
     {
         errorMsg = L"invalid key name: " + keyToken;
         return FALSE;
     }
-
     KeySignature sig{ vk, needShift, needCtrl, needAlt };
-    s_currentKeyTable[sig] = actionType; // 後勝ち
+    
+    // duplicate 検出
+    auto it = s_currentKeyTable.find(sig);
+    if (it != s_currentKeyTable.end())
+    {
+        errorMsg = L"duplicate function-key definition: " + keySpec;
+        // でも後勝ちで上書きする
+    }
+    
+    s_currentKeyTable[sig] = actionType;
 
     return TRUE;
 }

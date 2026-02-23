@@ -181,49 +181,20 @@ void ChmRomajiConverter::convert(const std::wstring& rawInput,
     }
 }
 
-// v0.2.2
-// ChmConfig::_parseLine と互換のあるインタフェースにする
-// ＝ 解析だけを行い、登録は呼び出し側に任せる
-
 // 成功: true
 // 失敗: false（error に理由を入れる）
-
 bool ChmKeytableParser::ParseLine(const std::wstring& line,
                                   std::wstring& left,
                                   std::wstring& right,
                                   std::wstring& error)
 {
-    left.clear();
-    right.clear();
     error.clear();
 
         // 前後Trim
     std::wstring trimmed = Trim(line);
 
-    // 空行はTrue
-    if (trimmed.empty()) {
-        return true;
-    }
-
-    // コメント行は無視（; または #）
-    if (trimmed[0] == L';' || trimmed[0] == L'#') {
-        return true;
-    }
-
-    // '=' の位置（右から検索）
-    size_t pos = line.rfind(L'=');
-    if (pos == std::wstring::npos) {
-        error = L"no '=' found";
-        return false;
-    }
-
-    left  = Trim(line.substr(0, pos));
-    right = Trim(line.substr(pos + 1));
-
-    if (left.empty()) {
-        error = L"left side empty";
-        return false;
-    }
+    left  = Trim(left);
+    right = Trim(right);
 
 	if (left.length() > MAX_KEY_LENGTH) {
         error = L"left side too large";
@@ -232,8 +203,6 @@ bool ChmKeytableParser::ParseLine(const std::wstring& line,
 
     // 予約行（将来用）はTrueをかえす
     if (left == L"algorithm") {
-      left.clear();
-      right.clear();
       return true;
     }
   
@@ -241,6 +210,9 @@ bool ChmKeytableParser::ParseLine(const std::wstring& line,
         error = L"right side empty";
         return false;
     }
+
+	// エラーが無ければとうろくする
+	RegisterOverrideTable(left, right);
 
     return true;
 }
