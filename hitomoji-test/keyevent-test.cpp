@@ -1,563 +1,327 @@
 #include "gtest/gtest.h"
 #include "ChmKeyEvent.h"
 
-// --------------------------------------------------
-// ParseFunctionKey 単体テスト（static版）
-// ChmConfig とは無関係に、
-// 純粋に文字列パース結果だけを確認する
-// --------------------------------------------------
+// =====================================================
+// テスト用 KeyStateProvider
+// =====================================================
 
-TEST(ParseFunctionKeyTest, CtrlShiftZ)
+static bool g_shift = false;
+static bool g_ctrl  = false;
+static bool g_alt   = false;
+static bool g_caps  = false;
+
+static SHORT TestKeyStateProvider(int vkey)
 {
-    ChmKeyEvent::ClearFunctionKeyOverride();
+    switch (vkey)
+    {
+    case VK_SHIFT:   return g_shift ? 0x8000 : 0;
+    case VK_CONTROL: return g_ctrl  ? 0x8000 : 0;
+    case VK_MENU:    return g_alt   ? 0x8000 : 0;
+    case VK_CAPITAL: return g_caps  ? 0x0001 : 0;
+    default:         return 0;
+    }
+}
+
+static void SetKeyState(bool shift, bool ctrl, bool alt, bool caps = false)
+{
+    g_shift = shift;
+    g_ctrl  = ctrl;
+    g_alt   = alt;
+    g_caps  = caps;
+}
+
+// =====================================================
+// gtest フィクスチャ
+// すべてのテスト前に KeyStateProvider を差し替える
+// =====================================================
+
+class FunctionKeyTestBase : public ::testing::Test
+{
+protected:
+    void SetUp() override
+    {
+        ChmKeyEvent::SetKeyStateProvider(TestKeyStateProvider);
+        SetKeyState(false, false, false, false);
+    }
+
+    void TearDown() override
+    {
+        ChmKeyEvent::SetKeyStateProvider(::GetKeyState);
+    }
+};
+
+// =====================================================
+// 新設計用テスト（v0.2.3以降）
+// 方針：
+//  - 内部構造体は検査しない
+//  - 実際のキー入力結果(Type)のみ確認する
+//  - Init / Clear / 後勝ち を中心に検証
+// =====================================================
+
+// ---------------------------------------------
+// 初期化テスト
+// ---------------------------------------------
+TEST_F(FunctionKeyTestBase, InitAndClear)
+{
+    // 初期化
+    ChmKeyEvent::InitFunctionKey();
+
+    // デフォルトキーが存在するか（例：Enter）
+    ChmKeyEvent ev(VK_RETURN, 0);
+    EXPECT_EQ(ChmKeyEvent::Type::CommitKana, ev.GetType());
+
+    // クリア
+    ChmKeyEvent::ClearFunctionKey();
+    ChmKeyEvent ev2(VK_RETURN, 0);
+    EXPECT_EQ(ChmKeyEvent::Type::None, ev2.GetType());
+}
+
+// ---------------------------------------------
+// Parse 正常系
+// ---------------------------------------------
+TEST_F(FunctionKeyTestBase, ParseAndApply)
+{
+    ChmKeyEvent::InitFunctionKey();
 
     std::wstring error;
 
+    EXPECT_TRUE(
+        ChmKeyEvent::ParseFunctionKey(
+            L"CTRL+Z",
+            L"finish-raw-wide",
+            error));
+
+    EXPECT_TRUE(error.empty());
+
+                  // CTRLのみON
+    SetKeyState(false, true, false);
+
+    // 実際にキーイベントを生成して確認
+    ChmKeyEvent ev('Z', 0);
+    EXPECT_EQ(ChmKeyEvent::Type::CommitAsciiWide, ev.GetType());
+}
+
+// ---------------------------------------------
+// 各特殊キー名のチェック
+// ---------------------------------------------
+TEST_F(FunctionKeyTestBase, SpecialKeyNames)
+{
+    ChmKeyEvent::ClearFunctionKey();
+    std::wstring error;
+
+    // ENTER
+    EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"RETURN", L"finish", error));
+    EXPECT_TRUE(error.empty());
+
+    ChmKeyEvent ev1(VK_RETURN, 0);
+    EXPECT_EQ(ChmKeyEvent::Type::CommitKana, ev1.GetType());
+
+    // ESC
+    EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"ESC", L"cancel", error));
+    EXPECT_TRUE(error.empty());
+
+    ChmKeyEvent ev2(VK_ESCAPE, 0);
+    EXPECT_EQ(ChmKeyEvent::Type::Cancel, ev2.GetType());
+}
+
+// ---------------------------------------------
+// SHIFT + 特殊キーの確認
+// ---------------------------------------------
+TEST_F(FunctionKeyTestBase, ShiftWithSpecialKey)
+{
+    ChmKeyEvent::ClearFunctionKey();
+    std::wstring error;
+
+    // SHIFT+ENTER を定義
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(
+        L"SHIFT+ENTER",
         L"finish-raw",
-        L"CTRL+SHIFT+Z",
         error));
 
-	EXPECT_TRUE(error.empty()) << L"(" << error ;
+    EXPECT_TRUE(error.empty());
 
-    const ChmKeyEvent::FuncKeyDef* def =
-        ChmKeyEvent::GetFunctionKeyDefinition(L"finish-raw");
+    // SHIFTのみON
+    SetKeyState(true, false, false);
 
-    ASSERT_NE(nullptr, def);
-
-    EXPECT_EQ('Z', def->wp);
-    EXPECT_TRUE(def->needCtrl);
-    EXPECT_TRUE(def->needShift);
-    EXPECT_FALSE(def->needAlt);
+    ChmKeyEvent ev(VK_RETURN, 0);
+    EXPECT_EQ(ChmKeyEvent::Type::CommitAscii, ev.GetType());
 }
 
-TEST(ParseFunctionKeyTest, DuplicateModifierAllowed)
+// ---------------------------------------------
+// 1) 単独アルファベット・数字はエラー
+// ---------------------------------------------
+TEST_F(FunctionKeyTestBase, SingleAlphaOrDigitIsError)
 {
-    ChmKeyEvent::ClearFunctionKeyOverride();
+    std::wstring error;
+    EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(L"A", L"finish", error));
+    EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(L"1", L"finish", error));
+}
 
+// ---------------------------------------------
+// 2) SHIFT+アルファベット / 数字はエラー
+// ---------------------------------------------
+TEST_F(FunctionKeyTestBase, ShiftWithAlphaOrDigitIsError)
+{
+    std::wstring error;
+    EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(L"SHIFT+A", L"finish", error));
+    EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(L"SHIFT+1", L"finish", error));
+}
+
+// ---------------------------------------------
+// 3) CTRL 組み合わせ（特殊/英字/数字）
+// ---------------------------------------------
+TEST_F(FunctionKeyTestBase, CtrlCombinations)
+{
+    std::wstring error;
+    EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"CTRL+ENTER", L"finish", error));
+    EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"CTRL+Z", L"finish-raw", error));
+    EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"CTRL+1", L"finish-raw", error));
+}
+
+// ---------------------------------------------
+// 4) ALT 組み合わせ
+// ---------------------------------------------
+TEST_F(FunctionKeyTestBase, AltCombinations)
+{
+    std::wstring error;
+    EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"ALT+ENTER", L"finish", error));
+    EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"ALT+Z", L"finish-raw", error));
+    EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"ALT+1", L"finish-raw", error));
+}
+
+// ---------------------------------------------
+// 5) 複合修飾キー
+// ---------------------------------------------
+TEST_F(FunctionKeyTestBase, MultiModifierCombinations)
+{
+    std::wstring error;
+    EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"SHIFT+CTRL+ENTER", L"finish", error));
+    EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"SHIFT+ALT+ENTER", L"finish", error));
+    EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"CTRL+ALT+ENTER", L"finish", error));
+}
+
+// ---------------------------------------------
+// 6) 空白耐性
+// ---------------------------------------------
+TEST_F(FunctionKeyTestBase, WhitespaceTolerance)
+{
+    std::wstring error;
+    EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"  CTRL + ENTER  ", L"finish", error));
+}
+
+// ---------------------------------------------
+// 7) 大文字小文字・記号混在
+// ---------------------------------------------
+TEST_F(FunctionKeyTestBase, CaseAndSymbolTolerance)
+{
+    std::wstring error;
+    EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"ctrl+enter", L"FINISH", error));
+    EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"ctrl+Escape", L"cancel_fiNISH", error));
+}
+
+// ---------------------------------------------
+// 8) 不正入力
+// ---------------------------------------------
+TEST_F(FunctionKeyTestBase, InvalidTokens)
+{
+    std::wstring error;
+    EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(L"SHFT+ENTER", L"finish", error));
+    EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(L"CTRL+@", L"finish", error));
+    EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(L"CTRL+ENTER", L"unknown", error));
+}
+
+// ---------------------------------------------
+// 9) 連続++許容 / キーなしエラー
+// ---------------------------------------------
+TEST_F(FunctionKeyTestBase, DoublePlusAndMissingKey)
+{
+    std::wstring error;
+    EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"CTRL++ENTER", L"finish", error));
+    EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(L"CTRL+", L"finish", error));
+}
+
+// ---------------------------------------------
+// 追加: 特殊キー名の網羅チェック
+// ---------------------------------------------
+TEST_F(FunctionKeyTestBase, AllSpecialKeyTokensCovered)
+{
     std::wstring error;
 
-    EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(
-        L"finish-raw",
-        L"CTRL+SHIFT+SHIFT+Z",
-        error));
+    const wchar_t* keys[] = {
+        L"ENTER", L"RETURN", L"TAB", L"BACKSPACE",
+        L"ESC", L"ESCAPE", L"SPACE",
+        L"LEFT", L"RIGHT", L"UP", L"DOWN",
+        L"HOME", L"END", L"PAGEUP", L"PAGEDOWN",
+        L"DEL", L"DELETE", L"INS", L"INSERT",
+        L"F1", L"F2", L"F3", L"F4", L"F5", L"F6",
+        L"F7", L"F8", L"F9", L"F10", L"F11", L"F12"
+    };
 
-	EXPECT_TRUE(error.empty()) << L"(" << error ;
-
-    const ChmKeyEvent::FuncKeyDef* def =
-        ChmKeyEvent::GetFunctionKeyDefinition(L"finish-raw");
-
-    ASSERT_NE(nullptr, def);
-
-    EXPECT_EQ('Z', def->wp);
-    EXPECT_TRUE(def->needCtrl);
-    EXPECT_TRUE(def->needShift);
+    for (auto k : keys)
+    {
+        EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(k, L"finish", error))
+            << "Failed key token: " << std::wstring(k);
+    }
 }
 
-TEST(ParseFunctionKeyTest, MissingKeyNameError)
+// ---------------------------------------------
+// 追加: 機能名の網羅チェック
+// ---------------------------------------------
+TEST_F(FunctionKeyTestBase, AllActionNamesCovered)
 {
-    ChmKeyEvent::ClearFunctionKeyOverride();
-
     std::wstring error;
-
-    EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(
-        L"finish-raw",
-        L"CTRL+SHIFT",
-        error));
-
-    EXPECT_FALSE(error.empty());
-}
-
-// --------------------------------------------------
-// 単一キー（特殊キー）正常系 全網羅テスト
-// g_keyNameTable にあるキーが単体で正しく解決されることを確認
-// --------------------------------------------------
-TEST(ParseFunctionKeyTest, SingleSpecialKey_All)
-{
-    ChmKeyEvent::ClearFunctionKeyOverride();
-
-    struct Case {
-        const wchar_t* value;
-        UINT expectedVk;
-    };
-
-    Case cases[] = {
-        { L"enter", VK_RETURN },
-        { L"return", VK_RETURN },
-        { L"tab", VK_TAB },
-        { L"backspace", VK_BACK },
-        { L"esc", VK_ESCAPE },
-        { L"escape", VK_ESCAPE },
-        { L"space", VK_SPACE },
-        { L"left", VK_LEFT },
-        { L"right", VK_RIGHT },
-        { L"up", VK_UP },
-        { L"down", VK_DOWN },
-        { L"home", VK_HOME },
-        { L"end", VK_END },
-        { L"pageup", VK_PRIOR },
-        { L"pagedown", VK_NEXT },
-        { L"del", VK_DELETE },
-        { L"delete", VK_DELETE },
-        { L"ins", VK_INSERT },
-        { L"insert", VK_INSERT },
-        { L"f1", VK_F1 }, { L"f2", VK_F2 }, { L"f3", VK_F3 },
-        { L"f4", VK_F4 }, { L"f5", VK_F5 }, { L"f6", VK_F6 },
-        { L"f7", VK_F7 }, { L"f8", VK_F8 }, { L"f9", VK_F9 },
-        { L"f10", VK_F10 }, { L"f11", VK_F11 }, { L"f12", VK_F12 },
-    };
-
-    for (const auto& c : cases)
-    {
-        std::wstring error;
-
-        EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(
-            L"finish-raw",
-            c.value,
-            error)) << "Failed at value=" << std::wstring(c.value);
-
-		EXPECT_TRUE(error.empty()) << L"(" << error ;
-
-        const ChmKeyEvent::FuncKeyDef* def =
-            ChmKeyEvent::GetFunctionKeyDefinition(L"finish-raw");
-
-        ASSERT_NE(nullptr, def);
-        EXPECT_EQ(c.expectedVk, def->wp);
-        EXPECT_FALSE(def->needCtrl);
-        EXPECT_FALSE(def->needShift);
-        EXPECT_FALSE(def->needAlt);
-
-        // 次ケースのためクリア
-        ChmKeyEvent::ClearFunctionKeyOverride();
-    }
-}
-
-// --------------------------------------------------
-// 単一キー（通常ASCIIキー）禁止テスト
-// 0x20-0x7E 相当のキーは FunctionKey として許可しない
-// --------------------------------------------------
-TEST(ParseFunctionKeyTest, SingleAsciiKey_Disallowed)
-{
-    ChmKeyEvent::ClearFunctionKeyOverride();
-
-    struct Case {
-        const wchar_t* value;
-    };
-
-    Case cases[] = {
-        { L"A" },
-        { L"Z" },
-        { L"9" },
-        { L"." },
-        { L"\\" },   // バックスラッシュ
-    };
-
-    for (const auto& c : cases)
-    {
-        std::wstring error;
-
-        EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(
-            L"finish-raw",
-            c.value,
-            error)) << "Unexpected success at value=" << std::wstring(c.value);
-
-        EXPECT_FALSE(error.empty());
-
-        const ChmKeyEvent::FuncKeyDef* def =
-            ChmKeyEvent::GetFunctionKeyDefinition(L"finish-raw");
-
-        EXPECT_EQ(nullptr, def);
-
-        ChmKeyEvent::ClearFunctionKeyOverride();
-    }
-}
-
-// --------------------------------------------------
-// SHIFT + 特殊キー（正常系）抽出テスト
-// ENTER と SPACE を対象とする
-// --------------------------------------------------
-TEST(ParseFunctionKeyTest, ShiftPlusSpecialKey)
-{
-    ChmKeyEvent::ClearFunctionKeyOverride();
-
-    struct Case {
-        const wchar_t* value;
-        UINT expectedVk;
-    };
-
-    Case cases[] = {
-        { L"SHIFT+ENTER", VK_RETURN },
-        { L"SHIFT+SPACE", VK_SPACE },
-    };
-
-    for (const auto& c : cases)
-    {
-        std::wstring error;
-
-        EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(
-            L"finish-raw",
-            c.value,
-            error)) << "Failed at value=" << std::wstring(c.value);
-
-        EXPECT_TRUE(error.empty()) << L"(" << error ;
-
-        const ChmKeyEvent::FuncKeyDef* def =
-            ChmKeyEvent::GetFunctionKeyDefinition(L"finish-raw");
-
-        ASSERT_NE(nullptr, def);
-        EXPECT_EQ(c.expectedVk, def->wp);
-        EXPECT_FALSE(def->needCtrl);
-        EXPECT_TRUE(def->needShift);
-        EXPECT_FALSE(def->needAlt);
-
-        ChmKeyEvent::ClearFunctionKeyOverride();
-    }
-}
-
-// --------------------------------------------------
-// SHIFT + 通常ASCIIキー（禁止）抽出テスト
-// "a" と ">" を対象とする
-// --------------------------------------------------
-TEST(ParseFunctionKeyTest, ShiftPlusAscii_Disallowed)
-{
-    ChmKeyEvent::ClearFunctionKeyOverride();
-
-    struct Case {
-        const wchar_t* value;
-    };
-
-    Case cases[] = {
-        { L"SHIFT+A" },
-        { L"SHIFT+z" },
-        { L"SHIFT+0" },
-        { L"SHIFT+>" },
-    };
-
-    for (const auto& c : cases)
-    {
-        std::wstring error;
-
-        EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(
-            L"finish-raw",
-            c.value,
-            error))
-            << "Unexpected success at value=" << std::wstring(c.value);
-
-        EXPECT_FALSE(error.empty());
-
-        const ChmKeyEvent::FuncKeyDef* def =
-            ChmKeyEvent::GetFunctionKeyDefinition(L"finish-raw");
-
-        EXPECT_EQ(nullptr, def);
-
-        ChmKeyEvent::ClearFunctionKeyOverride();
-    }
-}
-
-// --------------------------------------------------
-// CTRL / ALT + キー（正常系）抽出テスト
-// 特殊キーおよび通常ASCIIキーを対象とする
-// --------------------------------------------------
-TEST(ParseFunctionKeyTest, CtrlAltCombinations)
-{
-    ChmKeyEvent::ClearFunctionKeyOverride();
-
-    struct Case {
-        const wchar_t* value;
-        UINT expectedVk;
-        bool ctrl;
-        bool shift;
-        bool alt;
-    };
-
-    Case cases[] = {
-        // 特殊キー
-        { L"ALT+PAGEUP", VK_PRIOR, false, false, true },
-        { L"CTRL+ESCAPE", VK_ESCAPE, true, false, false },
-
-        // 通常ASCIIキー（CTRL/ALT付きは許可）
-        { L"CTRL+A", 'A', true, false, false },
-        { L"CTRL+Z", 'Z', true, false, false },
-        { L"CTRL++1", '1', true, false, false }, // 連続する++をゆるす
-        { L"ALT+9", '9', false, false, true },
-        // 
-    };
-
-    for (const auto& c : cases)
-    {
-        std::wstring error;
-
-        EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(
-            L"finish-raw",
-            c.value,
-            error))
-            << "Failed at value=" << std::wstring(c.value);
-
-        EXPECT_TRUE(error.empty()) << L"(" << error ;
-
-        const ChmKeyEvent::FuncKeyDef* def =
-            ChmKeyEvent::GetFunctionKeyDefinition(L"finish-raw");
-
-        ASSERT_NE(nullptr, def);
-        EXPECT_EQ(c.expectedVk, def->wp);
-        EXPECT_EQ(c.ctrl, def->needCtrl);
-        EXPECT_EQ(c.shift, def->needShift);
-        EXPECT_EQ(c.alt, def->needAlt);
-
-        ChmKeyEvent::ClearFunctionKeyOverride();
-    }
-}
-
-// --------------------------------------------------
-// 複数モディファイア + キー（正常系）抽出テスト
-// a) SHIFT+CTRL
-// b) SHIFT+ALT
-// c) CTRL+ALT
-// --------------------------------------------------
-TEST(ParseFunctionKeyTest, MultiModifierCombinations)
-{
-    ChmKeyEvent::ClearFunctionKeyOverride();
-
-    struct Case {
-        const wchar_t* value;
-        UINT expectedVk;
-        bool ctrl;
-        bool shift;
-        bool alt;
-    };
-
-    Case cases[] = {
-        // a) SHIFT + CTRL
-        { L"SHIFT+CTRL+F1", VK_F1, true, true, false },
-
-        // b) SHIFT + ALT
-        { L"SHIFT+ALT+TAB", VK_TAB, false, true, true },
-
-        // c) CTRL + ALT
-        { L"CTRL+ALT+DELETE", VK_DELETE, true, false, true },
-    };
-
-    for (const auto& c : cases)
-    {
-        std::wstring error;
-
-        EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(
-            L"finish-raw",
-            c.value,
-            error))
-            << "Failed at value=" << std::wstring(c.value);
-
-        EXPECT_TRUE(error.empty()) << L"(" << error ;
-
-        const ChmKeyEvent::FuncKeyDef* def =
-            ChmKeyEvent::GetFunctionKeyDefinition(L"finish-raw");
-
-        ASSERT_NE(nullptr, def);
-        EXPECT_EQ(c.expectedVk, def->wp);
-        EXPECT_EQ(c.ctrl, def->needCtrl);
-        EXPECT_EQ(c.shift, def->needShift);
-        EXPECT_EQ(c.alt, def->needAlt);
-
-        ChmKeyEvent::ClearFunctionKeyOverride();
-    }
-}
-
-// --------------------------------------------------
-// 左辺アクション名（正常系）網羅テスト
-// 許可されている全アクション名が受理されることを確認
-// --------------------------------------------------
-TEST(ParseFunctionKeyTest, ActionName_AllValid)
-{
-    ChmKeyEvent::ClearFunctionKeyOverride();
-
-    // 右辺は安全な特殊キーで統一
-    const wchar_t* rhs = L"CTRL+F1";
 
     const wchar_t* actions[] = {
-        L"FINISH",
-        L"finish-KATAKANA",
-        L"Finish-Raw",
-        L"finish_raw_wide",
+        L"finish",
+        L"finish-katakana",
+        L"finish-raw",
+        L"finish-raw-wide",
         L"backspace",
         L"cancel",
-        L"cancel_finish",
-        L"pass-through",
+        L"cancel-finish"
 #ifdef _DEBUG
-		L"version-info",
+        ,L"version-info",
+        L"reload-ini"
 #endif
     };
 
-    for (auto action : actions)
+    for (auto a : actions)
     {
-        std::wstring error;
-
-        EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(
-            action,
-            rhs,
-            error)) << "Failed at action=" << std::wstring(action);
-
-        EXPECT_TRUE(error.empty()) << L"(" << error ;
-
-        const ChmKeyEvent::FuncKeyDef* def =
-            ChmKeyEvent::GetFunctionKeyDefinition(action);
-
-        ASSERT_NE(nullptr, def);
-        EXPECT_EQ(VK_F1, def->wp);
-        EXPECT_TRUE(def->needCtrl);
-        EXPECT_FALSE(def->needShift);
-        EXPECT_FALSE(def->needAlt);
-
-        ChmKeyEvent::ClearFunctionKeyOverride();
+        EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"CTRL+ENTER", a, error))
+            << "Failed action token: " << std::wstring(a);
     }
 }
 
-// --------------------------------------------------
-// Canonize テスト（左辺＋右辺）
-// Trim確認はここでは行わない
-// --------------------------------------------------
-TEST(ParseFunctionKeyTest, CanonizeCases)
+// ---------------------------------------------
+// 追加: duplicate 定義は警告のみ（後勝ち）
+// ---------------------------------------------
+TEST_F(FunctionKeyTestBase, DuplicateDefinitionWarning)
 {
-    ChmKeyEvent::ClearFunctionKeyOverride();
+    ChmKeyEvent::ClearFunctionKey();
+    std::wstring error;
 
-    struct Case {
-        const wchar_t* lhs;
-        const wchar_t* rhs;
-        UINT expectedVk;
-        bool ctrl;
-        bool shift;
-        bool alt;
-    };
+    // 1回目
+    EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(
+        L"CTRL+Z",
+        L"finish",
+        error));
+    EXPECT_TRUE(error.empty());
 
-    Case cases[] = {
-        // a) 全部大文字
-        { L"FINISH-RAW", L"ENTER", VK_RETURN, false, false, false },
+    // 2回目（duplicate）
+    EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(
+        L"CTRL+Z",
+        L"cancel",
+        error));
 
-        // b) 先頭だけ大文字
-        { L"Finish-Raw", L"Ctrl+Enter", VK_RETURN, true, false, false },
+    // 警告が入っていること
+    EXPECT_FALSE(error.empty());
 
-        // c) 全部小文字 + モディファイア2つ
-        { L"finish-raw", L"ctrl+shift+f2", VK_F2, true, true, false },
-    };
-
-    for (const auto& c : cases)
-    {
-        std::wstring error;
-
-        EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(
-            c.lhs,
-            c.rhs,
-            error)) << "Failed at lhs=" << std::wstring(c.rhs) << L" (" << error.c_str() << L")";
-
-        EXPECT_TRUE(error.empty()) << L"(" << error ;
-
-        const ChmKeyEvent::FuncKeyDef* def =
-            ChmKeyEvent::GetFunctionKeyDefinition(L"finish-raw");
-
-        ASSERT_NE(nullptr, def);
-        EXPECT_EQ(c.expectedVk, def->wp);
-        EXPECT_EQ(c.ctrl, def->needCtrl);
-        EXPECT_EQ(c.shift, def->needShift);
-        EXPECT_EQ(c.alt, def->needAlt);
-
-        ChmKeyEvent::ClearFunctionKeyOverride();
-    }
+    // duplicate という文字列を含むこと
+    EXPECT_NE(std::wstring::npos, error.find(L"duplicate"))
+      << "Expected duplicate warning, but got: " << error;
+  
+    // 後勝ちで cancel が有効になることを確認
+    SetKeyState(false, true, false);
+    ChmKeyEvent ev('Z', 0);
+    EXPECT_EQ(ChmKeyEvent::Type::Cancel, ev.GetType());
 }
-
-// --------------------------------------------------
-// Trim テスト
-// 左辺両側空白、+前後空白、最終キー前後空白を確認
-// --------------------------------------------------
-TEST(ParseFunctionKeyTest, TrimHandling)
-{
-    ChmKeyEvent::ClearFunctionKeyOverride();
-
-    struct Case {
-        const wchar_t* lhs;
-        const wchar_t* rhs;
-        UINT expectedVk;
-        bool ctrl;
-        bool shift;
-        bool alt;
-    };
-
-    Case cases[] = {
-        // + の前後空白
-        { L"finish-raw", L"CTRL + SHIFT + F3", VK_F3, true, true, false },
-
-        // 最終キー前後空白（特殊キー）
-        { L"finish-raw", L"CTRL+  ENTER  ", VK_RETURN, true, false, false },
-
-        // 最終キー前後空白（通常ASCIIキー）
-        { L"finish-raw", L"CTRL+  Z  ", 'Z', true, false, false },
-    };
-
-    for (const auto& c : cases)
-    {
-        std::wstring error;
-
-        EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(
-            c.lhs,
-            c.rhs,
-            error)) << "Failed at lhs=" << std::wstring(c.lhs);
-
-        EXPECT_TRUE(error.empty()) << L"(" << error ;
-
-        const ChmKeyEvent::FuncKeyDef* def =
-            ChmKeyEvent::GetFunctionKeyDefinition(L"finish-raw");
-
-        ASSERT_NE(nullptr, def);
-        EXPECT_EQ(c.expectedVk, def->wp);
-        EXPECT_EQ(c.ctrl, def->needCtrl);
-        EXPECT_EQ(c.shift, def->needShift);
-        EXPECT_EQ(c.alt, def->needAlt);
-
-        ChmKeyEvent::ClearFunctionKeyOverride();
-    }
-}
-
-// --------------------------------------------------
-// シンタックスエラー系まとめテスト
-// --------------------------------------------------
-TEST(ParseFunctionKeyTest, SyntaxErrors)
-{
-    ChmKeyEvent::ClearFunctionKeyOverride();
-
-    struct Case {
-        const wchar_t* lhs;
-        const wchar_t* rhs;
-    };
-
-    Case cases[] = {
-
-        // 存在しないアクション名
-        { L"unknown-action", L"CTRL+Z" },
-
-        // 存在しないモディファイア
-        { L"finish-raw", L"SUPER+Z" },
-
-        // 末尾がモディファイアのみ
-        { L"finish-raw", L"CTRL+SHIFT" },
-    };
-
-    for (const auto& c : cases)
-    {
-        std::wstring error;
-
-        EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(
-            c.lhs,
-            c.rhs,
-            error))
-            << "Unexpected success at lhs=" << std::wstring(c.lhs)
-            << " rhs=" << std::wstring(c.rhs);
-
-        EXPECT_FALSE(error.empty());
-
-        const ChmKeyEvent::FuncKeyDef* def =
-            ChmKeyEvent::GetFunctionKeyDefinition(c.lhs);
-
-        EXPECT_EQ(nullptr, def);
-
-        ChmKeyEvent::ClearFunctionKeyOverride();
-    }
-}
-
