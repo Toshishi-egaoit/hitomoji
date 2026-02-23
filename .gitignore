@@ -28,3 +28,4 @@ Release/
 /dbg_distribution/32_tsftest.exe
 /hitomoji-test/testdata/*.swp
 /packages
+/dbg_distribution/.hitomoji.ini.swp

@@ -67,6 +67,7 @@ private:
         { 'Y', L'y', L'Y' }, { 'Z', L'z', L'Z' },
 
         // basic symbols (US keyboard)
+        { VK_SPACE,          L' ',  L' ' },
         { VK_OEM_MINUS,      L'-',  L'_' },
         { VK_OEM_PLUS,       L'=',  L'+' },
         { VK_OEM_4,          L'[',  L'{' },
@@ -82,9 +83,17 @@ private:
 };
 
 // ---- 機能キー定義テーブル ----
-// デフォルト定義（ビルド時固定）
+// 内部専用構造体
+struct FuncKeyDef {
+    WPARAM wp;
+    bool needShift;
+    bool needCtrl;
+    bool needAlt;
+    ChmKeyEvent::Type type;
+};
 
-static const ChmKeyEvent::FuncKeyDef g_functionKeyTable[] = {
+// デフォルト定義（ビルド時固定）
+static const FuncKeyDef g_functionKeyTable[] = {
     // WPARAM      SHIFT  CTRL   ALT    Type
     { VK_RETURN,   false, false, false, ChmKeyEvent::Type::CommitKana     },
     { VK_RETURN,   true,  false, false, ChmKeyEvent::Type::CommitKatakana },
@@ -99,44 +108,43 @@ static const ChmKeyEvent::FuncKeyDef g_functionKeyTable[] = {
     { 'M',         false, true,  false, ChmKeyEvent::Type::CommitKana     },
 #ifdef _DEBUG
     { 'V',         true,  true,  false, ChmKeyEvent::Type::VersionInfo    },
+    { 'R',         true,  true,  false, ChmKeyEvent::Type::ReloadIni      },
 #endif
 };
 
-// ---- override テーブル（ini による上書き） ----
-// key: Type（動作名）
-// value: FuncKeyDef（物理キー定義）
-static std::map<ChmKeyEvent::Type, ChmKeyEvent::FuncKeyDef> s_functionKeyOverride;
+// ---- 実行時キー → Type テーブル ----
+struct KeySignature {
+    WPARAM wp;
+    bool shift;
+    bool ctrl;
+    bool alt;
 
-void ChmKeyEvent::ClearFunctionKeyOverride()
+    bool operator<(const KeySignature& rhs) const {
+        return std::tie(wp, shift, ctrl, alt)
+             < std::tie(rhs.wp, rhs.shift, rhs.ctrl, rhs.alt);
+    }
+};
+
+// ---- FunctionKeyTableのていぎとしょきかしょり ----
+static std::map<KeySignature, ChmKeyEvent::Type> s_currentKeyTable;
+
+void ChmKeyEvent::ClearFunctionKey()
 {
-    s_functionKeyOverride.clear();
+    s_currentKeyTable.clear();
 }
 
-const ChmKeyEvent::FuncKeyDef*
-ChmKeyEvent::GetFunctionKeyDefinition(const std::wstring& key)
+void ChmKeyEvent::InitFunctionKey()
 {
-    std::wstring actionName = ChmConfig::Canonize(key);
-    if (actionName.empty())
-        return nullptr;
-
-    ChmKeyEvent::Type actionType;
-    if (!_ResolveActionName(actionName, actionType))
-        return nullptr;
-
-    auto it = s_functionKeyOverride.find(actionType);
-    if (it == s_functionKeyOverride.end())
-        return nullptr;
-
-    return &(it->second);
+    ClearFunctionKey();
+    for (const auto& k : g_functionKeyTable)
+    {
+        KeySignature sig{ k.wp, k.needShift, k.needCtrl, k.needAlt };
+        s_currentKeyTable[sig] = k.type;
+    }
 }
 
 // ---- actionName → Type 変換テーブル ----
-struct ActionNameDef {
-    const wchar_t* name;
-    ChmKeyEvent::Type type;
-};
-
-static const ActionNameDef g_actionNameTable[] = {
+static const std::map<std::wstring, ChmKeyEvent::Type> s_actionNameMap = {
     { L"finish",             ChmKeyEvent::Type::CommitKana },
     { L"finish-katakana",    ChmKeyEvent::Type::CommitKatakana },
     { L"finish-raw",         ChmKeyEvent::Type::CommitAscii },
@@ -144,32 +152,25 @@ static const ActionNameDef g_actionNameTable[] = {
     { L"backspace",          ChmKeyEvent::Type::Backspace },
     { L"cancel",             ChmKeyEvent::Type::Cancel },
     { L"cancel-finish",      ChmKeyEvent::Type::Uncommit },
-    { L"pass-through",       ChmKeyEvent::Type::PassThrough },
 #ifdef _DEBUG
     { L"version-info",       ChmKeyEvent::Type::VersionInfo },
+    { L"reload-ini",         ChmKeyEvent::Type::ReloadIni },
 #endif
 };
 
 bool ChmKeyEvent::_ResolveActionName(const std::wstring& name, ChmKeyEvent::Type& outType)
 {
-    for (const auto& def : g_actionNameTable)
+    auto it = s_actionNameMap.find(name);
+    if (it != s_actionNameMap.end())
     {
-        if (name == def.name)
-        {
-            outType = def.type;
-            return true;
-        }
+        outType = it->second;
+        return true;
     }
     return false;
 }
 
 // ---- key token → VK 変換テーブル ----
-struct KeyNameDef {
-    const wchar_t* name;
-    UINT vk;
-};
-
-static const KeyNameDef g_keyNameTable[] = {
+static const std::map<std::wstring, UINT> s_keyNameMap = {
     { L"enter",    VK_RETURN },
     { L"return",   VK_RETURN },
     { L"tab",      VK_TAB },
@@ -197,13 +198,11 @@ static const KeyNameDef g_keyNameTable[] = {
 
 bool ChmKeyEvent::_ResolveKeyName(const std::wstring& name, UINT& outVk)
 {
-    for (const auto& def : g_keyNameTable)
+    auto it = s_keyNameMap.find(name);
+    if (it != s_keyNameMap.end())
     {
-        if (name == def.name)
-        {
-            outVk = def.vk;
-            return true;
-        }
+        outVk = it->second;
+        return true;
     }
 
     // v0.2方針：ここでは物理キー名のみ解決する。
@@ -212,22 +211,21 @@ bool ChmKeyEvent::_ResolveKeyName(const std::wstring& name, UINT& outVk)
 }
 
 
-
-// ---- KeyState hook は通常はWin32::GetKeyState
-SHORT (__stdcall *ChmKeyEvent::s_getKeyStateFunc)(int) = ::GetKeyState;
-
-void ChmKeyEvent::SetGetKeyStateFunc(SHORT (__stdcall *func)(int))
+// テストプログラムようのstaticメソッド。
+//   Win32::GetKeyStateをテストで、さしかえできるようにした。
+ChmKeyEvent::KeyStateProvider  ChmKeyEvent::pFunc_keyStateProvider = ::GetKeyState;
+void ChmKeyEvent::SetKeyStateProvider(ChmKeyEvent::KeyStateProvider pFunc)
 {
-    s_getKeyStateFunc = func ;
+    pFunc_keyStateProvider  = pFunc ;
 }
 
 ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/)
     : _wp(wp), _type(Type::None)
 {
-    _shift   = (s_getKeyStateFunc(VK_SHIFT)   & 0x8000) != 0;
-    _control = (s_getKeyStateFunc(VK_CONTROL) & 0x8000) != 0;
-    _alt     = (s_getKeyStateFunc(VK_MENU)    & 0x8000) != 0;
-	_caps    = (s_getKeyStateFunc(VK_CAPITAL) & 0x0001) != 0;
+    _shift   = (pFunc_keyStateProvider(VK_SHIFT)   & 0x8000) != 0;
+    _control = (pFunc_keyStateProvider(VK_CONTROL) & 0x8000) != 0;
+    _alt     = (pFunc_keyStateProvider(VK_MENU)    & 0x8000) != 0;
+	_caps    = (pFunc_keyStateProvider(VK_CAPITAL) & 0x0001) != 0;
 
     _TranslateByTable();
 }
@@ -244,14 +242,16 @@ BOOL ChmKeyEvent::ParseFunctionKey(const std::wstring& key,
                                    const std::wstring& value,
                                    std::wstring& errorMsg)
 {
-    // 1. action 名解決
-    std::wstring actionName = ChmConfig::Canonize(key);
-    if (actionName.empty())
+    // 左辺: 物理キー定義（例: ctrl+enter）
+    std::wstring keySpec = ChmConfig::Canonize(key);
+    if (keySpec.empty())
     {
-        errorMsg = L"invalid function-key name";
+        errorMsg = L"invalid function-key definition";
         return FALSE;
     }
 
+    // 右辺: action 名
+    std::wstring actionName = ChmConfig::Canonize(value);
     ChmKeyEvent::Type actionType;
     if (!_ResolveActionName(actionName, actionType))
     {
@@ -259,25 +259,23 @@ BOOL ChmKeyEvent::ParseFunctionKey(const std::wstring& key,
         return FALSE;
     }
 
-    // 2. value を '+' で分割
+    // keySpec を '+' で分割
     std::vector<std::wstring> tokens;
     size_t start = 0;
-    while (start <= value.size())
+    while (start <= keySpec.size())
     {
-        size_t pos = value.find(L'+', start);
+        size_t pos = keySpec.find(L'+', start);
         std::wstring token;
         if (pos == std::wstring::npos)
         {
-            token = value.substr(start);
-            start = value.size() + 1;
+            token = keySpec.substr(start);
+            start = keySpec.size() + 1;
         }
         else
         {
-            token = value.substr(start, pos - start);
+            token = keySpec.substr(start, pos - start);
             start = pos + 1;
         }
-
-		// RHS は Canonize しない（'-' と '_' を変換しないため）
         token = ChmConfig::Trim(token);
         std::transform(token.begin(), token.end(), token.begin(),
             [](wchar_t ch) { return (wchar_t)towlower(ch); });
@@ -287,105 +285,63 @@ BOOL ChmKeyEvent::ParseFunctionKey(const std::wstring& key,
 
     if (tokens.empty())
     {
-        errorMsg = L"empty function-key definition";
+        errorMsg = L"empty key definition";
         return FALSE;
     }
 
-    // 3. modifier + 最後が実キーというルールで解析
-    FuncKeyDef def{};
-    def.type = actionType;
+    bool needShift = false;
+    bool needCtrl  = false;
+    bool needAlt   = false;
 
-    // modifier 部分（最後以外）
+    // 最後以外は modifier
     if (tokens.size() > 1)
     {
         for (size_t i = 0; i < tokens.size() - 1; ++i)
         {
             const std::wstring& t = tokens[i];
-
-            // 順序自由・重複許容
-            if (t == L"shift")
-            {
-                def.needShift = true;
-            }
-            else if (t == L"ctrl" || t == L"control")
-            {
-                def.needCtrl = true;
-            }
-            else if (t == L"alt")
-            {
-                def.needAlt = true;
-            }
+            if (t == L"shift") needShift = true;
+            else if (t == L"ctrl" || t == L"control") needCtrl = true;
+            else if (t == L"alt") needAlt = true;
             else
             {
-                errorMsg = L"invalid modifier in function-key: " + t;
+                errorMsg = L"invalid modifier: " + t;
                 return FALSE;
             }
         }
     }
 
-        // 最後は必ず実キー
     const std::wstring& keyToken = tokens.back();
-
     UINT vk = 0;
-    bool isSingleChar = false;
 
-    // ① 物理キー名か？
     if (_ResolveKeyName(keyToken, vk))
     {
         // OK
     }
-    // ② 単文字か？（A-Z / 0-9 のみ許可）
     else if (keyToken.length() == 1)
     {
         wchar_t ch = keyToken[0];
-
-        if ((ch >= L'a' && ch <= L'z') ||
-            (ch >= L'A' && ch <= L'Z'))
+        if ((ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z'))
         {
-            ch = static_cast<wchar_t>(towupper(ch));
-            vk = static_cast<UINT>(ch);
-            isSingleChar = true;
+            vk = static_cast<UINT>(towupper(ch));
         }
         else if (ch >= L'0' && ch <= L'9')
         {
             vk = static_cast<UINT>(ch);
-            isSingleChar = true;
         }
         else
         {
-            errorMsg = L"invalid key name in function-key: " + keyToken;
+            errorMsg = L"invalid key name: " + keyToken;
             return FALSE;
         }
     }
     else
     {
-        errorMsg = L"invalid key name in function-key: " + keyToken;
+        errorMsg = L"invalid key name: " + keyToken;
         return FALSE;
     }
 
-    def.wp = vk;
-
-        // 4. 単文字キー制限チェック
-    // A-Z / 0-9 を modifier なし、または SHIFT のみで
-    // 機能キーにすることは禁止（文字入力不能になるため）
-    if (isSingleChar)
-    {
-        bool onlyShiftOrNone = (!def.needCtrl && !def.needAlt);
-        if (onlyShiftOrNone)
-        {
-            errorMsg = L"printable key cannot be used as function-key without CTRL/ALT";
-            return FALSE;
-        }
-    }
-
-    // 5. duplicate（後勝ち）
-    auto it = s_functionKeyOverride.find(actionType);
-    if (it != s_functionKeyOverride.end())
-    {
-        errorMsg = L"duplicate function-key definition (overwritten): " + actionName;
-    }
-
-    s_functionKeyOverride[actionType] = def;
+    KeySignature sig{ vk, needShift, needCtrl, needAlt };
+    s_currentKeyTable[sig] = actionType; // 後勝ち
 
     return TRUE;
 }
@@ -393,48 +349,32 @@ BOOL ChmKeyEvent::ParseFunctionKey(const std::wstring& key,
 
 void ChmKeyEvent::_TranslateByTable()
 {
-    // ① override テーブル（ini 優先）
-    for (auto& kv : s_functionKeyOverride)
+
+
+    KeySignature sig{ _wp, _shift, _control, _alt };
+    auto it = s_currentKeyTable.find(sig);
+    if (it != s_currentKeyTable.end())
     {
-        const FuncKeyDef& k = kv.second;
-        if (k.wp == _wp &&
-            k.needShift == _shift &&
-            k.needCtrl  == _control &&
-            k.needAlt   == _alt)
-        {
-            _type = k.type;
-            return;
-        }
+        _type = it->second;
+        return;
     }
 
-    // ② デフォルト機能キー
-    for (auto& k : g_functionKeyTable) {
-        if (k.wp == _wp &&
-            k.needShift == _shift &&
-            k.needCtrl  == _control &&
-            k.needAlt   == _alt) {
-            _type = k.type;
-            return;
-        }
+    if (IsNavigationKey())
+    {
+        _type = Type::CommitNonConvert;
+        return;
     }
 
-	// ② ナビゲーションキー
-	if (IsNavigationKey()) {
-		_type = Type::CommitNonConvert;
-		return ;
-	}
-
-    // ③ CTRL / ALT 中は CharInput にしない
-    if (_control || _alt) {
+    if (_control || _alt)
+    {
         _type = Type::None;
         return;
     }
 
-    // ④ キーボードレイアウトによる文字変換
     wchar_t ch = 0;
-    if (ChmKeyLayout::Translate(_wp, _shift, _caps, ch)) {
+    if (ChmKeyLayout::Translate(_wp, _shift, _caps, ch))
+    {
         _type = Type::CharInput;
-        //_ch = (char)ch;
         return;
     }
 

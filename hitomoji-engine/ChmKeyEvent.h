@@ -13,7 +13,9 @@ class ChmConfig;
 
 class ChmKeyEvent {
 public:
-	// TODO: タイプ名を実体に合うように修正
+	typedef SHORT (__stdcall *KeyStateProvider)(int);
+
+	// TODO: タイプ名を実体に合うように修正(0.3で)
     enum class Type {
         None = 0,
         CharInput,          // 通常文字入力
@@ -25,8 +27,8 @@ public:
         Cancel,             // キャンセル(ESC)
         Backspace,          // 後退(BS)
         Uncommit,           // 確定取消（将来）(CTRL+Z)
-        PassThrough,        // 定義解除（Config専用）
-		VersionInfo,        // バージョン表示
+        VersionInfo,        // バージョン表示
+		ReloadIni,          // iniファイルのリロード
     };
 
     struct FuncKeyDef {
@@ -62,15 +64,13 @@ public:
 	ChmKeyEvent(ChmKeyEvent::Type type); // マウスクリックなどの特殊用途（OnEndEditで使用）
 
     // --- function-key table helpers ---
+    static void ClearFunctionKey();
+    static void InitFunctionKey();
     static BOOL ParseFunctionKey(const std::wstring& key,
                                  const std::wstring& value,
                                  std::wstring& errorMsg);
-	static const FuncKeyDef* GetFunctionKeyDefinition(const std::wstring& key);
-
-    static void ClearFunctionKeyOverride();
-
     // --- KeyState hook (for testing) ---
-	static void SetGetKeyStateFunc(SHORT (__stdcall *func)(int));
+	static void SetKeyStateProvider(KeyStateProvider pFunc);
 
     // --- accessors ---
     Type GetType() const { return _type; }
@@ -96,8 +96,8 @@ private:
     // --- KeyTable helper ---
 	static bool _ResolveActionName(const std::wstring& name, ChmKeyEvent::Type& outType);
 	static bool _ResolveKeyName(const std::wstring& name, UINT& outVk);
-    // --- KeyState hook ---
-	static SHORT (__stdcall *s_getKeyStateFunc)(int);
+    // --- Win32::GetKeyState hook ---
+	static KeyStateProvider pFunc_keyStateProvider;
 
     void _TranslateByTable();
 
