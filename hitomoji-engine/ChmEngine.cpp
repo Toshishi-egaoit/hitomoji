@@ -70,13 +70,22 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 
 	// 確定キー
 	switch (_type) {
-#ifdef _DEBUG
+      case ChmKeyEvent::Type::ReloadIni: {
+            bool bRet = _pConfig->LoadFile();
+			if (bRet) {
+				_converted = L"ok";
+			}else {
+				_converted = L"ng";
+			}
+            _pending = L"";
+            _hasComposition = TRUE;
+            break;
+	  }
       case ChmKeyEvent::Type::VersionInfo:
             _converted = HM_VERSION L"(" __DATE__ L" " __TIME__ L")";
             _pending = L"";
             _hasComposition = TRUE;
             break;
-#endif
       case ChmKeyEvent::Type::CommitNonConvert: // 無変換確定
 			// 未変換部分も含めて全確定
             _hasComposition = FALSE;
