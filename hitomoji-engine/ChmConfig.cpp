@@ -41,9 +41,15 @@ void ChmConfig::InitConfig()
 
 }
 
-BOOL ChmConfig::LoadFromStream(std::wistream& is)
+// --- include 対応内部ローダ ---
+// NOTE: m_currentFile をエラー表示用に利用する設計
+BOOL ChmConfig::_LoadStreamInternal(std::wistream& is,
+                                     const std::wstring& fileName,
+                                     BOOL isMain)
 {
-    InitConfig();
+    // ファイル名はここで一元管理する
+    std::wstring prevFile = m_currentFile;
+    m_currentFile = fileName;
 
     std::wstring rawLine;
     std::wstring currentSection;
@@ -53,65 +59,93 @@ BOOL ChmConfig::LoadFromStream(std::wistream& is)
     {
         ++lineNo;
 
-        std::wstring errorMsg ;
+        std::wstring errorMsg;
         bool bRet = true;
 
-        // ---- 共通処理 ----
-		errorMsg.clear();
         std::wstring rawTrim = Trim(rawLine);
 
-        // 空行
         if (rawTrim.empty())
             continue;
 
-        // コメント行
         if (rawTrim[0] == L';' || rawTrim[0] == L'#')
             continue;
 
-        // 
-        // ---- セクション処理----
-
-		// key-table ではセクション指定のおせっかいチェックを止める。
-		if (currentSection != L"key-table") {
-			if ( rawTrim.front() != L'[' && rawTrim.back() == L']')
-			{
-			errorMsg = L"missing '[' at section header";
-			return FALSE;
-			}
-			if ( rawTrim.front() == L'[' && rawTrim.back() != L']')
-			{
-			errorMsg = L"missing ']' at end of section header";
-			return FALSE;
-			}
-		}
-
-		if (_parseSection(rawTrim, currentSection, errorMsg)) {
-			// TRUE＝セクションとして処理したばあい
-            continue;
-		}
-		else if (!errorMsg.empty()) {
-            m_errors.push_back({ lineNo, errorMsg });
-			continue ;
-		}
-		
-        // ---- キーとバリューの取得 ----
-
-		std::wstring key;
-		std::wstring value;
-		bRet = _divideRawTrim(rawTrim, key, value, errorMsg) ;
-
-        // エラー検出時はここでcontinue
-        if (!errorMsg.empty())
+        // --- @include 対応（main のみ） ---
+        if (isMain && rawTrim.rfind(L"@include", 0) == 0)
         {
-            m_errors.push_back({ lineNo, errorMsg });
+            std::wstring incFile = Trim(rawTrim.substr(8));
+
+            if (incFile.empty())
+            {
+                m_errors.push_back({ m_currentFile, lineNo, L"@include without file name" });
+                continue;
+            }
+
+            std::wstring baseDir;
+            PWSTR path = nullptr;
+            if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &path)))
+            {
+                baseDir = path;
+                CoTaskMemFree(path);
+                baseDir += L"\\hitomoji\\";
+            }
+
+            std::wstring fullPath = baseDir + incFile;
+
+            std::wifstream incIfs(fullPath);
+            if (!incIfs.is_open())
+            {
+                m_errors.push_back({ m_currentFile, lineNo, L"cannot open include file: " + incFile });
+                continue;
+            }
+
+            incIfs.imbue(std::locale(
+                incIfs.getloc(),
+                new std::codecvt_utf8<wchar_t>
+            ));
+
+            // 再帰呼び出し時に fileName を渡す
+            _LoadStreamInternal(incIfs, fullPath, FALSE);
             continue;
         }
-        // ---- 共通処理ここまで
+
+        // ---- セクション処理 ----
+        if (currentSection != L"key-table") {
+            if (rawTrim.front() != L'[' && rawTrim.back() == L']')
+            {
+                m_errors.push_back({ m_currentFile, lineNo, L"missing '[' at section header" });
+                continue;
+            }
+            if (rawTrim.front() == L'[' && rawTrim.back() != L']')
+            {
+                m_errors.push_back({ m_currentFile, lineNo, L"missing ']' at end of section header" });
+                continue;
+            }
+        }
+
+        if (_parseSection(rawTrim, currentSection, errorMsg))
+        {
+            continue;
+        }
+        else if (!errorMsg.empty())
+        {
+            m_errors.push_back({ m_currentFile, lineNo, errorMsg });
+            continue;
+        }
+
+        std::wstring key;
+        std::wstring value;
+        bRet = _divideRawTrim(rawTrim, key, value, errorMsg);
+
+        if (!errorMsg.empty())
+        {
+            m_errors.push_back({ m_currentFile, lineNo, errorMsg });
+            continue;
+        }
 
         if (currentSection == L"key-table")
         {
             bRet = ChmKeytableParser::ParseLine(rawLine, key, value, errorMsg);
-
         }
         else if (currentSection == L"function-key")
         {
@@ -124,15 +158,14 @@ BOOL ChmConfig::LoadFromStream(std::wistream& is)
 
         if (!errorMsg.empty())
         {
-            m_errors.push_back({ lineNo, errorMsg });
+            m_errors.push_back({ m_currentFile, lineNo, errorMsg });
         }
-
-
-
     }
 
+    m_currentFile = prevFile; // 呼び出し元へ復帰
     return !HasErrors();
 }
+
 
 BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 {
@@ -153,13 +186,16 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
         return FALSE;
     }
 
-	ifs.imbue(std::locale(
-		ifs.getloc(),
-		new std::codecvt_utf8<wchar_t>
-	));
+    ifs.imbue(std::locale(
+        ifs.getloc(),
+        new std::codecvt_utf8<wchar_t>
+    ));
 
-    return LoadFromStream(ifs);
+    InitConfig();
+
+    return _LoadStreamInternal(ifs, path, /*isMain*/ TRUE);
 }
+
 
 BOOL ChmConfig::GetBool(const std::wstring& section, const std::wstring& key, const BOOL bDefault) const
 {
@@ -290,12 +326,13 @@ std::wstring ChmConfig::_DumpErrors() const
     std::wstring out;
     for (const auto& e : m_errors)
     {
+        out += e.fileName;
+        out += L"(";
         out += std::to_wstring(e.lineNo);
-        out += L": ";
+        out += L"): ";
         out += e.message;
         out += L"\n";
     }
-
     return out;
 }
 

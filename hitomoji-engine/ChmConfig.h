@@ -14,6 +14,7 @@ public:
     static constexpr LONG GetLong_default = 0;
 
     struct ParseError {
+		std::wstring fileName;
         size_t lineNo;
         std::wstring message;
     };
@@ -46,6 +47,9 @@ public:
     static std::wstring Canonize(const std::wstring& s);
     
 private:
+	BOOL _LoadStreamInternal(std::wistream& is, 
+							 const std::wstring& fileName,
+						 	 BOOL isMain);
 	BOOL _parseSection(const std::wstring& rawTrim,
                        std::wstring& currentSection,
                        std::wstring& errorMsg);
@@ -66,6 +70,7 @@ private:
     static bool _tryParseBool(const std::wstring& s, bool& outValue);
 	bool _isDuplicateKey(const std::wstring& section, const std::wstring & canonizedKey) ;
 
+	std::wstring m_currentFile;
     ConfigMap m_config;
     ErrorMap  m_errors;
 };
