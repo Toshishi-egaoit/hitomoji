@@ -24,6 +24,11 @@ void ChmEngine::InitConfig() {
 	// ChmConfigの初期化
 	ChmConfig* newConfig = new ChmConfig();
 	BOOL bSuccess = newConfig->LoadFile();
+
+	if (newConfig->HasErrors())
+	{
+		ChmLogger::Warn((std::wstring(L"===ERRORS===\n") + newConfig->DumpErrors()).c_str());
+	}
 	if (!bSuccess && _pConfig) {
 		delete newConfig;
 		OutputDebugString(L"   > keeping old _pConfig");
@@ -35,10 +40,6 @@ void ChmEngine::InitConfig() {
 		delete _pConfig;
 		_pConfig = newConfig;
 		ChmLogger::Info((std::wstring(L"=== Configs ===\n") + _pConfig->Dump()).c_str());
-		if (_pConfig->HasErrors())
-		{
-			ChmLogger::Warn((std::wstring(L"===ERRORS===\n") + _pConfig->DumpErrors()).c_str());
-		}
 	}
 
 	return ;

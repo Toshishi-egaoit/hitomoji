@@ -52,7 +52,6 @@ BOOL ChmConfig::LoadFromStream(std::wistream& is)
     while (std::getline(is, rawLine))
     {
         ++lineNo;
-		OutputDebugStringWithString(L"   > %s<<", rawLine.c_str());
 
         std::wstring errorMsg ;
         bool bRet = true;
@@ -71,6 +70,21 @@ BOOL ChmConfig::LoadFromStream(std::wistream& is)
 
         // 
         // ---- セクション処理----
+
+		// key-table ではセクション指定のおせっかいチェックを止める。
+		if (currentSection != L"key-table") {
+			if ( rawTrim.front() != L'[' && rawTrim.back() == L']')
+			{
+			errorMsg = L"missing '[' at section header";
+			return FALSE;
+			}
+			if ( rawTrim.front() == L'[' && rawTrim.back() != L']')
+			{
+			errorMsg = L"missing ']' at end of section header";
+			return FALSE;
+			}
+		}
+
 		if (_parseSection(rawTrim, currentSection, errorMsg)) {
 			// TRUE＝セクションとして処理したばあい
             continue;
@@ -346,17 +360,6 @@ BOOL ChmConfig::_parseSection(const std::wstring& rawTrim,
                               std::wstring& currentSection,
                               std::wstring& errorMsg)
 {
-	// おせっかいチェック
-	if ( rawTrim.front() != L'[' && rawTrim.back() == L']')
-	{
-	errorMsg = L"missing '[' at section header";
-	return FALSE;
-	}
-	if ( rawTrim.front() == L'[' && rawTrim.back() != L']')
-	{
-	errorMsg = L"missing ']' at end of section header";
-	return FALSE;
-	}
 
 	if ( rawTrim.front() == L'[' && rawTrim.back() == L']')
 	  {
