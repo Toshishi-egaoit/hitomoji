@@ -6,7 +6,7 @@ size_t ChmRomajiConverter::_lastRawUnitLength = 0;
 // ---- static member ----
 
 // 最大キー長（v0.2.2 固定値）
-static constexpr int MAX_KEY_LENGTH = 6;
+static constexpr int MAX_KEY_LENGTH = 12;
 
 // Override table (Configから追加される)
 std::unordered_map<std::wstring, std::wstring> _overrideTable;
