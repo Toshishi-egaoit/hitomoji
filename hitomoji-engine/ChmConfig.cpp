@@ -47,14 +47,14 @@ void ChmConfig::InitConfig()
 // NOTE: m_currentFile をエラー表示用に利用する設計
 BOOL ChmConfig::_LoadStreamInternal(std::wistream& is,
                                      const std::wstring& fileName,
-                                     BOOL isMain)
+                                     BOOL isMain,
+                                     std::wstring currentSection)
 {
     // ファイル名はここで一元管理する
     std::wstring prevFile = m_currentFile;
     m_currentFile = fileName;
 
     std::wstring rawLine;
-    std::wstring currentSection;
     size_t lineNo = 0;
 
     while (std::getline(is, rawLine))
@@ -107,7 +107,7 @@ BOOL ChmConfig::_LoadStreamInternal(std::wistream& is,
             ));
 
             // 再帰呼び出し時に fileName を渡す
-            _LoadStreamInternal(incIfs, fullPath, FALSE);
+            _LoadStreamInternal(incIfs, fullPath, FALSE, currentSection);
             continue;
         }
 
@@ -135,6 +135,12 @@ BOOL ChmConfig::_LoadStreamInternal(std::wistream& is,
 			std::wstring key;
 			std::wstring value;
 			bRet = _divideRawTrim(rawTrim, key, value, errorMsg);
+
+            // セクション未指定チェック
+            if (errorMsg.level == ParseLevel::None && currentSection.empty())
+            {
+                SetError(errorMsg, L"key-value pair found before any section header");
+            }
 
 			if (errorMsg.level != ParseLevel::None)
 			{
@@ -195,7 +201,7 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 
     InitConfig();
 
-    BOOL bRet = _LoadStreamInternal(ifs, path, /*isMain*/ TRUE);
+    BOOL bRet = _LoadStreamInternal(ifs, path, /*isMain*/ TRUE, L"");
 
 	OutputDebugStringWithInt(L"   > LoadFile end. m_errors.size(): %d\n", m_errors.size());
 	OutputDebugStringWithInt(L"   >               m_infos.size(): %d\n", m_infos.size());

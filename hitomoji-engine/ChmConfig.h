@@ -69,9 +69,10 @@ public:
 	}
     
 private:
-	BOOL _LoadStreamInternal(std::wistream& is, 
-							 const std::wstring& fileName,
-						 	 BOOL isMain);
+	BOOL _LoadStreamInternal(std::wistream& is,
+                             const std::wstring& fileName,
+                             BOOL isMain,
+                             std::wstring currentSection);
 	BOOL _parseSection(const std::wstring& rawTrim,
                        std::wstring& currentSection,
 					   ParseResult& errorMsg);
