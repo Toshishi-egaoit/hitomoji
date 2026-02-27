@@ -19,18 +19,28 @@ public:
         std::wstring message;
     };
 
+	enum class ParseLevel {
+		None,
+		Info,
+		Error
+	};
+
+	struct ParseResult {
+		ParseLevel level = ParseLevel::None;
+		std::wstring message;
+	};
+
     // 内部表現は long / string に正規化
     using ConfigValue = std::variant<bool, long, std::wstring>;
     using SectionMap  = std::unordered_map<std::wstring, ConfigValue>;
     using ConfigMap   = std::unordered_map<std::wstring, SectionMap>;
     using ErrorMap    = std::vector<ParseError>;
+    using InfoMap     = std::vector<ParseError>;
 
-public:
     ChmConfig();
     ~ChmConfig() = default;
 
     // ini 読み込み
-    BOOL LoadFromStream(std::wistream& is);
     BOOL LoadFile(const std::wstring& fileName=L"");
     void InitConfig();
 
@@ -40,11 +50,23 @@ public:
     std::wstring GetString(const std::wstring& section, const std::wstring& key) const;
     std::wstring Dump() const;
     std::wstring DumpErrors() const;
+    std::wstring DumpInfos() const;
     BOOL HasErrors() const { return !m_errors.empty(); }
+    BOOL HasInfos() const { return !m_infos.empty(); }
 
     // 公開ヘルパー
     static std::wstring Trim(const std::wstring& s);
     static std::wstring Canonize(const std::wstring& s);
+	static void SetError(ParseResult& r, const std::wstring& msg)
+	{
+		r.level = ParseLevel::Error;
+		r.message = msg;
+	}
+	static void SetInfo(ParseResult& r, const std::wstring& msg)
+	{
+		r.level = ParseLevel::Info;
+		r.message = msg;
+	}
     
 private:
 	BOOL _LoadStreamInternal(std::wistream& is, 
@@ -65,6 +87,7 @@ private:
     // --- helper ---
     std::wstring _Dump() const;
     std::wstring _DumpErrors() const;
+    std::wstring _DumpInfos() const;
     static bool _isValidName(const std::wstring& name);
     static bool _tryParseLong(const std::wstring& s, long& outValue);
     static bool _tryParseBool(const std::wstring& s, bool& outValue);
@@ -73,4 +96,5 @@ private:
 	std::wstring m_currentFile;
     ConfigMap m_config;
     ErrorMap  m_errors;
+    InfoMap  m_infos;
 };

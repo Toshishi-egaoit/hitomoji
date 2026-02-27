@@ -264,6 +264,11 @@ std::wstring ChmConfig::DumpErrors() const
 	return _DumpErrors();
 }
 
+std::wstring ChmConfig::DumpInfos() const
+{
+	return _DumpInfos();
+}
+
 // --- public helpers ---
 std::wstring ChmConfig::Trim(const std::wstring& s)
 {
@@ -325,6 +330,21 @@ std::wstring ChmConfig::_DumpErrors() const
 {
     std::wstring out;
     for (const auto& e : m_errors)
+    {
+        out += e.fileName;
+        out += L"(";
+        out += std::to_wstring(e.lineNo);
+        out += L"): ";
+        out += e.message;
+        out += L"\n";
+    }
+    return out;
+}
+
+std::wstring ChmConfig::_DumpInfos() const
+{
+    std::wstring out;
+    for (const auto& e : m_infos)
     {
         out += e.fileName;
         out += L"(";
@@ -461,9 +481,13 @@ BOOL ChmConfig::_parseValue(const std::wstring& keyTrim,
         return FALSE;
     }
 
-	if ( _isDuplicateKey(currentSection,key))
+	if (_isDuplicateKey(currentSection,key))
 	{
-		errorMsg = L"WARN: duplicate key. overwritten: " + currentSection + L"." + key;
+		m_infos.push_back({
+			m_currentFile,
+			0,/* lineNoÇÕåƒÇ—èoÇµå≥Ç≈ìnÇµÇΩÇ¢Ç™ç°ÇÕñ≥Ç¢ÇÃÇ≈0Ç≈OK */
+			L"duplicate key overwritten: " + currentSection + L"." + key
+		});
 	}
 
 	bool bValue = true;
