@@ -39,13 +39,13 @@ private:
 class ChmKeytableParser {
 public:
 
-	static bool ParseLine(const std::wstring& line,
+	static BOOL ParseLine(const std::wstring& line,
                                   std::wstring& left,
                                   std::wstring& right,
-                                  std::wstring& error);
+                                  ChmConfig::ParseResult& error);
 
 	static void RegisterOverrideTable(const std::wstring& key,
-											  const std::wstring& value)
+									  const std::wstring& value)
 	{
 		_overrideTable[key] = value;
 	}

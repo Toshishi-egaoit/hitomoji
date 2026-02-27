@@ -240,13 +240,13 @@ ChmKeyEvent::ChmKeyEvent(ChmKeyEvent::Type type)
 // ---- function-key 解析 ----
 BOOL ChmKeyEvent::ParseFunctionKey(const std::wstring& key,
                                    const std::wstring& value,
-                                   std::wstring& errorMsg)
+                                   ChmConfig::ParseResult& errorMsg)
 {
     // 左辺: 物理キー定義（例: ctrl+enter）
     std::wstring keySpec = ChmConfig::Canonize(key);
     if (keySpec.empty())
     {
-        errorMsg = L"invalid function-key definition";
+		ChmConfig::SetError(errorMsg,L"invalid function-key definition");
         return FALSE;
     }
 
@@ -255,7 +255,7 @@ BOOL ChmKeyEvent::ParseFunctionKey(const std::wstring& key,
     ChmKeyEvent::Type actionType;
     if (!_ResolveActionName(actionName, actionType))
     {
-        errorMsg = L"unknown function-key action: " + actionName;
+		ChmConfig::SetError(errorMsg,L"unknown function-key action: " + actionName);
         return FALSE;
     }
 
@@ -285,7 +285,7 @@ BOOL ChmKeyEvent::ParseFunctionKey(const std::wstring& key,
 
     if (tokens.empty())
     {
-        errorMsg = L"empty key definition";
+		ChmConfig::SetError(errorMsg,L"empty key definition");
         return FALSE;
     }
 
@@ -304,7 +304,7 @@ BOOL ChmKeyEvent::ParseFunctionKey(const std::wstring& key,
             else if (t == L"alt") needAlt = true;
             else
             {
-                errorMsg = L"invalid modifier: " + t;
+				ChmConfig::SetError(errorMsg,L"invalid modifier: " + t);
                 return FALSE;
             }
         }
@@ -331,13 +331,13 @@ BOOL ChmKeyEvent::ParseFunctionKey(const std::wstring& key,
         // 英字・数字は CTRL または ALT を含まない場合はエラー
         if (vk !=0 && !needCtrl && !needAlt)
         {
-            errorMsg = L"alphabet/digit requires CTRL or ALT modifier";
+			ChmConfig::SetError(errorMsg,L"alphabet/digit requires CTRL or ALT modifier");
             return FALSE;
         }    
     }
     if ( vk == 0) 
     {
-        errorMsg = L"invalid key name: " + keyToken;
+		ChmConfig::SetError(errorMsg, L"invalid key name: " + keyToken);
         return FALSE;
     }
     KeySignature sig{ vk, needShift, needCtrl, needAlt };
@@ -346,7 +346,7 @@ BOOL ChmKeyEvent::ParseFunctionKey(const std::wstring& key,
     auto it = s_currentKeyTable.find(sig);
     if (it != s_currentKeyTable.end())
     {
-        errorMsg = L"duplicate function-key definition: " + keySpec;
+		ChmConfig::SetInfo(errorMsg, L"duplicate function-key definition: " + keySpec);
         // でも後勝ちで上書きする
     }
     
@@ -355,6 +355,18 @@ BOOL ChmKeyEvent::ParseFunctionKey(const std::wstring& key,
     return TRUE;
 }
 
+std::wstring ChmKeyEvent::Dump()
+{
+	std::wstring result;
+	for (const auto& pair : s_currentKeyTable) {
+		result += (std::wstring)(pair.first.shift ? L" Shift+" : L"") +
+				  (pair.first.ctrl  ? L" Ctrl+"  : L"") +
+				  (pair.first.alt   ? L" Alt+"   : L"") +
+				  std::to_wstring(pair.first.wp) +
+			L" => " + std::to_wstring(static_cast<int>(pair.second)) + L"\n";
+	}
+	return result;
+}
 
 void ChmKeyEvent::_TranslateByTable()
 {

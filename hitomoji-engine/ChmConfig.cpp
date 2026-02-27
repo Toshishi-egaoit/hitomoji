@@ -11,6 +11,8 @@
 #include "ChmKeyEvent.h"
 #include "utils.h"
 
+#define MAX_ERROR_COUNT 100
+
 static std::wstring GetConfigPath()
 {
     PWSTR path = nullptr;
@@ -59,7 +61,7 @@ BOOL ChmConfig::_LoadStreamInternal(std::wistream& is,
     {
         ++lineNo;
 
-        std::wstring errorMsg;
+        ParseResult errorMsg;
         bool bRet = true;
 
         std::wstring rawTrim = Trim(rawLine);
@@ -127,39 +129,39 @@ BOOL ChmConfig::_LoadStreamInternal(std::wistream& is,
         {
             continue;
         }
-        else if (!errorMsg.empty())
-        {
-            m_errors.push_back({ m_currentFile, lineNo, errorMsg });
-            continue;
-        }
+        if (errorMsg.level != ParseLevel::None) goto WriteLog;
 
-        std::wstring key;
-        std::wstring value;
-        bRet = _divideRawTrim(rawTrim, key, value, errorMsg);
+		{
+			std::wstring key;
+			std::wstring value;
+			bRet = _divideRawTrim(rawTrim, key, value, errorMsg);
 
-        if (!errorMsg.empty())
-        {
-            m_errors.push_back({ m_currentFile, lineNo, errorMsg });
-            continue;
-        }
+			if (errorMsg.level != ParseLevel::None)
+			{
+				_addErrorOrInfo(errorMsg, lineNo);
+				continue;
+			}
 
-        if (currentSection == L"key-table")
-        {
-            bRet = ChmKeytableParser::ParseLine(rawLine, key, value, errorMsg);
-        }
-        else if (currentSection == L"function-key")
-        {
-            bRet = ChmKeyEvent::ParseFunctionKey(key, value, errorMsg);
-        }
-        else
-        {
-            bRet = _parseValue(key, value, currentSection, errorMsg);
-        }
+			if (currentSection == L"key-table")
+			{
+				bRet = ChmKeytableParser::ParseLine(rawLine, key, value, errorMsg);
+			}
+			else if (currentSection == L"function-key")
+			{
+				bRet = ChmKeyEvent::ParseFunctionKey(key, value, errorMsg);
+			}
+			else
+			{
+				bRet = _parseValue(key, value, currentSection, errorMsg);
+			}
+		}
 
-        if (!errorMsg.empty())
-        {
-            m_errors.push_back({ m_currentFile, lineNo, errorMsg });
-        }
+WriteLog:
+		// Error／Infoの記録
+		if (_addErrorOrInfo(errorMsg, lineNo) == false) {
+			// エラー／情報の上限超過
+			return FALSE;
+		}
     }
 
     m_currentFile = prevFile; // 呼び出し元へ復帰
@@ -193,7 +195,12 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 
     InitConfig();
 
-    return _LoadStreamInternal(ifs, path, /*isMain*/ TRUE);
+    BOOL bRet = _LoadStreamInternal(ifs, path, /*isMain*/ TRUE);
+
+	OutputDebugStringWithInt(L"   > LoadFile end. m_errors.size(): %d\n", m_errors.size());
+	OutputDebugStringWithInt(L"   >               m_infos.size(): %d\n", m_infos.size());
+
+	return bRet;
 }
 
 
@@ -415,7 +422,7 @@ bool ChmConfig::_isValidName(const std::wstring& name)
 
 BOOL ChmConfig::_parseSection(const std::wstring& rawTrim,
                               std::wstring& currentSection,
-                              std::wstring& errorMsg)
+                              ParseResult& errorMsg)
 {
 
 	if ( rawTrim.front() == L'[' && rawTrim.back() == L']')
@@ -425,13 +432,13 @@ BOOL ChmConfig::_parseSection(const std::wstring& rawTrim,
 
 	if (!_isValidName(section))
 	{
-	  errorMsg = L"invalid section name";
-	  return FALSE;
+		SetError(errorMsg, L"invalid section name") ;
+		return FALSE;
 	}
 
 	if (section.empty())
 	{
-		errorMsg = L"empty section name";
+		SetError(errorMsg, L"empty section name") ;
 		return FALSE;
 	}
 
@@ -446,12 +453,12 @@ BOOL ChmConfig::_parseSection(const std::wstring& rawTrim,
 BOOL ChmConfig::_divideRawTrim(const std::wstring& rawTrim,
                                std::wstring& key,
                                std::wstring& value,
-                               std::wstring& errorMsg)
+                              ParseResult& errorMsg)
 {
     size_t pos = rawTrim.find(L'=');
     if (pos == std::wstring::npos)
     {
-        errorMsg = L"missing '=' in key-value pair";
+		SetError(errorMsg, L"missing '=' in key-value pair");
         return FALSE;
     }
 
@@ -460,7 +467,7 @@ BOOL ChmConfig::_divideRawTrim(const std::wstring& rawTrim,
 
     if (key.empty())
     {
-        errorMsg = L"empty key name";
+		SetError(errorMsg, L"empty key name");
         return FALSE;
     }
 
@@ -471,25 +478,25 @@ BOOL ChmConfig::_divideRawTrim(const std::wstring& rawTrim,
 BOOL ChmConfig::_parseValue(const std::wstring& keyTrim,
                                const std::wstring& valueTrim,
                                const std::wstring& currentSection,
-                               std::wstring& errorMsg)
+                               ParseResult& errorMsg)
 {
     std::wstring key = Canonize(keyTrim);
 
+	// --- key の妥当性チェック
     if (!_isValidName(key))
     {
-        errorMsg = L"invalid key name";
+        SetError(errorMsg, L"invalid key name:" + keyTrim);
         return FALSE;
     }
 
 	if (_isDuplicateKey(currentSection,key))
 	{
-		m_infos.push_back({
-			m_currentFile,
-			0,/* lineNoは呼び出し元で渡したいが今は無いので0でOK */
-			L"duplicate key overwritten: " + currentSection + L"." + key
-		});
+		SetInfo(errorMsg, 
+			L"duplicate key overwritten: " + currentSection + L"." + key);
+		// 重複はエラーではないのでReturnはしない
 	}
 
+	// --- value の型判定（bool → long → string の順で試す）
 	bool bValue = true;
     if (_tryParseBool(valueTrim, bValue))
     {
@@ -515,4 +522,18 @@ bool ChmConfig::_isDuplicateKey(const std::wstring& section, const std::wstring 
 	if ( sectionMap == m_config.end()) return false;
 
 	return (sectionMap->second.find(canonizedKey) != sectionMap->second.end());
+}
+
+bool ChmConfig::_addErrorOrInfo(ParseResult& errorMsg, size_t lineNo)
+{
+	if (m_errors.size() + m_infos.size() >= MAX_ERROR_COUNT) {
+		// エラー／情報が多すぎる場合はこれ以上記録しない（無限ループ対策）
+		m_errors.push_back({ m_currentFile, lineNo, L"Too many errors or infos." });
+		return false;
+	}
+	if (errorMsg.level == ParseLevel::Error)
+		m_errors.push_back({ m_currentFile, lineNo, errorMsg.message });
+	else if (errorMsg.level == ParseLevel::Info)
+		m_infos.push_back({ m_currentFile, lineNo, errorMsg.message });
+	return true;
 }

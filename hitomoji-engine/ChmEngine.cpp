@@ -27,7 +27,8 @@ void ChmEngine::InitConfig() {
 
 	if (newConfig->HasErrors())
 	{
-		ChmLogger::Warn((std::wstring(L"===ERRORS===\n") + newConfig->DumpErrors()).c_str());
+		ChmLogger::Warn((std::wstring(L"===Errors===\n") + newConfig->DumpErrors()).c_str());
+		ChmLogger::Warn((std::wstring(L"===Infos===\n") + newConfig->DumpInfos()).c_str());
 	}
 	if (!bSuccess && _pConfig) {
 		delete newConfig;
@@ -40,6 +41,7 @@ void ChmEngine::InitConfig() {
 		delete _pConfig;
 		_pConfig = newConfig;
 		ChmLogger::Info((std::wstring(L"=== Configs ===\n") + _pConfig->Dump()).c_str());
+		ChmLogger::Info((std::wstring(L"=== Function-Keys ===\n") + ChmKeyEvent::Dump()).c_str());
 	}
 
 	return ;

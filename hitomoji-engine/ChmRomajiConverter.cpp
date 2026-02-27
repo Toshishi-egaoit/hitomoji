@@ -183,38 +183,36 @@ void ChmRomajiConverter::convert(const std::wstring& rawInput,
 
 // 成功: true
 // 失敗: false（error に理由を入れる）
-bool ChmKeytableParser::ParseLine(const std::wstring& line,
+BOOL ChmKeytableParser::ParseLine(const std::wstring& line,
                                   std::wstring& left,
                                   std::wstring& right,
-                                  std::wstring& error)
+                                  ChmConfig::ParseResult& errorMsg)
 {
-    error.clear();
-
-        // 前後Trim
+    // 前後Trim
     std::wstring trimmed = Trim(line);
 
     left  = Trim(left);
     right = Trim(right);
 
 	if (left.length() > MAX_KEY_LENGTH) {
-        error = L"left side too large";
-        return false;
+		ChmConfig::SetError(errorMsg, L"left side too large");
+        return FALSE;
 	}
 
     // 予約行（将来用）はTrueをかえす
     if (left == L"algorithm") {
-      return true;
+      return TRUE;
     }
   
     if (right.empty()) {
-        error = L"right side empty";
-        return false;
+		ChmConfig::SetError(errorMsg, L"right side empty");
+        return FALSE;
     }
 
 	// エラーが無ければとうろくする
 	RegisterOverrideTable(left, right);
 
-    return true;
+    return TRUE;
 }
 
 std::wstring ChmKeytableParser::Trim(const std::wstring& s)

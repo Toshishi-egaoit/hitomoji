@@ -1,4 +1,5 @@
 #include "gtest/gtest.h"
+#include "ChmConfig.h"
 #include "ChmKeyEvent.h"
 
 // =====================================================
@@ -83,7 +84,7 @@ TEST_F(FunctionKeyTestBase, ParseAndApply)
 {
     ChmKeyEvent::InitFunctionKey();
 
-    std::wstring error;
+    ChmConfig::ParseResult error;
 
     EXPECT_TRUE(
         ChmKeyEvent::ParseFunctionKey(
@@ -91,7 +92,7 @@ TEST_F(FunctionKeyTestBase, ParseAndApply)
             L"finish-raw-wide",
             error));
 
-    EXPECT_TRUE(error.empty());
+    EXPECT_TRUE(error.level == ChmConfig::ParseLevel::None);
 
                   // CTRLのみON
     SetKeyState(false, true, false);
@@ -107,18 +108,18 @@ TEST_F(FunctionKeyTestBase, ParseAndApply)
 TEST_F(FunctionKeyTestBase, SpecialKeyNames)
 {
     ChmKeyEvent::ClearFunctionKey();
-    std::wstring error;
+    ChmConfig::ParseResult error;
 
     // ENTER
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"RETURN", L"finish", error));
-    EXPECT_TRUE(error.empty());
+    EXPECT_TRUE(error.level == ChmConfig::ParseLevel::None);
 
     ChmKeyEvent ev1(VK_RETURN, 0);
     EXPECT_EQ(ChmKeyEvent::Type::CommitKana, ev1.GetType());
 
     // ESC
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"ESC", L"cancel", error));
-    EXPECT_TRUE(error.empty());
+    EXPECT_TRUE(error.level == ChmConfig::ParseLevel::None);
 
     ChmKeyEvent ev2(VK_ESCAPE, 0);
     EXPECT_EQ(ChmKeyEvent::Type::Cancel, ev2.GetType());
@@ -130,7 +131,7 @@ TEST_F(FunctionKeyTestBase, SpecialKeyNames)
 TEST_F(FunctionKeyTestBase, ShiftWithSpecialKey)
 {
     ChmKeyEvent::ClearFunctionKey();
-    std::wstring error;
+    ChmConfig::ParseResult error;
 
     // SHIFT+ENTER を定義
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(
@@ -138,7 +139,7 @@ TEST_F(FunctionKeyTestBase, ShiftWithSpecialKey)
         L"finish-raw",
         error));
 
-    EXPECT_TRUE(error.empty());
+    EXPECT_TRUE(error.level == ChmConfig::ParseLevel::None);
 
     // SHIFTのみON
     SetKeyState(true, false, false);
@@ -152,7 +153,7 @@ TEST_F(FunctionKeyTestBase, ShiftWithSpecialKey)
 // ---------------------------------------------
 TEST_F(FunctionKeyTestBase, SingleAlphaOrDigitIsError)
 {
-    std::wstring error;
+    ChmConfig::ParseResult error;
     EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(L"A", L"finish", error));
     EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(L"1", L"finish", error));
 }
@@ -162,7 +163,7 @@ TEST_F(FunctionKeyTestBase, SingleAlphaOrDigitIsError)
 // ---------------------------------------------
 TEST_F(FunctionKeyTestBase, ShiftWithAlphaOrDigitIsError)
 {
-    std::wstring error;
+    ChmConfig::ParseResult error;
     EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(L"SHIFT+A", L"finish", error));
     EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(L"SHIFT+1", L"finish", error));
 }
@@ -172,7 +173,7 @@ TEST_F(FunctionKeyTestBase, ShiftWithAlphaOrDigitIsError)
 // ---------------------------------------------
 TEST_F(FunctionKeyTestBase, CtrlCombinations)
 {
-    std::wstring error;
+    ChmConfig::ParseResult error;
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"CTRL+ENTER", L"finish", error));
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"CTRL+Z", L"finish-raw", error));
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"CTRL+1", L"finish-raw", error));
@@ -183,7 +184,7 @@ TEST_F(FunctionKeyTestBase, CtrlCombinations)
 // ---------------------------------------------
 TEST_F(FunctionKeyTestBase, AltCombinations)
 {
-    std::wstring error;
+    ChmConfig::ParseResult error;
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"ALT+ENTER", L"finish", error));
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"ALT+Z", L"finish-raw", error));
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"ALT+1", L"finish-raw", error));
@@ -194,7 +195,7 @@ TEST_F(FunctionKeyTestBase, AltCombinations)
 // ---------------------------------------------
 TEST_F(FunctionKeyTestBase, MultiModifierCombinations)
 {
-    std::wstring error;
+    ChmConfig::ParseResult error;
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"SHIFT+CTRL+ENTER", L"finish", error));
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"SHIFT+ALT+ENTER", L"finish", error));
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"CTRL+ALT+ENTER", L"finish", error));
@@ -205,7 +206,7 @@ TEST_F(FunctionKeyTestBase, MultiModifierCombinations)
 // ---------------------------------------------
 TEST_F(FunctionKeyTestBase, WhitespaceTolerance)
 {
-    std::wstring error;
+    ChmConfig::ParseResult error;
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"  CTRL + ENTER  ", L"finish", error));
 }
 
@@ -214,7 +215,7 @@ TEST_F(FunctionKeyTestBase, WhitespaceTolerance)
 // ---------------------------------------------
 TEST_F(FunctionKeyTestBase, CaseAndSymbolTolerance)
 {
-    std::wstring error;
+    ChmConfig::ParseResult error;
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"ctrl+enter", L"FINISH", error));
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"ctrl+Escape", L"cancel_fiNISH", error));
 }
@@ -224,7 +225,7 @@ TEST_F(FunctionKeyTestBase, CaseAndSymbolTolerance)
 // ---------------------------------------------
 TEST_F(FunctionKeyTestBase, InvalidTokens)
 {
-    std::wstring error;
+    ChmConfig::ParseResult error;
     EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(L"SHFT+ENTER", L"finish", error));
     EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(L"CTRL+@", L"finish", error));
     EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(L"CTRL+ENTER", L"unknown", error));
@@ -235,7 +236,7 @@ TEST_F(FunctionKeyTestBase, InvalidTokens)
 // ---------------------------------------------
 TEST_F(FunctionKeyTestBase, DoublePlusAndMissingKey)
 {
-    std::wstring error;
+    ChmConfig::ParseResult error;
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"CTRL++ENTER", L"finish", error));
     EXPECT_FALSE(ChmKeyEvent::ParseFunctionKey(L"CTRL+", L"finish", error));
 }
@@ -245,7 +246,7 @@ TEST_F(FunctionKeyTestBase, DoublePlusAndMissingKey)
 // ---------------------------------------------
 TEST_F(FunctionKeyTestBase, AllSpecialKeyTokensCovered)
 {
-    std::wstring error;
+    ChmConfig::ParseResult error;
 
     const wchar_t* keys[] = {
         L"ENTER", L"RETURN", L"TAB", L"BACKSPACE",
@@ -269,7 +270,7 @@ TEST_F(FunctionKeyTestBase, AllSpecialKeyTokensCovered)
 // ---------------------------------------------
 TEST_F(FunctionKeyTestBase, AllActionNamesCovered)
 {
-    std::wstring error;
+    ChmConfig::ParseResult error;
 
     const wchar_t* actions[] = {
         L"finish",
@@ -298,14 +299,14 @@ TEST_F(FunctionKeyTestBase, AllActionNamesCovered)
 TEST_F(FunctionKeyTestBase, DuplicateDefinitionWarning)
 {
     ChmKeyEvent::ClearFunctionKey();
-    std::wstring error;
+    ChmConfig::ParseResult error;
 
     // 1回目
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(
         L"CTRL+Z",
         L"finish",
         error));
-    EXPECT_TRUE(error.empty());
+    EXPECT_TRUE(error.level == ChmConfig::ParseLevel::None);
 
     // 2回目（duplicate）
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(
@@ -314,11 +315,10 @@ TEST_F(FunctionKeyTestBase, DuplicateDefinitionWarning)
         error));
 
     // 警告が入っていること
-    EXPECT_FALSE(error.empty());
+    EXPECT_TRUE(error.level == ChmConfig::ParseLevel::Info);
 
     // duplicate という文字列を含むこと
-    EXPECT_NE(std::wstring::npos, error.find(L"duplicate"))
-      << "Expected duplicate warning, but got: " << error;
+    EXPECT_NE(std::wstring::npos, error.message.find(L"duplicate"));
   
     // 後勝ちで cancel が有効になることを確認
     SetKeyState(false, true, false);

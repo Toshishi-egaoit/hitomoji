@@ -5,9 +5,9 @@
 #include <string>
 #include "utils.h"
 #include "hitomoji.h"
+#include "ChmConfig.h"
 
 class ChmRawInputStore;
-class ChmConfig;
 
 #define VK_HITOMOJI 0 // 仮想キーコード: マウスイベントなどの特殊用途
 
@@ -68,7 +68,9 @@ public:
     static void InitFunctionKey();
     static BOOL ParseFunctionKey(const std::wstring& key,
                                  const std::wstring& value,
-                                 std::wstring& errorMsg);
+                                 ChmConfig::ParseResult&  errorMsg);
+    static std::wstring Dump();
+
     // --- KeyState hook (for testing) ---
 	static void SetKeyStateProvider(KeyStateProvider pFunc);
 

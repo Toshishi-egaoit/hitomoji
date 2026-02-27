@@ -74,15 +74,15 @@ private:
 						 	 BOOL isMain);
 	BOOL _parseSection(const std::wstring& rawTrim,
                        std::wstring& currentSection,
-                       std::wstring& errorMsg);
+					   ParseResult& errorMsg);
 	BOOL _divideRawTrim(const std::wstring& rawTrim,
 					std::wstring& key,
 					std::wstring& value,
-					std::wstring& errorMsg);
+	 			    ParseResult& errorMsg);
 	BOOL _parseValue(const std::wstring& keyTrim,
                     const std::wstring& valueTrim,
                     const std::wstring& currentSection,
-                    std::wstring& errorMsg);
+                    ParseResult& errorMsg);
 
     // --- helper ---
     std::wstring _Dump() const;
@@ -92,6 +92,7 @@ private:
     static bool _tryParseLong(const std::wstring& s, long& outValue);
     static bool _tryParseBool(const std::wstring& s, bool& outValue);
 	bool _isDuplicateKey(const std::wstring& section, const std::wstring & canonizedKey) ;
+	bool _addErrorOrInfo(ParseResult& errorMsg, size_t lineNo);
 
 	std::wstring m_currentFile;
     ConfigMap m_config;
