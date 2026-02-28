@@ -13,22 +13,17 @@
 
 #define MAX_ERROR_COUNT 100
 
-static std::wstring GetConfigPath()
-{
-    PWSTR path = nullptr;
-    std::wstring result;
-
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &path)))
-    {
-        result = path;
-        CoTaskMemFree(path);
-        result += L"\\hitomoji\\hitomoji.ini";
-    }
-    return result;
-}
 
 ChmConfig::ChmConfig()
 {
+    // デフォルト basePath = Roaming\hitomoji\  となる。
+    PWSTR path = nullptr;
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &path)))
+    {
+        m_basePath = path;
+        CoTaskMemFree(path);
+        m_basePath += L"\\hitomoji\\";
+    }
     InitConfig();
 }
 
@@ -72,32 +67,35 @@ BOOL ChmConfig::_LoadStreamInternal(std::wistream& is,
         if (rawTrim[0] == L';' || rawTrim[0] == L'#')
             continue;
 
-        // --- @include 対応（main のみ） ---
-        if (isMain && rawTrim.rfind(L"@include", 0) == 0)
+                // --- @include 対応 ---
+        if (rawTrim.rfind(L"@include", 0) == 0)
         {
+            if (!isMain)
+            {
+                SetError(errorMsg, L"nested include is not allowed");
+                if (_addErrorOrInfo(errorMsg, lineNo) == false)
+                    return FALSE;
+                continue;
+            }
+
             std::wstring incFile = Trim(rawTrim.substr(8));
 
             if (incFile.empty())
             {
-                m_errors.push_back({ m_currentFile, lineNo, L"@include without file name" });
+                SetError(errorMsg, L"@include without file name");
+                if (_addErrorOrInfo(errorMsg, lineNo) == false)
+                    return FALSE;
                 continue;
             }
 
-            std::wstring baseDir;
-            PWSTR path = nullptr;
-            if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &path)))
-            {
-                baseDir = path;
-                CoTaskMemFree(path);
-                baseDir += L"\\hitomoji\\";
-            }
-
-            std::wstring fullPath = baseDir + incFile;
+                        std::wstring fullPath = m_basePath + incFile;
 
             std::wifstream incIfs(fullPath);
             if (!incIfs.is_open())
             {
-                m_errors.push_back({ m_currentFile, lineNo, L"cannot open include file: " + incFile });
+                SetError(errorMsg, L"cannot open include file: " + incFile);
+                if (_addErrorOrInfo(errorMsg, lineNo) == false)
+                    return FALSE;
                 continue;
             }
 
@@ -106,7 +104,7 @@ BOOL ChmConfig::_LoadStreamInternal(std::wistream& is,
                 new std::codecvt_utf8<wchar_t>
             ));
 
-            // 再帰呼び出し時に fileName を渡す
+                        // include 内ではさらに include を許可しない（isMain = FALSE）
             _LoadStreamInternal(incIfs, fullPath, FALSE, currentSection);
             continue;
         }
@@ -143,10 +141,11 @@ BOOL ChmConfig::_LoadStreamInternal(std::wistream& is,
             }
 
 			if (errorMsg.level != ParseLevel::None)
-			{
-				_addErrorOrInfo(errorMsg, lineNo);
-				continue;
-			}
+            {
+                if (_addErrorOrInfo(errorMsg, lineNo) == false)
+                    return FALSE;
+                continue;
+            }
 
 			if (currentSection == L"key-table")
 			{
@@ -178,7 +177,16 @@ WriteLog:
 BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 {
     OutputDebugStringWithString(L"[Hitomoji] ChmConfig::LoadFile(%s) called", fileName.c_str());
-    std::wstring path = fileName.empty() ? GetConfigPath() : fileName;
+
+    std::wstring path;
+    if (fileName.empty())
+    {
+        path = m_basePath + L"hitomoji.ini";
+    }
+    else
+    {
+        path = m_basePath + fileName;
+    }
 
     DWORD attr = GetFileAttributesW(path.c_str());
     if (attr == INVALID_FILE_ATTRIBUTES || (attr & FILE_ATTRIBUTE_DIRECTORY))
@@ -528,6 +536,17 @@ bool ChmConfig::_isDuplicateKey(const std::wstring& section, const std::wstring 
 	if ( sectionMap == m_config.end()) return false;
 
 	return (sectionMap->second.find(canonizedKey) != sectionMap->second.end());
+}
+
+void ChmConfig::SetBasePath(const std::wstring& basePath)
+{
+    m_basePath = basePath;
+    if (!m_basePath.empty())
+    {
+        wchar_t last = m_basePath.back();
+        if (last != L'\\' && last != L'/')
+            m_basePath += L"\\";
+    }
 }
 
 bool ChmConfig::_addErrorOrInfo(ParseResult& errorMsg, size_t lineNo)

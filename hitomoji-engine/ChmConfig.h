@@ -40,6 +40,9 @@ public:
     ChmConfig();
     ~ChmConfig() = default;
 
+    // ベースパス変更（テスト用）
+    void SetBasePath(const std::wstring& basePath);
+    
     // ini 読み込み
     BOOL LoadFile(const std::wstring& fileName=L"");
     void InitConfig();
@@ -96,6 +99,7 @@ private:
 	bool _addErrorOrInfo(ParseResult& errorMsg, size_t lineNo);
 
 	std::wstring m_currentFile;
+    std::wstring m_basePath;
     ConfigMap m_config;
     ErrorMap  m_errors;
     InfoMap  m_infos;

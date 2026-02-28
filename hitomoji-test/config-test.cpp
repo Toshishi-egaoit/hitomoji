@@ -1,25 +1,27 @@
 #include "gtest/gtest.h"
 #include "ChmConfig.h"
+#include <fstream>
 
 TEST(ConfigTest, LoadFunctionKeyIni)
 {
     ChmConfig config;
 
-    EXPECT_FALSE(config.LoadFile(L".\\testdata\\funckey.ini"));
+    EXPECT_TRUE(config.LoadFile(L".\\testdata\\funckey.ini"));
 
     // funckey.ini には duplicate を含んでいる想定
-    EXPECT_TRUE(config.HasErrors());
+    EXPECT_FALSE(config.HasErrors());
+    EXPECT_TRUE(config.HasInfos());
 
-    std::wstring errors = config.DumpErrors();
-    OutputDebugString(L"===FUNCKEY ERRORS===");
-    OutputDebugString(errors.c_str());
+    std::wstring infos = config.DumpInfos();
+    OutputDebugString(L"===FUNCKEY INFOS===");
+    OutputDebugString(infos.c_str());
 
     // duplicate 文言が含まれていることを確認
-    EXPECT_NE(std::wstring::npos, errors.find(L"duplicate"));
+    EXPECT_NE(std::wstring::npos, infos.find(L"duplicate"));
 
     // unknown やinvalid が含まれていないことを確認
-    EXPECT_EQ(std::wstring::npos, errors.find(L"unknown"));
-    EXPECT_EQ(std::wstring::npos, errors.find(L"invalid"));
+    EXPECT_EQ(std::wstring::npos, infos.find(L"unknown"));
+    EXPECT_EQ(std::wstring::npos, infos.find(L"invalid"));
 }
 
 
@@ -121,15 +123,16 @@ TEST(ConfigTest, Canonize)
 TEST(ConfigTest, DuplicateKey)
 {
     ChmConfig config;
-    EXPECT_FALSE(config.LoadFile(L".\\testdata\\duplicate.ini"));
+    EXPECT_TRUE(config.LoadFile(L".\\testdata\\duplicate.ini"));
 
     // 最後の値が有効
     EXPECT_EQ(2, config.GetLong(L"dup", L"value"));
 
-    EXPECT_TRUE(config.HasErrors());
+    EXPECT_FALSE(config.HasErrors());
+    EXPECT_TRUE(config.HasInfos());
 
-    std::wstring errors = config.DumpErrors();
-    EXPECT_NE(std::wstring::npos, errors.find(L"duplicate key"));
+    std::wstring infos = config.DumpInfos();
+    EXPECT_NE(std::wstring::npos, infos.find(L"duplicate key"));
 }
 
 
@@ -179,3 +182,41 @@ TEST(ConfigTest, FileNotFound)
     EXPECT_FALSE(config.LoadFile(L".\\testdata\\no-such-file.ini"));
 }
 
+// --- include + SetBasePath テスト ---
+TEST(ConfigTest, IncludeWithCustomBasePath)
+{
+    // 一時ディレクトリ作成
+    wchar_t tempPath[MAX_PATH];
+    GetTempPathW(MAX_PATH, tempPath);
+
+    std::wstring baseDir = tempPath;
+    baseDir += L"hitomoji_test\\";
+    CreateDirectoryW(baseDir.c_str(), nullptr);
+
+    std::wstring mainPath = baseDir + L"main.ini";
+    std::wstring subPath  = baseDir + L"sub.ini";
+
+    // sub.ini
+    {
+        std::wofstream sub(subPath);
+        sub << L"[numbers]\n";
+        sub << L"value=123\n";
+    }
+
+    // main.ini
+    {
+        std::wofstream mainf(mainPath);
+        mainf << L"@include sub.ini\n";
+    }
+
+    ChmConfig config;
+    config.SetBasePath(baseDir);
+
+    EXPECT_TRUE(config.LoadFile(L"main.ini"));
+    EXPECT_EQ(123, config.GetLong(L"numbers", L"value"));
+
+    // 後片付け
+    DeleteFileW(mainPath.c_str());
+    DeleteFileW(subPath.c_str());
+    RemoveDirectoryW(baseDir.c_str());
+}
