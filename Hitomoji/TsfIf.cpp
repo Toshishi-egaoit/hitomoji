@@ -361,9 +361,21 @@ STDMETHODIMP ChmTsfInterface::OnKeyUp(ITfContext* pic, WPARAM wp, LPARAM lp, BOO
 
 STDMETHODIMP ChmTsfInterface::OnPreservedKey(ITfContext* pic, REFGUID rguid, BOOL* pfEaten) {
 	if (IsEqualGUID(rguid, GUID_PreservedKey_OpenClose)) {
+		if ( _pEngine->IsON() && _pEngine->HasComposition() ) {
+			bool fEnd = true;
+			// OFFになる時にCompositionが残っている場合は、それを確定させる
+			ChmKeyEvent kEv(ChmKeyEvent::Type::CommitKana);
+			_pEngine->UpdateComposition(kEv,fEnd);
+			_InvokeEditSession(pic, fEnd);
+			_pEngine->PostUpdateComposition();
+		}
+
+		// TODO(v0.2.5): 
+		// ToggleIME は現在フラグ変更のみ。
+		// 将来 ToggleIME が Composition や TSF 状態を触る仕様に変わった場合、
+		// EditSession 完了後に実行する構造へ変更する必要あり。
 		_pEngine->ToggleIME();
 		_pLangBarItem->SetImeState(_pEngine->IsON());
-
 		OutputDebugString(L"[Hitomoji]OnPreservedKey:processed");
 		*pfEaten = TRUE;
 	}

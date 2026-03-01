@@ -26,6 +26,7 @@ public:
     
     // IME‚ÌON/OFF
     void ToggleIME() { _isON = !_isON; }
+
     BOOL IsON() const { return _isON; }
 	BOOL HasComposition() { return _hasComposition;} ;
 	std::wstring GetCompositionStr() ;

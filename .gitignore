@@ -26,3 +26,4 @@ Release/
 /distribution/*.ini
 /dbg_distribution/*.ini
 /packages
+/SQLite
