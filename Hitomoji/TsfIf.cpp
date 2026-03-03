@@ -73,7 +73,6 @@ public:
 
 		if (pRange) pRange->Release();
 		_pTsfIf->SetMyEditSessionTick(); 
-		OutputDebugString(L"[hitomoji] DoEditSession: end");
 		return S_OK;
 	}
 
@@ -130,7 +129,6 @@ private:
 
     // 下線を引くための詳細実装を切り出す
     HRESULT _ApplyDisplayAttribute(TfEditCookie ec, ITfRange* pRange) {
-		OutputDebugString(L"[hitomoji] _ApplyDisplayAttribute");
 		ITfProperty* pProp = nullptr;
 		HRESULT hr;
         hr = _pic->GetProperty(GUID_PROP_ATTRIBUTE, &pProp);
@@ -223,7 +221,7 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 	// ChmLangBarItemButtonの初期化
 	_pLangBarItem = new ChmLangBarItemButton(GUID_HmLangBar);
 	// TODO AddToLangBarを実行すると原因不明のループに陥る様子
-	// _pLangBarItem->AddToLangBar(_pThreadMgr);
+	_pLangBarItem->AddToLangBar(_pThreadMgr);
 
     // ThreadFocusSinkの登録
     ITfSource* pSource = nullptr;
@@ -315,12 +313,10 @@ HRESULT ChmTsfInterface::GetFirstCompositionView(
 
 STDMETHODIMP ChmTsfInterface::OnSetFocus(BOOL fFocus)
 {
-	if (fFocus == TRUE) { // フォーカス喪失時
-		OutputDebugString(L"OnSetFocus(TRUE)");
+	return S_OK;
+	if (fFocus == TRUE) { // フォーカス取得時
         ClearComposition();
 		_pEngine->ResetStatus();
-    } else {
-		OutputDebugString(L"OnSetFocus(FALSE)");
 	}
 	return S_OK;
 }
@@ -506,7 +502,7 @@ void ChmTsfInterface::_UninitDisplayAttributeInfo() {
 
 STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 {
-	OutputDebugString(L"[Hitomoji] OnSetThreadFocus()");
+//	OutputDebugString(L"[Hitomoji] OnSetThreadFocus()");
 
     // フォーカス取得時は Composition 側のみを基準に整理
     if (GetCompositionContext()) {
@@ -518,7 +514,7 @@ STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 
 
 STDMETHODIMP ChmTsfInterface::OnKillThreadFocus() {
-	OutputDebugString(L"OnKillThreadFocus()");
+//	OutputDebugString(L"OnKillThreadFocus()");
     return S_OK;
 }
 

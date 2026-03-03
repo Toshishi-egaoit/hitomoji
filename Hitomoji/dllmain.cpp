@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <ole2.h>
 #include "TsfIf.h"
+#include "Hitomoji.h"
 #include <cstdio>
 
 // --- グローバル変数 ---
@@ -55,7 +56,8 @@ BOOL WINAPI DllMain(HINSTANCE hInst, DWORD dwReason, LPVOID pvReserved) {
     if (dwReason == DLL_PROCESS_ATTACH) {
         g_hInst = hInst;
         DisableThreadLibraryCalls(hInst);
-		OutputDebugString(L"[Hitomoji] dllmain(PROCESS_ATTACH");
+		OutputDebugString(L"[Hitomoji] dllmain(PROCESS_ATTACH) " 
+			HM_VERSION  L"ignore additem(" __DATE__ L" " __TIME__ L")");
     }
     return TRUE;
 }
