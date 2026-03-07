@@ -66,8 +66,10 @@ public:
 	// ITfTextEditSink
 	STDMETHODIMP OnEndEdit(ITfContext* pic, TfEditCookie ecReadOnly, ITfEditRecord* pEditRecord) ;
 
-	// Compositionä«óù
+	// IMEÉÇÅ[ÉhÇÃÇ´ÇËÇ©Ç¶
+	BOOL ToggleIME();
 
+	// Compositionä«óù
 	void SetMyEditSessionTick() { _llMyEditSessionTick = GetTickCount64() ; }
 	BOOL IsMyEditSession() { return (GetTickCount64() - _llMyEditSessionTick <= CHM_ONENDEDIT_TICK) ; }
 	ITfComposition* GetComposition() const { return _pComposition; }
@@ -109,6 +111,7 @@ public:
 	);
 
 private:
+	void _SetImeOpenClose(BOOL fOpen);
 
     // ITfKeyEventSink
     HRESULT _InitKeyEventSink();

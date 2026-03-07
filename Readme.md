@@ -165,11 +165,12 @@ https://github.com/toshishi-egaoit/hitomoji
 目的：TSFまわりの残件の解消
 
 - IME ON/OFFによるCompositionの確定処理の実装
-- アイコン表示の再挑戦（v0.1.6であきらめた部分）
-- アイコンの右クリック対応（設定ファイルのOpenなど）
+- 言語バーアイコン表示の再挑戦（v0.1.6であきらめた部分）
+- 言語バーへの独自メニューの追加
 -- ファイルOpenは既定のエディタで開く
--ｰ ファイルRereadは、ファイルの再読み込みを行う。再読み込みでは、致命的エラーが出ると捨てる。エラーがなければ、新たなオブジェクトに切り替える。
+-ｰ ファイルRereadは、ファイルの再読み込みを行う。
 -- エラーログOpenは既定のエディタで開く
+-- ChmLoggerの強化。ログファイルへの書きこみをサポート
 - OnSetFocus / OnSetThreadFocus でのCompositionの初期化処理を改善
 -- _ｂNeedTerminateCompositionを定義
 -- 実際のTerminate処理をDoEditSessionに閉じ込める
@@ -190,6 +191,7 @@ https://github.com/toshishi-egaoit/hitomoji
 目的：漢字データベースの整備
 
 - 各種のコーパスなどから、漢字情報を集められるかどうかを判断する。
+- KANJIDIC2を利用する
 - 教育漢字のデータベースを作成する。
 　含みたい情報：文字（区点、U＋、JIS）、読み、部首、画数、配布年次
 - DBの構造を検討する。

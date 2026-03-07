@@ -7,7 +7,8 @@ class ChmLangBarItemButton : public ITfLangBarItemButton,
                            public ITfSource
 {
 public:
-        ChmLangBarItemButton(REFGUID guidItem) : _cRef(1), _guidItem(guidItem), _bOn(FALSE), _hIconOn(nullptr), _hIconOff(nullptr) {
+        ChmLangBarItemButton(REFGUID guidItem, ChmTsfInterface* pTsfIf) 
+		: _cRef(1), _pTsfIf(pTsfIf), _guidItem(guidItem), _bOn(FALSE), _hIconOn(nullptr), _hIconOff(nullptr) {
         // アイコン情報の初期化
         _info.clsidService = CLSID_Hitomoji;
         _info.guidItem = _guidItem;
@@ -59,8 +60,7 @@ public:
 		HRESULT hr = pThreadMgr->QueryInterface(IID_ITfLangBarItemMgr, (void**)&pMgr);
     
 		if (SUCCEEDED(hr)) {
-			OutputDebugString(L"skip AddItem");
-			//hr = pMgr->AddItem(this); 
+			hr = pMgr->AddItem(this); 
 			pMgr->Release();
 		}
 		OUTPUT_HR_ON_ERROR(L"AddToLangBar.AddItem (via ThreadMgr)", hr);
@@ -96,7 +96,9 @@ public:
     }
 
     // --- ITfLangBarItemButton (アイコン表示の核心) ---
-    STDMETHODIMP OnClick(TfLBIClick click, POINT pt, const RECT *prcArea) { return S_OK; }
+    STDMETHODIMP OnClick(TfLBIClick click, POINT pt, const RECT *prcArea) { 
+		_pTsfIf->ToggleIME();
+		return S_OK; }
     STDMETHODIMP GetText(BSTR *pbstr) {
         *pbstr = SysAllocString(L"ひともじ");
         return S_OK;
@@ -109,6 +111,10 @@ public:
 
     STDMETHODIMP InitMenu(ITfMenu *pMenu) { return S_OK; }
     STDMETHODIMP OnMenuSelect(UINT wID) { return S_OK; }
+
+    STDMETHODIMP OnUpdate(DWORD dwFlags) { 
+		return S_OK; 
+	}
 
     // --- ITfSource (言語バーへの通知用) ---
     STDMETHODIMP AdviseSink(REFIID riid, IUnknown *punk, DWORD *pdwCookie) {
@@ -138,6 +144,7 @@ private:
     GUID _guidItem;
     TF_LANGBARITEMINFO _info;
     ITfLangBarItemSink *_pLangBarItemSink = nullptr;
+	ChmTsfInterface *_pTsfIf;
     BOOL _bOn;
 
     // icon handles

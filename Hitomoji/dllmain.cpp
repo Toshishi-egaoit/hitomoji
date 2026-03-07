@@ -55,7 +55,8 @@ BOOL WINAPI DllMain(HINSTANCE hInst, DWORD dwReason, LPVOID pvReserved) {
     if (dwReason == DLL_PROCESS_ATTACH) {
         g_hInst = hInst;
         DisableThreadLibraryCalls(hInst);
-		OutputDebugString(L"[Hitomoji] dllmain(PROCESS_ATTACH");
+		OutputDebugString(L"[Hitomoji] dllmain(PROCESS_ATTACH) " 
+			HM_VERSION  L" (" __DATE__ L" " __TIME__ L")");
     }
     return TRUE;
 }

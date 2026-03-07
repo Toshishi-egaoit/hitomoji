@@ -221,9 +221,8 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 	if (FAILED(_InitDisplayAttributeInfo())) return E_FAIL;
 
 	// ChmLangBarItemButtonの初期化
-	_pLangBarItem = new ChmLangBarItemButton(GUID_HmLangBar);
-	// TODO AddToLangBarを実行すると原因不明のループに陥る様子
-	// _pLangBarItem->AddToLangBar(_pThreadMgr);
+	_pLangBarItem = new ChmLangBarItemButton(GUID_HmLangBar, this);
+	_pLangBarItem->AddToLangBar(_pThreadMgr);
 
     // ThreadFocusSinkの登録
     ITfSource* pSource = nullptr;
@@ -241,6 +240,7 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 }
 
 STDMETHODIMP ChmTsfInterface::Deactivate() {
+	OutputDebugString(L"[Hitomoji] Deactivate() called");
 	ClearComposition();
 	if (_dwThreadFocusSinkCookie != TF_INVALID_COOKIE) {
 		ITfSource* pSource = nullptr;
@@ -370,11 +370,7 @@ STDMETHODIMP ChmTsfInterface::OnPreservedKey(ITfContext* pic, REFGUID rguid, BOO
 			_pEngine->PostUpdateComposition();
 		}
 
-		// TODO(v0.2.5): 
-		// ToggleIME は現在フラグ変更のみ。
-		// 将来 ToggleIME が Composition や TSF 状態を触る仕様に変わった場合、
-		// EditSession 完了後に実行する構造へ変更する必要あり。
-		_pEngine->ToggleIME();
+		ToggleIME();
 		_pLangBarItem->SetImeState(_pEngine->IsON());
 		OutputDebugString(L"[Hitomoji]OnPreservedKey:processed");
 		*pfEaten = TRUE;
@@ -545,6 +541,46 @@ STDMETHODIMP ChmTsfInterface::OnEndEdit(
 		_pEngine->ResetStatus();
 	}
     return S_OK;
+}
+
+BOOL ChmTsfInterface::ToggleIME() 
+{
+	if (!_pEngine) return FALSE;
+
+	// ロジック上のIME状態を切り替え
+	_pEngine->ToggleIME();
+	BOOL newState = _pEngine->IsON();
+
+	// OSに状態通知
+	_SetImeOpenClose(newState);
+
+	// LangBarの状態update
+	if (_pLangBarItem) {
+		_pLangBarItem->SetImeState(newState);
+	}
+	return TRUE;
+}
+
+// IME ON/OFF を OS に通知する
+void ChmTsfInterface::_SetImeOpenClose(BOOL fOpen)
+{
+	if (!_pThreadMgr) return;
+
+	ITfCompartmentMgr* pCompMgr = nullptr;
+	if (FAILED(_pThreadMgr->QueryInterface(IID_ITfCompartmentMgr, (void**)&pCompMgr)))
+		return;
+
+	ITfCompartment* pComp = nullptr;
+	if (SUCCEEDED(pCompMgr->GetCompartment(GUID_COMPARTMENT_KEYBOARD_OPENCLOSE, &pComp)))
+	{
+		VARIANT var;
+		VariantInit(&var);
+		var.vt = VT_I4;
+		var.lVal = fOpen ? 1 : 0;   // 1=IME ON, 0=IME OFF
+		pComp->SetValue(0, &var);
+		pComp->Release();
+	}
+	pCompMgr->Release();
 }
 
 HRESULT ChmTsfInterface::_InitTextEditSink(ITfContext* pic)
