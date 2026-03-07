@@ -68,6 +68,7 @@ public:
 	}
 
 	HRESULT RemoveFromLangBar() {
+		return S_OK; // TODO: ‚±‚±‚Å CoCreateInstance ‚µ‚Ä‚à–â‘è‚È‚¢‚©H
 		ITfLangBarItemMgr* pMgr = nullptr;
 		HRESULT hr = CoCreateInstance(
 			CLSID_TF_LangBarItemMgr, nullptr, CLSCTX_INPROC_SERVER,
@@ -105,7 +106,7 @@ public:
     }
     STDMETHODIMP GetIcon(HICON *phIcon) {
         *phIcon = (_bOn) ? _hIconOn : _hIconOff;
-		OutputDebugStringWithInt(L"   > GetIcon: *phIcon=%x", (ULONG)(*phIcon));
+//		OutputDebugStringWithInt(L"   > GetIcon: *phIcon=%x", (ULONG)(*phIcon));
         return *phIcon ? S_OK : E_FAIL;
     }
 

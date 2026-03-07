@@ -168,7 +168,6 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 }
 
 void ChmEngine::PostUpdateComposition(){
-	OutputDebugString(L"[Hitomoji] PostUpdateComposition");
 	// 変換中でなくなった場合は、残りかすを処分
 	if (!_hasComposition) {
 		ResetStatus();
@@ -177,7 +176,6 @@ void ChmEngine::PostUpdateComposition(){
 }
 
 void ChmEngine::ResetStatus() {
-	OutputDebugString(L"[Hitomoji] ResetStatus");
     _hasComposition = FALSE;
     _pRawInputStore->clear();
     _converted = L"";

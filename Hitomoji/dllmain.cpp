@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <ole2.h>
 #include "TsfIf.h"
+#include "Hitomoji.h"
 #include <cstdio>
 
 // --- グローバル変数 ---
