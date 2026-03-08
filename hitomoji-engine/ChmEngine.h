@@ -18,9 +18,9 @@ public:
     ChmEngine();
     ~ChmEngine();
 
-    // g_config‚Ì‰Šú‰»ˆ—
+    // ChmConfig‚Ìˆ—ƒwƒ‹ƒp
 	static void InitConfig();
-	static std::wstring GetConfigFile() { return _pConfig->GetConfigFile(); };
+	std::wstring GetConfigFile() ; 
     
     // ƒL[‚ğIME‚Åˆ—‚·‚×‚«‚©”»’è
     BOOL IsKeyEaten(WPARAM wp);

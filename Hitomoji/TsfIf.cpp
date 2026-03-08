@@ -7,6 +7,7 @@
 #include <cctype>
 #include <initguid.h> // GUIDの実体定義用
 #include <objbase.h>
+#include <shellapi.h>
 #include "TsfIf.h"
 #include "ChmKeyEvent.h"
 #include "DisplayAttribute.h"
@@ -252,7 +253,7 @@ STDMETHODIMP ChmTsfInterface::Deactivate() {
 	_pEngine->ResetStatus();
 
 	// ChmLangBarItemButtonの後始末
-	_pLangBarItem->RemoveFromLangBar();
+	_pLangBarItem->RemoveFromLangBar(_pThreadMgr);
 	_pLangBarItem->Release();
 	_pLangBarItem = nullptr;
 
@@ -367,7 +368,6 @@ STDMETHODIMP ChmTsfInterface::OnPreservedKey(ITfContext* pic, REFGUID rguid, BOO
 		}
 
 		ToggleIME();
-		_pLangBarItem->SetImeState(_pEngine->IsON());
 		OutputDebugString(L"[Hitomoji]OnPreservedKey:processed");
 		*pfEaten = TRUE;
 	}
@@ -610,3 +610,25 @@ HRESULT ChmTsfInterface::_UninitTextEditSink(ITfContext* pic)
     return S_OK;
 }
 
+// --- configファイルを開く ---
+void ChmTsfInterface::OpenConfig()
+{
+	std::wstring configPath = _pEngine->GetConfigFile();
+    HINSTANCE h = ShellExecuteW(
+        NULL,
+        L"open",
+        configPath.c_str(),
+        NULL,
+        NULL,
+        SW_SHOWNORMAL
+    );
+
+    if ((INT_PTR)h <= 32)
+    {
+        OutputDebugString(L"OpenConfig failed");
+    }
+}
+
+void ChmTsfInterface::ReloadConfig() {
+	return _pEngine->InitConfig();
+}

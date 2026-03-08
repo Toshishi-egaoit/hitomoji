@@ -68,6 +68,8 @@ public:
 
 	// IMEÉÇÅ[ÉhÇÃÇ´ÇËÇ©Ç¶
 	BOOL ToggleIME();
+	void OpenConfig();
+	void ReloadConfig();
 
 	// Compositionä«óù
 	void SetMyEditSessionTick() { _llMyEditSessionTick = GetTickCount64() ; }

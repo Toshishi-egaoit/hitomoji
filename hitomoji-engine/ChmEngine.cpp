@@ -47,6 +47,10 @@ void ChmEngine::InitConfig() {
 	return ;
 }
 
+std::wstring ChmEngine::GetConfigFile() { 
+	return _pConfig->GetConfigFile(); 
+}
+
 BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
     // IMEがOFFなら全てfalse
     if (!_isON) return FALSE;
