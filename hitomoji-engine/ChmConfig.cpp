@@ -181,7 +181,7 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
     std::wstring path;
     if (fileName.empty())
     {
-        path = m_basePath + L"hitomoji.ini";
+        path = GetConfigFile();
     }
     else
     {

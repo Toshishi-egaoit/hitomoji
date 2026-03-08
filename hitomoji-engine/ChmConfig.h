@@ -42,6 +42,9 @@ public:
 
     // ベースパス変更（テスト用）
     void SetBasePath(const std::wstring& basePath);
+
+    const std::wstring GetConfigPath() { return m_basePath ; };
+    const std::wstring GetConfigFile() { return m_basePath + L"Hitomoji.ini"; };
     
     // ini 読み込み
     BOOL LoadFile(const std::wstring& fileName=L"");

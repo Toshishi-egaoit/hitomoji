@@ -20,6 +20,7 @@ public:
 
     // g_config‚Ì‰Šú‰»ˆ—
 	static void InitConfig();
+	static std::wstring GetConfigFile() { return _pConfig->GetConfigFile(); };
     
     // ƒL[‚ğIME‚Åˆ—‚·‚×‚«‚©”»’è
     BOOL IsKeyEaten(WPARAM wp);
