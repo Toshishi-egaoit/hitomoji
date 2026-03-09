@@ -16,14 +16,8 @@
 
 ChmConfig::ChmConfig()
 {
-    // デフォルト basePath = Roaming\hitomoji\  となる。
-    PWSTR path = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &path)))
-    {
-        m_basePath = path;
-        CoTaskMemFree(path);
-        m_basePath += L"\\hitomoji\\";
-    }
+	
+	m_basePath = GetBasePath(); // %appdata%\hitomoji\ になる
     InitConfig();
 }
 

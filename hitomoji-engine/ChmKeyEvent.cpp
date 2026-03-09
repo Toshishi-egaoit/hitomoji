@@ -359,11 +359,38 @@ std::wstring ChmKeyEvent::Dump()
 {
 	std::wstring result;
 	for (const auto& pair : s_currentKeyTable) {
+		std::wstring keyName = L"?";
+		{
+			wchar_t ch = pair.first.wp ;
+			if ((ch >= L'A' && ch <= L'Z') ||
+			    (ch >= L'0' && ch <= L'9'))
+			{
+				keyName = std::wstring(1,ch) ;
+			}
+			else {
+				for (const auto& p : s_keyNameMap)
+				{
+					if (p.second == ch)
+						keyName = p.first;
+						std::transform(keyName.begin(), keyName.end(), keyName.begin(),
+							[](wchar_t c) { return (wchar_t)towlower(c); });
+				}
+			}
+		}
+		std::wstring FunctionName = L"?";
+		{
+			ChmKeyEvent::Type funcType = pair.second;
+			for (const auto& p : s_actionNameMap )
+			{
+				if (p.second == funcType)
+					FunctionName = p.first;
+			}
+		}
 		result += (std::wstring)(pair.first.shift ? L" Shift+" : L"") +
 				  (pair.first.ctrl  ? L" Ctrl+"  : L"") +
 				  (pair.first.alt   ? L" Alt+"   : L"") +
-				  std::to_wstring(pair.first.wp) +
-			L" => " + std::to_wstring(static_cast<int>(pair.second)) + L"\n";
+				  keyName +
+			L" = <" + FunctionName + L">\n";
 	}
 	return result;
 }

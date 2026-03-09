@@ -21,6 +21,7 @@ public:
     // ChmConfig‚Ìˆ—ƒwƒ‹ƒp
 	static void InitConfig();
 	std::wstring GetConfigFile() ; 
+	std::wstring GetConfigPath() ; 
     
     // ƒL[‚ğIME‚Åˆ—‚·‚×‚«‚©”»’è
     BOOL IsKeyEaten(WPARAM wp);

@@ -14,6 +14,13 @@ https://github.com/toshishi-egaoit/hitomoji
 
 なお、ひともじはオープンソースであり、GPLv3ライセンスで配布している。
 
+
+# 残存バグ
+
+- OnSetFocus / OnSetThreadFocus でのCompositionの初期化処理を改善
+- OnEndEditの処理がうまく動いてない原因を調査
+- アイコンが消失(HIDDEN)となる原因の調査
+
 # ロードマップ（2026.3.2版）
 
 現状、v0.2.2.4までを実装済み。
@@ -171,9 +178,10 @@ https://github.com/toshishi-egaoit/hitomoji
 -ｰ ファイルRereadは、ファイルの再読み込みを行う。
 -- エラーログOpenは既定のエディタで開く
 -- ChmLoggerの強化。ログファイルへの書きこみをサポート
-- OnSetFocus / OnSetThreadFocus でのCompositionの初期化処理を改善
--- _ｂNeedTerminateCompositionを定義
--- 実際のTerminate処理をDoEditSessionに閉じ込める
+- コードの整理
+-- 機能キー名を実体に合うように変更（CommitKana->Finishなど）
+- UIの改善
+-- かな確定キーの実装（ENTERは「そのまま確定」となったため。ひらがな確定を作る）
 
 
 ## v0.3系統

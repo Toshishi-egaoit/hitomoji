@@ -51,6 +51,10 @@ std::wstring ChmEngine::GetConfigFile() {
 	return _pConfig->GetConfigFile(); 
 }
 
+std::wstring ChmEngine::GetConfigPath() { 
+	return _pConfig->GetConfigPath(); 
+}
+
 BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
     // IMEがOFFなら全てfalse
     if (!_isON) return FALSE;
