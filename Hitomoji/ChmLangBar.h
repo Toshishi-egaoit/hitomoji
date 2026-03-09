@@ -54,7 +54,7 @@ public:
 	HRESULT AddToLangBar(ITfThreadMgr *pThreadMgr) { // 引数で ThreadMgr を受け取る
 		if (!pThreadMgr) return E_INVALIDARG;
 
-		OutputDebugString(L"   > AddToLangBar called");
+		ChmLogger::Debug(L"AddToLangBar called");
 		ITfLangBarItemMgr* pMgr = nullptr;
 		// ThreadMgr に対して「言語バーマネージャーを貸して！」と頼む
 		HRESULT hr = pThreadMgr->QueryInterface(IID_ITfLangBarItemMgr, (void**)&pMgr);
@@ -69,7 +69,7 @@ public:
 
 	HRESULT RemoveFromLangBar(ITfThreadMgr* pThreadMgr) {
         if (!pThreadMgr) return E_INVALIDARG;
-        OutputDebugString(L"   > RemoveFromLangBar called");
+        ChmLogger::Debug(L"   > RemoveFromLangBar called");
 
         ITfLangBarItemMgr* pMgr = nullptr;
         HRESULT hr = pThreadMgr->QueryInterface(IID_ITfLangBarItemMgr, (void**)&pMgr);
@@ -141,10 +141,7 @@ public:
 	// --- 独自メニューの処理 ---
 	STDMETHODIMP InitMenu(ITfMenu *pMenu)
 	{
-		OutputDebugString(L"> InitMenu\n");
-
 		HRESULT hr;
-
 		hr = pMenu->AddMenuItem(1, 0, nullptr, nullptr, L"Open Config Folder", 18, nullptr);
 		OUTPUT_HR_ON_ERROR(L"AddMenuItem(Open Folder)", hr);
 		hr = pMenu->AddMenuItem(2, 0, nullptr, nullptr, L"Edit Config", 11, nullptr);

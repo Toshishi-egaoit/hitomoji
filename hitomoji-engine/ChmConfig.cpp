@@ -170,7 +170,7 @@ WriteLog:
 
 BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 {
-    OutputDebugStringWithString(L"[Hitomoji] ChmConfig::LoadFile(%s) called", fileName.c_str());
+    ChmLogger::Info(L" ChmConfig::LoadFile");
 
     std::wstring path;
     if (fileName.empty())
@@ -185,14 +185,16 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
     DWORD attr = GetFileAttributesW(path.c_str());
     if (attr == INVALID_FILE_ATTRIBUTES || (attr & FILE_ATTRIBUTE_DIRECTORY))
     {
-        OutputDebugStringWithString(L"   > File not found(%s)", path.c_str());
+		std::wstring errorMsg = L"file not found: " + path;
+        ChmLogger::Error(errorMsg);
         return FALSE;
     }
 
     std::wifstream ifs(path);
     if (!ifs.is_open())
     {
-        OutputDebugStringWithString(L"   > cannot open(%s)", path.c_str());
+		std::wstring errorMsg = L"cannot open: " + path;
+        ChmLogger::Error(errorMsg);
         return FALSE;
     }
 

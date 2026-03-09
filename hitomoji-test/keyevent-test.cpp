@@ -69,7 +69,7 @@ TEST_F(FunctionKeyTestBase, InitAndClear)
 
     // デフォルトキーが存在するか（例：Enter）
     ChmKeyEvent ev(VK_RETURN, 0);
-    EXPECT_EQ(ChmKeyEvent::Type::CommitKana, ev.GetType());
+    EXPECT_EQ(ChmKeyEvent::Type::CompFinish, ev.GetType());
 
     // クリア
     ChmKeyEvent::ClearFunctionKey();
@@ -99,7 +99,7 @@ TEST_F(FunctionKeyTestBase, ParseAndApply)
 
     // 実際にキーイベントを生成して確認
     ChmKeyEvent ev('Z', 0);
-    EXPECT_EQ(ChmKeyEvent::Type::CommitAsciiWide, ev.GetType());
+    EXPECT_EQ(ChmKeyEvent::Type::CompFinishKeyWide, ev.GetType());
 }
 
 // ---------------------------------------------
@@ -115,7 +115,7 @@ TEST_F(FunctionKeyTestBase, SpecialKeyNames)
     EXPECT_TRUE(error.level == ChmConfig::ParseLevel::None);
 
     ChmKeyEvent ev1(VK_RETURN, 0);
-    EXPECT_EQ(ChmKeyEvent::Type::CommitKana, ev1.GetType());
+    EXPECT_EQ(ChmKeyEvent::Type::CompFinish, ev1.GetType());
 
     // ESC
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"ESC", L"cancel", error));
@@ -145,7 +145,7 @@ TEST_F(FunctionKeyTestBase, ShiftWithSpecialKey)
     SetKeyState(true, false, false);
 
     ChmKeyEvent ev(VK_RETURN, 0);
-    EXPECT_EQ(ChmKeyEvent::Type::CommitAscii, ev.GetType());
+    EXPECT_EQ(ChmKeyEvent::Type::CompFinishKey, ev.GetType());
 }
 
 // ---------------------------------------------

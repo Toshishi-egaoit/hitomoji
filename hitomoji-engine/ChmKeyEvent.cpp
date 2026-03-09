@@ -95,17 +95,18 @@ struct FuncKeyDef {
 // デフォルト定義（ビルド時固定）
 static const FuncKeyDef g_functionKeyTable[] = {
     // WPARAM      SHIFT  CTRL   ALT    Type
-    { VK_RETURN,   false, false, false, ChmKeyEvent::Type::CommitKana     },
-    { VK_RETURN,   true,  false, false, ChmKeyEvent::Type::CommitKatakana },
-    { VK_TAB,      false, false, false, ChmKeyEvent::Type::CommitAscii    },
-    { VK_TAB,      true,  false, false, ChmKeyEvent::Type::CommitAsciiWide},
+    { VK_RETURN,   false, false, false, ChmKeyEvent::Type::CompFinish     },
+    { VK_RETURN,   false, false, true,  ChmKeyEvent::Type::CompFinishHiragana },
+    { VK_RETURN,   true,  false, false, ChmKeyEvent::Type::CompFinishKatakana },
+    { VK_TAB,      false, false, false, ChmKeyEvent::Type::CompFinishKey    },
+    { VK_TAB,      true,  false, false, ChmKeyEvent::Type::CompFinishKeyWide},
     { VK_BACK,     false, false, false, ChmKeyEvent::Type::Backspace      },
     { VK_ESCAPE,   false, false, false, ChmKeyEvent::Type::Cancel         },
     // CTRL+*
     { 'H',         false, true,  false, ChmKeyEvent::Type::Backspace      },
-    { 'I',         false, true,  false, ChmKeyEvent::Type::CommitAscii    },
-    { 'I',         true,  true,  false, ChmKeyEvent::Type::CommitAsciiWide},
-    { 'M',         false, true,  false, ChmKeyEvent::Type::CommitKana     },
+    { 'I',         false, true,  false, ChmKeyEvent::Type::CompFinishKey    },
+    { 'I',         true,  true,  false, ChmKeyEvent::Type::CompFinishKeyWide},
+    { 'M',         false, true,  false, ChmKeyEvent::Type::CompFinish     },
 #ifdef _DEBUG
     { 'V',         true,  true,  false, ChmKeyEvent::Type::VersionInfo    },
     { 'R',         true,  true,  false, ChmKeyEvent::Type::ReloadIni      },
@@ -145,13 +146,13 @@ void ChmKeyEvent::InitFunctionKey()
 
 // ---- actionName → Type 変換テーブル ----
 static const std::map<std::wstring, ChmKeyEvent::Type> s_actionNameMap = {
-    { L"finish",             ChmKeyEvent::Type::CommitKana },
-    { L"finish-katakana",    ChmKeyEvent::Type::CommitKatakana },
-    { L"finish-raw",         ChmKeyEvent::Type::CommitAscii },
-    { L"finish-raw-wide",    ChmKeyEvent::Type::CommitAsciiWide },
+    { L"finish",             ChmKeyEvent::Type::CompFinish },
+    { L"finish-katakana",    ChmKeyEvent::Type::CompFinishKatakana },
+    { L"finish-raw",         ChmKeyEvent::Type::CompFinishKey },
+    { L"finish-raw-wide",    ChmKeyEvent::Type::CompFinishKeyWide },
     { L"backspace",          ChmKeyEvent::Type::Backspace },
     { L"cancel",             ChmKeyEvent::Type::Cancel },
-    { L"cancel-finish",      ChmKeyEvent::Type::Uncommit },
+    { L"cancel-finish",      ChmKeyEvent::Type::UnFinish },
 #ifdef _DEBUG
     { L"version-info",       ChmKeyEvent::Type::VersionInfo },
     { L"reload-ini",         ChmKeyEvent::Type::ReloadIni },
@@ -409,7 +410,7 @@ void ChmKeyEvent::_TranslateByTable()
 
     if (IsNavigationKey())
     {
-        _type = Type::CommitNonConvert;
+        _type = Type::CompFinish;
         return;
     }
 

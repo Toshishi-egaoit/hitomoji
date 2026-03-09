@@ -32,11 +32,11 @@ void ChmEngine::InitConfig() {
 	}
 	if (!bSuccess && _pConfig) {
 		delete newConfig;
-		OutputDebugString(L"   > keeping old _pConfig");
+		ChmLogger::Warn(L"   > keeping old _pConfig");
 	} else {
 		if (!bSuccess) {
 			newConfig->InitConfig();
-			OutputDebugString(L"   > using empty config");
+			ChmLogger::Warn(L"   > using empty config");
 		}
 		delete _pConfig;
 		_pConfig = newConfig;
@@ -97,27 +97,28 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
             _pending = L"";
             _hasComposition = TRUE;
             break;
-      case ChmKeyEvent::Type::CommitNonConvert: // 無変換確定
-			// 未変換部分も含めて全確定
+        case ChmKeyEvent::Type::CompFinishHiragana: // ひらがな変換
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
+				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
             _hasComposition = FALSE;
-			break ;
-        case ChmKeyEvent::Type::CommitKatakana: // カタカナ変換
+            break ;
+        case ChmKeyEvent::Type::CompFinishKatakana: // カタカナ変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
             _converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
             _hasComposition = FALSE;
             break ;
-        case ChmKeyEvent::Type::CommitKana:     // ひらがな変換
+        case ChmKeyEvent::Type::CompFinish:     // 見たまま変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
             _hasComposition = FALSE;
             break;
-        case ChmKeyEvent::Type::CommitAscii:    // ASCII確定
+        case ChmKeyEvent::Type::CompFinishKey:    // ASCII確定
             _converted = _pRawInputStore->get();
 			_pending = L"";
             _hasComposition = FALSE;
             break;
-        case ChmKeyEvent::Type::CommitAsciiWide: // 全角ASCII確定
+        case ChmKeyEvent::Type::CompFinishKeyWide: // 全角ASCII確定
             _converted = AsciiToWide(_pRawInputStore->get());
 			_pending = L"";
             _hasComposition = FALSE;

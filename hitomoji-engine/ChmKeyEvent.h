@@ -19,14 +19,15 @@ public:
     enum class Type {
         None = 0,
         CharInput,          // 通常文字入力
-        CommitKana,         // 見たまま確定(ENTER)
-        CommitKatakana,     // カタカナ確定(Shift+Enter)
-        CommitAscii,        // キーどおり確定(TAB)
-        CommitAsciiWide,    // キーどおり確定ワイド(Shift+TAB)
-        CommitNonConvert,   // 見たまま確定(VN_LEFTなど) TODO:見たまま確定に将来は統合
+        CompFinish,         // 見たまま確定(ENTER)
+        CompFinishHiragana, // ひらがな確定(Alt+Enter)
+        CompFinishKatakana, // カタカナ確定(Shift+Enter)
+        CompFinishKey,     // キーどおり確定(TAB)
+        CompFinishKeyWide,    // キーどおり確定ワイド(Shift+TAB)
+        NOT_USE,   // 見たまま確定(VN_LEFTなど) 
         Cancel,             // キャンセル(ESC)
         Backspace,          // 後退(BS)
-        Uncommit,           // 確定取消（将来）(CTRL+Z)
+        UnFinish,           // 確定取消（将来）(CTRL+Z)
         VersionInfo,        // バージョン表示
 		ReloadIni,          // iniファイルのリロード
     };

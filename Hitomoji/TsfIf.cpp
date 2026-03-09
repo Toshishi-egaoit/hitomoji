@@ -228,7 +228,6 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
     if (SUCCEEDED(_pThreadMgr->QueryInterface(IID_ITfSource, (void**)&pSource))) {
         HRESULT hr = pSource->AdviseSink(IID_ITfThreadFocusSink, (ITfThreadFocusSink*)this,&_dwThreadFocusSinkCookie);
 		OUTPUT_HR_ON_ERROR(L"Activate.AdviceSink",hr);
-		OutputDebugStringWithInt(L"   > THeadFocusCookie:%x",_dwThreadFocusSinkCookie);
         pSource->Release();
     }
 
@@ -248,7 +247,6 @@ STDMETHODIMP ChmTsfInterface::Deactivate() {
 			pSource->Release();
 		}
 		_dwThreadFocusSinkCookie = TF_INVALID_COOKIE;
-		OutputDebugStringWithInt(L"Deactivate cookie:%x",_dwThreadFocusSinkCookie);
 	}
 	_pEngine->ResetStatus();
 
@@ -361,7 +359,7 @@ STDMETHODIMP ChmTsfInterface::OnPreservedKey(ITfContext* pic, REFGUID rguid, BOO
 		if ( _pEngine->IsON() && _pEngine->HasComposition() ) {
 			bool fEnd = true;
 			// OFFになる時にCompositionが残っている場合は、それを確定させる
-			ChmKeyEvent kEv(ChmKeyEvent::Type::CommitKana);
+			ChmKeyEvent kEv(ChmKeyEvent::Type::CompFinish);
 			_pEngine->UpdateComposition(kEv,fEnd);
 			_InvokeEditSession(pic, fEnd);
 			_pEngine->PostUpdateComposition();
@@ -397,7 +395,6 @@ HRESULT ChmTsfInterface::_InitPreservedKey() {
 	HRESULT hr = _pThreadMgr->QueryInterface(IID_ITfKeystrokeMgr, (void**)&pKeystrokeMgr);
 	if (SUCCEEDED(hr)) {
 		hr = pKeystrokeMgr->PreserveKey(_tfClientId, GUID_PreservedKey_OpenClose, &c_presKeyOpenClose, L"ひともじ ON/OFF", (ULONG)wcslen(L"ひともじ ON/OFF"));
-		OutputDebugStringWithInt(L"[Hitomoji] InitPreservedKey:", hr);
 		pKeystrokeMgr->Release();
 	}
 	return hr;
@@ -498,7 +495,7 @@ void ChmTsfInterface::_UninitDisplayAttributeInfo() {
 
 STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 {
-//	OutputDebugString(L"[Hitomoji] OnSetThreadFocus()");
+	OutputDebugString(L"[Hitomoji] OnSetThreadFocus()");
 
     // フォーカス取得時は Composition 側のみを基準に整理
     if (GetCompositionContext()) {
@@ -510,7 +507,7 @@ STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 
 
 STDMETHODIMP ChmTsfInterface::OnKillThreadFocus() {
-//	OutputDebugString(L"OnKillThreadFocus()");
+	OutputDebugString(L"OnKillThreadFocus()");
     return S_OK;
 }
 
@@ -625,7 +622,7 @@ void ChmTsfInterface::OpenConfig()
 
     if ((INT_PTR)h <= 32)
     {
-        OutputDebugString(L"OpenConfig failed");
+        ChmLogger::Warn(L"OpenConfig failed");
     }
 }
 
