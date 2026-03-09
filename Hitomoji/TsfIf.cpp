@@ -210,7 +210,7 @@ STDMETHODIMP_(ULONG) ChmTsfInterface::Release() {
 // -----
 
 STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
-	OutputDebugString(L"[Hitomoji] Activate() called");
+	ChmLogger::Info(L"Activate() : Hitomoji " HM_VERSION L"(" __DATE__ L")" );
 	_pThreadMgr = ptm;
 	_pThreadMgr->AddRef();
 	_tfClientId = tid;
@@ -239,7 +239,7 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 }
 
 STDMETHODIMP ChmTsfInterface::Deactivate() {
-	OutputDebugString(L"[Hitomoji] Deactivate() called");
+	ChmLogger::Info(L"Deactivate()");
 	ClearComposition();
 	if (_dwThreadFocusSinkCookie != TF_INVALID_COOKIE) {
 		ITfSource* pSource = nullptr;
@@ -630,5 +630,19 @@ void ChmTsfInterface::OpenConfig()
 }
 
 void ChmTsfInterface::ReloadConfig() {
-	return _pEngine->InitConfig();
+	_pEngine->InitConfig();
+	return;
+}
+
+void ChmTsfInterface::OpenFolder()
+{
+    ShellExecuteW(
+        NULL,
+        L"open",
+        GetBasePath().c_str(),
+        NULL,
+        NULL,
+        SW_SHOWNORMAL
+    );
+	return;
 }

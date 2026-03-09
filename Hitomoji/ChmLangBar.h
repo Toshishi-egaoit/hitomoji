@@ -145,10 +145,12 @@ public:
 
 		HRESULT hr;
 
-		hr = pMenu->AddMenuItem(1, 0, nullptr, nullptr, L"Edit Config", 12, nullptr);
-		OUTPUT_HR_ON_ERROR(L"AddMenuItem1", hr);
-		hr = pMenu->AddMenuItem(2, 0, nullptr, nullptr, L"Reload Config", 14, nullptr);
-		OUTPUT_HR_ON_ERROR(L"AddMenuItem2", hr);
+		hr = pMenu->AddMenuItem(1, 0, nullptr, nullptr, L"Open Config Folder", 18, nullptr);
+		OUTPUT_HR_ON_ERROR(L"AddMenuItem(Open Folder)", hr);
+		hr = pMenu->AddMenuItem(2, 0, nullptr, nullptr, L"Edit Config", 11, nullptr);
+		OUTPUT_HR_ON_ERROR(L"AddMenuItem(Edit Config)", hr);
+		hr = pMenu->AddMenuItem(3, 0, nullptr, nullptr, L"Reload Config", 13, nullptr);
+		OUTPUT_HR_ON_ERROR(L"AddMenuItem(Reload Config)", hr);
 
 		return S_OK;
 	}
@@ -158,10 +160,12 @@ public:
 		switch (wID)
 		{
 		case 1:
+			_pTsfIf->OpenFolder();
+			break;
+		case 2:
 			_pTsfIf->OpenConfig();
 			break;
-
-		case 2:
+		case 3:
 			_pTsfIf->ReloadConfig();
 			break;
 		}
@@ -175,7 +179,6 @@ private:
     ITfLangBarItemSink *_pLangBarItemSink = nullptr;
 	ChmTsfInterface *_pTsfIf;
     BOOL _bOn;
-	BOOL _bVisible = TRUE;
 
     // icon handles
     HICON _hIconOn;

@@ -68,6 +68,7 @@ public:
 
 	// IMEÉÇÅ[ÉhÇÃÇ´ÇËÇ©Ç¶
 	BOOL ToggleIME();
+	void OpenFolder();
 	void OpenConfig();
 	void ReloadConfig();
 
