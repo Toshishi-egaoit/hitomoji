@@ -21,9 +21,9 @@ https://github.com/toshishi-egaoit/hitomoji
 - OnEndEditの処理がうまく動いてない原因を調査
 - アイコンが消失(HIDDEN)となる原因の調査
 
-# ロードマップ（2026.3.2版）
+# ロードマップ（2026.3.9版）
 
-現状、v0.2.2.4までを実装済み。
+現状、v0.2.5.2までを実装済み。
 
 ## hitomoji v0.1系統
 
