@@ -61,9 +61,14 @@ if exist "%SYSTEM_DIR32%" (
 echo プロファイル登録
 copy /y "x64\regHitomoji.exe" "%TARGET_DIR%"
 "%TARGET_DIR%\regHitomoji.exe"
+copy /y "x86\regHitomoji.exe" "%TARGET_DIR32%"
+"%TARGET_DIR32%\regHitomoji.exe"
 
 echo "設定ファイルのコピー"
 copy /y "hitomoji.ini" "%CONFIG_DIR%"
+copy /y "layer2.sample.ini" "%CONFIG_DIR%"
 
-echo 全てのインストール工程が完了しました
+echo インストール工程が完了しました。
+echo 必要なファイルは全てコピーされました。
+echo このディレクトリは削除しても構いません。
 pause

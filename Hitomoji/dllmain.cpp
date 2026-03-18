@@ -49,6 +49,70 @@ private:
 	LONG _cRef = 1;
 };
 
+// CLSIDの登録関数。64/32ビット両対応
+HRESULT RegisterCLSID(const wchar_t* dllPath)
+{
+    HKEY hKey;
+    wchar_t clsidStr[64] = {};
+
+    StringFromGUID2(CLSID_Hitomoji, clsidStr, _countof(clsidStr));
+    std::wstring keyPath =
+        std::wstring(L"Software\\Classes\\CLSID\\") + clsidStr;
+
+    // アクセスフラグ（ここがキモ）
+    REGSAM samDesired = KEY_WRITE;
+
+#if defined(_WIN64)
+    samDesired |= KEY_WOW64_64KEY;
+#else
+    samDesired |= KEY_WOW64_32KEY;
+#endif
+
+    // 1. CLSIDキーの作成
+    if (RegCreateKeyExW(
+            HKEY_LOCAL_MACHINE,
+            keyPath.c_str(),
+            0, NULL, 0,
+            samDesired,
+            NULL, &hKey, NULL) != ERROR_SUCCESS)
+    {
+        return E_FAIL;
+    }
+
+    RegSetValueExW(
+        hKey, NULL, 0, REG_SZ,
+        (const BYTE*)L"Hitomoji IME",
+        (DWORD)(wcslen(L"Hitomoji IME") + 1) * sizeof(wchar_t)
+    );
+
+    // 2. InprocServer32キーの作成
+    HKEY hSubKey;
+    if (RegCreateKeyExW(
+            hKey,
+            L"InprocServer32",
+            0, NULL, 0,
+            samDesired,
+            NULL, &hSubKey, NULL) == ERROR_SUCCESS)
+    {
+        RegSetValueExW(
+            hSubKey, NULL, 0, REG_SZ,
+            (const BYTE*)dllPath,
+            (DWORD)(wcslen(dllPath) + 1) * sizeof(wchar_t)
+        );
+
+        RegSetValueExW(
+            hSubKey, L"ThreadingModel", 0, REG_SZ,
+            (const BYTE*)L"Apartment",
+            (DWORD)(wcslen(L"Apartment") + 1) * sizeof(wchar_t)
+        );
+
+        RegCloseKey(hSubKey);
+    }
+
+    RegCloseKey(hKey);
+    return S_OK;
+}
+
 // --- DLLエクスポート関数 ---
 
 BOOL WINAPI DllMain(HINSTANCE hInst, DWORD dwReason, LPVOID pvReserved) {
@@ -56,8 +120,13 @@ BOOL WINAPI DllMain(HINSTANCE hInst, DWORD dwReason, LPVOID pvReserved) {
     if (dwReason == DLL_PROCESS_ATTACH) {
         g_hInst = hInst;
         DisableThreadLibraryCalls(hInst);
-		OutputDebugString(L"[Hitomoji] dllmain(PROCESS_ATTACH) " 
-			HM_VERSION  L" (" __DATE__ L" " __TIME__ L")");
+		OutputDebugString(L"[Hitomoji] dllmain(PROCESS_ATTACH) " HM_VERSION  
+#if defined(_WIN64)
+			L"(x64)"
+#else
+			L"(x86)"
+#endif
+			L" (" __DATE__ L" " __TIME__ L")");
     }
     return TRUE;
 }
@@ -79,9 +148,11 @@ STDAPI DllCanUnloadNow() {
     return (g_cRefDll == 0) ? S_OK : S_FALSE;
 }
 
-// RegisterAppで登録するため、ここは最小限（成功を返すだけ）にする
 STDAPI DllRegisterServer() {
-    return S_OK;
+	wchar_t dllPath[MAX_PATH];
+	GetModuleFileNameW(g_hInst, dllPath, _countof(dllPath));
+	OutputDebugStringWithString(L"DllRegisterServer: %s", dllPath);
+	return RegisterCLSID(dllPath);
 }
 
 STDAPI DllUnregisterServer() {
