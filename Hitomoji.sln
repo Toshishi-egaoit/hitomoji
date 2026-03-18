@@ -18,7 +18,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "distribution", "distributio
 	ProjectSection(SolutionItems) = preProject
 		distribution\hitomoji.ini = distribution\hitomoji.ini
 		distribution\install.bat = distribution\install.bat
-		distribution\Layer2.sample.ini = distribution\Layer2.sample.ini
+		distribution\layer2.sample.ini = distribution\layer2.sample.ini
 		distribution\Readme.md = distribution\Readme.md
 		distribution\Usage.md = distribution\Usage.md
 	EndProjectSection
