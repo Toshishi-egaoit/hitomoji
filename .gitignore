@@ -27,3 +27,4 @@ Release/
 /dbg_distribution/*.ini
 /packages
 /SQLite
+/dbg_distribution/x86/regHitomoji.exe
