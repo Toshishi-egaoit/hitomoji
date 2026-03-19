@@ -147,6 +147,7 @@ void ChmKeyEvent::InitFunctionKey()
 // ---- actionName → Type 変換テーブル ----
 static const std::map<std::wstring, ChmKeyEvent::Type> s_actionNameMap = {
     { L"finish",             ChmKeyEvent::Type::CompFinish },
+    { L"finish-hiragana",    ChmKeyEvent::Type::CompFinishHiragana },
     { L"finish-katakana",    ChmKeyEvent::Type::CompFinishKatakana },
     { L"finish-raw",         ChmKeyEvent::Type::CompFinishKey },
     { L"finish-raw-wide",    ChmKeyEvent::Type::CompFinishKeyWide },
