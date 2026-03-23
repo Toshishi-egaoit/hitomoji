@@ -30,6 +30,11 @@ Windows11での開発、動作確認を行っている。
 
 このソフトウェアは、GPLv3ライセンスのもとで配布されている。
 
+また、このソフトウェアは漢字辞書の作成で、KANJIDICプロジェクトの成果物を利用している
+KANJIDIC2については以下を参照されたい。
+https://sources.debian.org/data/main/k/kanjidic/2022.08.23/kanjidic_doc.html
+
+
 ## 開発状況・ロードマップ
 
 以下のリポジトリを参照されたい。
