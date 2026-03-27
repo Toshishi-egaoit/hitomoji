@@ -81,92 +81,91 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 
 	// 確定キー
 	switch (_type) {
-      case ChmKeyEvent::Type::ReloadIni: {
-            bool bRet = _pConfig->LoadFile();
+		case ChmKeyEvent::Type::ReloadIni: {
+			bool bRet = _pConfig->LoadFile();
 			if (bRet) {
 				_converted = L"ok";
 			}else {
 				_converted = L"ng";
 			}
-            _pending = L"";
-            _hasComposition = TRUE;
-            break;
-	  }
-      case ChmKeyEvent::Type::VersionInfo:
-            _converted = HM_VERSION L"(" __DATE__ L" " __TIME__ L")";
-            _pending = L"";
-            _hasComposition = TRUE;
-            break;
-        case ChmKeyEvent::Type::CompFinishHiragana: // ひらがな変換
+			_pending = L"";
+			_hasComposition = TRUE;
+			break;
+		}
+		case ChmKeyEvent::Type::VersionInfo:
+			_converted = HM_VERSION L"(" __DATE__ L" " __TIME__ L")";
+			_pending = L"";
+			_hasComposition = TRUE;
+			break;
+		case ChmKeyEvent::Type::CompFinishHiragana: // ひらがな変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
-            _hasComposition = FALSE;
-            break ;
-        case ChmKeyEvent::Type::CompFinishKatakana: // カタカナ変換
+			_hasComposition = FALSE;
+			break ;
+		case ChmKeyEvent::Type::CompFinishKatakana: // カタカナ変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
-				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
-            _converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
-            _hasComposition = FALSE;
-            break ;
-        case ChmKeyEvent::Type::CompFinish:     // 見たまま変換
+			_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
+			_converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
+			_hasComposition = FALSE;
+			break ;
+		case ChmKeyEvent::Type::CompFinish:     // 見たまま変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
-            _hasComposition = FALSE;
-            break;
-        case ChmKeyEvent::Type::CompFinishKey:    // ASCII確定
-            _converted = _pRawInputStore->get();
+			_hasComposition = FALSE;
+			break;
+		case ChmKeyEvent::Type::CompFinishKey:    // ASCII確定
+			_converted = _pRawInputStore->get();
 			_pending = L"";
-            _hasComposition = FALSE;
-            break;
-        case ChmKeyEvent::Type::CompFinishKeyWide: // 全角ASCII確定
-            _converted = AsciiToWide(_pRawInputStore->get());
+			_hasComposition = FALSE;
+			break;
+		case ChmKeyEvent::Type::CompFinishKeyWide: // 全角ASCII確定
+			_converted = AsciiToWide(_pRawInputStore->get());
 			_pending = L"";
-            _hasComposition = FALSE;
-            break;
-        case ChmKeyEvent::Type::Cancel:         // ESCキャンセル
+			_hasComposition = FALSE;
+			break;
+		case ChmKeyEvent::Type::Cancel:         // ESCキャンセル
 			_converted = L"";
 			_pending = L"";
 			_hasComposition = FALSE;
 			break;
-         case ChmKeyEvent::Type::CharInput:
-            // 通常の文字入力
-            if (!_hasComposition) {
-                _pRawInputStore->clear();
-                _hasComposition = TRUE;
-            }
-            _pRawInputStore->push(keyEvent.GetChar());
-            ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
+		case ChmKeyEvent::Type::CharInput:
+			// 通常の文字入力
+			if (!_hasComposition) {
+				_pRawInputStore->clear();
+				_hasComposition = TRUE;
+			}
+			_pRawInputStore->push(keyEvent.GetChar());
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
 				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
 				;
-            break;
-        case ChmKeyEvent::Type::Backspace:
-            {
-				if (!_hasComposition) break;
-                size_t len = _pRawInputStore->get().size();
-                size_t del = ChmRomajiConverter::GetLastRawUnitLength();
+			break;
+		case ChmKeyEvent::Type::Backspace: {
+			if (!_hasComposition) break;
+			size_t len = _pRawInputStore->get().size();
+			size_t del = ChmRomajiConverter::GetLastRawUnitLength();
 
-                // Backspace の単位設定を考慮（Char / Unit）
-				if (!_pConfig->GetBool(L"ui",L"backspace-unit-symbol")) {
-                    del = 1;
-                }
+			// Backspace の単位設定を考慮（Char / Unit）
+			if (!_pConfig->GetBool(L"ui",L"backspace-unit-symbol")) {
+				del = 1;
+			}
 
-                // 念のためのガード：過剰な削除要求は全消去
-                if (del > len) del = len;
+			// 念のためのガード：過剰な削除要求は全消去
+			if (del > len) del = len;
 
-                _pRawInputStore->pop(del);
-				OutputDebugStringWithInt(L"[Hitomoji] Backspace %d chars",(ULONG)del);
+			_pRawInputStore->pop(del);
+			OutputDebugStringWithInt(L"[Hitomoji] Backspace %d chars",(ULONG)del);
 
-                // 削除の結果文字がなくなったらCompositionを削除
-                if (_pRawInputStore->get().empty()) {
-                    _converted = L"";
-                    _pending = L"";
-                    _hasComposition = FALSE;
-                } else {
-                    ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
-						_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
-                }
-            }
-            break;
+			// 削除の結果文字がなくなったらCompositionを削除
+			if (_pRawInputStore->get().empty()) {
+				_converted = L"";
+				_pending = L"";
+				_hasComposition = FALSE;
+			} else {
+				ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+					_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
+			}
+			break;
+		}
         default:
             // その他のキーは何もしない
             break;
