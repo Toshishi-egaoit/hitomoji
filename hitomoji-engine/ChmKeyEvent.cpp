@@ -89,27 +89,33 @@ struct FuncKeyDef {
     bool needShift;
     bool needCtrl;
     bool needAlt;
+    ChmEngine::State _state;
     ChmKeyEvent::Type type;
 };
 
 // デフォルト定義（ビルド時固定）
 static const FuncKeyDef g_functionKeyTable[] = {
-    // WPARAM      SHIFT  CTRL   ALT    Type
-    { VK_RETURN,   false, false, false, ChmKeyEvent::Type::CompFinish     },
-    { VK_RETURN,   false, false, true,  ChmKeyEvent::Type::CompFinishHiragana },
-    { VK_RETURN,   true,  false, false, ChmKeyEvent::Type::CompFinishKatakana },
-    { VK_TAB,      false, false, false, ChmKeyEvent::Type::CompFinishKey    },
-    { VK_TAB,      true,  false, false, ChmKeyEvent::Type::CompFinishKeyWide},
-    { VK_BACK,     false, false, false, ChmKeyEvent::Type::Backspace      },
-    { VK_ESCAPE,   false, false, false, ChmKeyEvent::Type::Cancel         },
+    // WPARAM      SHIFT  CTRL   ALT    State                   Type
+    { VK_SPACE,    false, false, false, ChmEngine::State::None,      ChmKeyEvent::Type::CharInputSpace },
+    { VK_RETURN,   false, false, false, ChmEngine::State::Inputing,  ChmKeyEvent::Type::CompFinish     },
+    { VK_RETURN,   false, false, true,  ChmEngine::State::Inputing,  ChmKeyEvent::Type::CompFinishHiragana },
+    { VK_RETURN,   true,  false, false, ChmEngine::State::Inputing,  ChmKeyEvent::Type::CompFinishKatakana },
+    { VK_TAB,      false, false, false, ChmEngine::State::Inputing,  ChmKeyEvent::Type::CompFinishKey  },
+    { VK_TAB,      true,  false, false, ChmEngine::State::Inputing,  ChmKeyEvent::Type::CompFinishKeyWide},
+    { VK_SPACE,    false, false, false, ChmEngine::State::Inputing,  ChmKeyEvent::Type::CompSelect     },
+    { VK_BACK,     false, false, false, ChmEngine::State::Inputing,  ChmKeyEvent::Type::Backspace      },
+    { VK_ESCAPE,   false, false, false, ChmEngine::State::Inputing,  ChmKeyEvent::Type::Cancel         },
+    { VK_SPACE,    false, false, false, ChmEngine::State::Selecting, ChmKeyEvent::Type::SelectNextPage },
+    { VK_BACK,     false, false, false, ChmEngine::State::Selecting, ChmKeyEvent::Type::SelectPrevPage },
+    { VK_ESCAPE,   false, false, false, ChmEngine::State::Selecting, ChmKeyEvent::Type::SelectCancel   },
     // CTRL+*
-    { 'H',         false, true,  false, ChmKeyEvent::Type::Backspace      },
-    { 'I',         false, true,  false, ChmKeyEvent::Type::CompFinishKey    },
-    { 'I',         true,  true,  false, ChmKeyEvent::Type::CompFinishKeyWide},
-    { 'M',         false, true,  false, ChmKeyEvent::Type::CompFinish     },
+    { 'H',         false, true,  false, ChmEngine::State::Selecting, ChmKeyEvent::Type::Backspace      },
+    { 'I',         false, true,  false, ChmEngine::State::Selecting, ChmKeyEvent::Type::CompFinishKey  },
+    { 'I',         true,  true,  false, ChmEngine::State::Selecting, ChmKeyEvent::Type::CompFinishKeyWide},
+    { 'M',         false, true,  false, ChmEngine::State::Selecting, ChmKeyEvent::Type::CompFinish     },
 #ifdef _DEBUG
-    { 'V',         true,  true,  false, ChmKeyEvent::Type::VersionInfo    },
-    { 'R',         true,  true,  false, ChmKeyEvent::Type::ReloadIni      },
+    { 'V',         true,  true,  false, ChmEngine::State::None,      ChmKeyEvent::Type::VersionInfo    },
+    { 'R',         true,  true,  false, ChmEngine::State::None,      ChmKeyEvent::Type::ReloadIni      },
 #endif
 };
 
@@ -119,10 +125,11 @@ struct KeySignature {
     bool shift;
     bool ctrl;
     bool alt;
+	ChmEngine::State state;
 
     bool operator<(const KeySignature& rhs) const {
-        return std::tie(wp, shift, ctrl, alt)
-             < std::tie(rhs.wp, rhs.shift, rhs.ctrl, rhs.alt);
+        return std::tie(wp, shift, ctrl, alt, state)
+             < std::tie(rhs.wp, rhs.shift, rhs.ctrl, rhs.alt, rhs.state);
     }
 };
 
@@ -139,8 +146,9 @@ void ChmKeyEvent::InitFunctionKey()
     ClearFunctionKey();
     for (const auto& k : g_functionKeyTable)
     {
-        KeySignature sig{ k.wp, k.needShift, k.needCtrl, k.needAlt };
-        s_currentKeyTable[sig] = k.type;
+		// TODO: v0.4で、configの指定方法を変更する必要がある
+		KeySignature sig{ k.wp, k.needShift, k.needCtrl, k.needAlt, ChmEngine::State::Inputing};
+		s_currentKeyTable[sig] = k.type;
     }
 }
 
@@ -151,6 +159,7 @@ static const std::map<std::wstring, ChmKeyEvent::Type> s_actionNameMap = {
     { L"finish-katakana",    ChmKeyEvent::Type::CompFinishKatakana },
     { L"finish-raw",         ChmKeyEvent::Type::CompFinishKey },
     { L"finish-raw-wide",    ChmKeyEvent::Type::CompFinishKeyWide },
+    { L"select",             ChmKeyEvent::Type::CompSelect },
     { L"backspace",          ChmKeyEvent::Type::Backspace },
     { L"cancel",             ChmKeyEvent::Type::Cancel },
     { L"cancel-finish",      ChmKeyEvent::Type::UnFinish },
@@ -221,7 +230,7 @@ void ChmKeyEvent::SetKeyStateProvider(ChmKeyEvent::KeyStateProvider pFunc)
     pFunc_keyStateProvider  = pFunc ;
 }
 
-ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/)
+ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/, ChmEngine::State isSelect)
     : _wp(wp), _type(Type::None)
 {
     _shift   = (pFunc_keyStateProvider(VK_SHIFT)   & 0x8000) != 0;
@@ -342,7 +351,8 @@ BOOL ChmKeyEvent::ParseFunctionKey(const std::wstring& key,
 		ChmConfig::SetError(errorMsg, L"invalid key name: " + keyToken);
         return FALSE;
     }
-    KeySignature sig{ vk, needShift, needCtrl, needAlt };
+	// TODO: 本来はfunctionキーにisSelectのモードも指定させるべきだが、今はInputing固定
+    KeySignature sig{ vk, needShift, needCtrl, needAlt, ChmEngine::State::Inputing};
     
     // duplicate 検出
     auto it = s_currentKeyTable.find(sig);
@@ -399,9 +409,7 @@ std::wstring ChmKeyEvent::Dump()
 
 void ChmKeyEvent::_TranslateByTable()
 {
-
-
-    KeySignature sig{ _wp, _shift, _control, _alt };
+    KeySignature sig{ _wp, _shift, _control, _alt , _state};
     auto it = s_currentKeyTable.find(sig);
     if (it != s_currentKeyTable.end())
     {
@@ -421,6 +429,7 @@ void ChmKeyEvent::_TranslateByTable()
         return;
     }
 
+	// 機能キーでなかった場合は、文字入力とみなす
     wchar_t ch = 0;
     if (ChmKeyLayout::Translate(_wp, _shift, _caps, ch))
     {

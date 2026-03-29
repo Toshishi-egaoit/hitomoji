@@ -336,7 +336,7 @@ STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, B
     if (*pfEaten) {
 
 		bool fEnd = false;
-        ChmKeyEvent kEv(wp, lp);
+        ChmKeyEvent kEv(wp, lp,_pEngine->GetState());
 		_pEngine->UpdateComposition(kEv,fEnd);
 		_InvokeEditSession(pic, fEnd);
 		_pEngine->PostUpdateComposition();

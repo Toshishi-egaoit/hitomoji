@@ -11,7 +11,7 @@ static bool g_ctrl  = false;
 static bool g_alt   = false;
 static bool g_caps  = false;
 
-static SHORT TestKeyStateProvider(int vkey)
+static SHORT __stdcall TestKeyStateProvider(int vkey)
 {
     switch (vkey)
     {

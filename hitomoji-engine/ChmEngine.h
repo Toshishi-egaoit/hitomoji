@@ -15,6 +15,12 @@ class ChmKeyEvent ;
 
 class ChmEngine {
 public:
+	enum class State {
+		None = 1,
+		Inputing ,
+		Selecting,
+	} ;
+
     ChmEngine();
     ~ChmEngine();
 
@@ -30,7 +36,9 @@ public:
     void ToggleIME() { _isON = !_isON; }
 
     BOOL IsON() const { return _isON; }
-	BOOL HasComposition() { return _hasComposition;} ;
+    BOOL IsSelecting() const { return _state == State::Selecting ; }
+	BOOL HasComposition() { return (_state == State::Selecting || _state == State::Inputing); }
+	State GetState() { return _state ;}
 	std::wstring GetCompositionStr() ;
 
 	void UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition);
@@ -44,8 +52,8 @@ private:
 	// --- static members ---
 	static ChmConfig* _pConfig;
 
-    BOOL _isON;
-	BOOL _hasComposition;
+    State _state ;
+	BOOL _isON;
 	ChmRawInputStore* _pRawInputStore; // 入力されたローマ字列
 	std::wstring _converted; // かな変換できた部分
 	std::wstring _pending; // かなに変換できていない部分（残り）

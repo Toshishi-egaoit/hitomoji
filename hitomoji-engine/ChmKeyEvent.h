@@ -6,6 +6,7 @@
 #include "utils.h"
 #include "hitomoji.h"
 #include "ChmConfig.h"
+#include "ChmEngine.h"
 
 class ChmRawInputStore;
 
@@ -15,16 +16,19 @@ class ChmKeyEvent {
 public:
 	typedef SHORT (__stdcall *KeyStateProvider)(int);
 
-	// TODO: タイプ名を実体に合うように修正(0.3で)
     enum class Type {
         None = 0,
         CharInput,          // 通常文字入力
+        CharInputSpace,     // 空白文字の入力(Compositionがない場合用)
         CompFinish,         // 見たまま確定(ENTER)
         CompFinishHiragana, // ひらがな確定(Alt+Enter)
         CompFinishKatakana, // カタカナ確定(Shift+Enter)
-        CompFinishKey,     // キーどおり確定(TAB)
-        CompFinishKeyWide,    // キーどおり確定ワイド(Shift+TAB)
-        NOT_USE,   // 見たまま確定(VN_LEFTなど) 
+        CompFinishKey,      // キーどおり確定(TAB)
+        CompFinishKeyWide,  // キーどおり確定ワイド(Shift+TAB)
+        CompSelect,         // 選択開始(かな漢字変換)
+        SelectNextPage,     // 選択中の次ページ
+        SelectPrevPage,     // 選択中の次ページ
+        SelectCancel,       // 選択中のキャンセル
         Cancel,             // キャンセル(ESC)
         Backspace,          // 後退(BS)
         UnFinish,           // 確定取消（将来）(CTRL+Z)
@@ -61,7 +65,7 @@ public:
 	}
 
     // --- ctor ---
-    ChmKeyEvent(WPARAM wp, LPARAM lp);
+    ChmKeyEvent(WPARAM wp, LPARAM lp,  ChmEngine::State state = ChmEngine::State::Inputing);
 	ChmKeyEvent(ChmKeyEvent::Type type); // マウスクリックなどの特殊用途（OnEndEditで使用）
 
     // --- function-key table helpers ---
@@ -109,6 +113,7 @@ private:
     bool   _control = false;
     bool   _alt     = false;
     bool   _caps    = false;
+    ChmEngine::State _state = ChmEngine::State::None;
 
     Type _type = Type::None;
 };

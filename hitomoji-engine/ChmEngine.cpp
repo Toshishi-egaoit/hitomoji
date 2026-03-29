@@ -12,7 +12,7 @@
 ChmConfig* ChmEngine::_pConfig = nullptr;
 
 ChmEngine::ChmEngine() 
-	: _isON(FALSE), _hasComposition(FALSE),_converted(L""), _pending(L"") {
+	: _isON(FALSE), _state(State::None), _converted(L""), _pending(L"") {
 	_pRawInputStore = new ChmRawInputStore();
 }
 
@@ -59,7 +59,7 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
     // IMEがOFFなら全てfalse
     if (!_isON) return FALSE;
 
-    ChmKeyEvent ev(wp, 0);
+    ChmKeyEvent ev(wp, 0, _state);
 
 	// 文字入力なら、常にIMEが食う
 	if (ev.GetType() == ChmKeyEvent::Type::CharInput) return TRUE;
@@ -70,7 +70,7 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
 #endif
 
 	// Compositonが存在する状態の特殊キーはIMEが食う
-	if (_hasComposition && ev.GetType() != ChmKeyEvent::Type::None ) return TRUE;
+	if (HasComposition() && ev.GetType() != ChmKeyEvent::Type::None) return TRUE;
 
 	// それ以外は食わない
     return FALSE;
@@ -89,50 +89,50 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 				_converted = L"ng";
 			}
 			_pending = L"";
-			_hasComposition = TRUE;
+			_state = State::Inputing;
 			break;
 		}
 		case ChmKeyEvent::Type::VersionInfo:
 			_converted = HM_VERSION L"(" __DATE__ L" " __TIME__ L")";
 			_pending = L"";
-			_hasComposition = TRUE;
+			_state = State::Inputing;
 			break;
 		case ChmKeyEvent::Type::CompFinishHiragana: // ひらがな変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
-			_hasComposition = FALSE;
+			_state = State::None;
 			break ;
 		case ChmKeyEvent::Type::CompFinishKatakana: // カタカナ変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
 			_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
 			_converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
-			_hasComposition = FALSE;
+			_state = State::None;
 			break ;
 		case ChmKeyEvent::Type::CompFinish:     // 見たまま変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
-			_hasComposition = FALSE;
+			_state = State::None;
 			break;
 		case ChmKeyEvent::Type::CompFinishKey:    // ASCII確定
 			_converted = _pRawInputStore->get();
 			_pending = L"";
-			_hasComposition = FALSE;
+			_state = State::None;
 			break;
 		case ChmKeyEvent::Type::CompFinishKeyWide: // 全角ASCII確定
 			_converted = AsciiToWide(_pRawInputStore->get());
 			_pending = L"";
-			_hasComposition = FALSE;
+			_state = State::None;
 			break;
 		case ChmKeyEvent::Type::Cancel:         // ESCキャンセル
 			_converted = L"";
 			_pending = L"";
-			_hasComposition = FALSE;
+			_state = State::None;
 			break;
 		case ChmKeyEvent::Type::CharInput:
 			// 通常の文字入力
-			if (!_hasComposition) {
+			if (!HasComposition()) {
 				_pRawInputStore->clear();
-				_hasComposition = TRUE;
+				_state = State::None;
 			}
 			_pRawInputStore->push(keyEvent.GetChar());
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
@@ -140,7 +140,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 				;
 			break;
 		case ChmKeyEvent::Type::Backspace: {
-			if (!_hasComposition) break;
+			if (!HasComposition()) break;
 			size_t len = _pRawInputStore->get().size();
 			size_t del = ChmRomajiConverter::GetLastRawUnitLength();
 
@@ -159,7 +159,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			if (_pRawInputStore->get().empty()) {
 				_converted = L"";
 				_pending = L"";
-				_hasComposition = FALSE;
+				_state = State::None;
 			} else {
 				ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
 					_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
@@ -170,21 +170,21 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
             // その他のキーは何もしない
             break;
 	}
-	pEndComposition = !_hasComposition;
+	pEndComposition = !HasComposition();
 
 	return ;
 }
 
 void ChmEngine::PostUpdateComposition(){
 	// 変換中でなくなった場合は、残りかすを処分
-	if (!_hasComposition) {
+	if (!HasComposition()) {
 		ResetStatus();
 	}
 	return;
 }
 
 void ChmEngine::ResetStatus() {
-    _hasComposition = FALSE;
+	_state = State::None;
     _pRawInputStore->clear();
     _converted = L"";
     _pending = L"";
