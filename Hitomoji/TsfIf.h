@@ -121,7 +121,7 @@ private:
     void _UninitKeyEventSink();
     HRESULT _InitPreservedKey();
     void _UninitPreservedKey();
-	HRESULT _InvokeEditSession(ITfContext* pic, BOOL fEnd) ;
+	HRESULT _InvokeEditSession(ITfContext* pic, BOOL fEnd, BOOL fDirectInput) ;
 
 	// ITfDisplayAttributeProvider
     HRESULT _InitDisplayAttributeInfo();

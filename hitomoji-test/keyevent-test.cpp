@@ -69,12 +69,12 @@ TEST_F(FunctionKeyTestBase, InitAndClear)
 
     // デフォルトキーが存在するか（例：Enter）
     ChmKeyEvent ev(VK_RETURN, 0);
-    EXPECT_EQ(ChmKeyEvent::Type::CompFinish, ev.GetType());
+    EXPECT_EQ(ChmFuncType::CompFinish, ev.GetType());
 
     // クリア
     ChmKeyEvent::ClearFunctionKey();
     ChmKeyEvent ev2(VK_RETURN, 0);
-    EXPECT_EQ(ChmKeyEvent::Type::None, ev2.GetType());
+    EXPECT_EQ(ChmFuncType::None, ev2.GetType());
 }
 
 // ---------------------------------------------
@@ -99,7 +99,7 @@ TEST_F(FunctionKeyTestBase, ParseAndApply)
 
     // 実際にキーイベントを生成して確認
     ChmKeyEvent ev('Z', 0);
-    EXPECT_EQ(ChmKeyEvent::Type::CompFinishKeyWide, ev.GetType());
+    EXPECT_EQ(ChmFuncType::CompFinishKeyWide, ev.GetType());
 }
 
 // ---------------------------------------------
@@ -115,14 +115,14 @@ TEST_F(FunctionKeyTestBase, SpecialKeyNames)
     EXPECT_TRUE(error.level == ChmConfig::ParseLevel::None);
 
     ChmKeyEvent ev1(VK_RETURN, 0);
-    EXPECT_EQ(ChmKeyEvent::Type::CompFinish, ev1.GetType());
+    EXPECT_EQ(ChmFuncType::CompFinish, ev1.GetType());
 
     // ESC
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"ESC", L"cancel", error));
     EXPECT_TRUE(error.level == ChmConfig::ParseLevel::None);
 
     ChmKeyEvent ev2(VK_ESCAPE, 0);
-    EXPECT_EQ(ChmKeyEvent::Type::Cancel, ev2.GetType());
+    EXPECT_EQ(ChmFuncType::Cancel, ev2.GetType());
 }
 
 // ---------------------------------------------
@@ -145,7 +145,7 @@ TEST_F(FunctionKeyTestBase, ShiftWithSpecialKey)
     SetKeyState(true, false, false);
 
     ChmKeyEvent ev(VK_RETURN, 0);
-    EXPECT_EQ(ChmKeyEvent::Type::CompFinishKey, ev.GetType());
+    EXPECT_EQ(ChmFuncType::CompFinishKey, ev.GetType());
 }
 
 // ---------------------------------------------
@@ -323,5 +323,5 @@ TEST_F(FunctionKeyTestBase, DuplicateDefinitionWarning)
     // 後勝ちで cancel が有効になることを確認
     SetKeyState(false, true, false);
     ChmKeyEvent ev('Z', 0);
-    EXPECT_EQ(ChmKeyEvent::Type::Cancel, ev.GetType());
+    EXPECT_EQ(ChmFuncType::Cancel, ev.GetType());
 }

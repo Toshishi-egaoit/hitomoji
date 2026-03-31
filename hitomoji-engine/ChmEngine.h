@@ -38,6 +38,7 @@ public:
     BOOL IsON() const { return _isON; }
     BOOL IsSelecting() const { return _state == State::Selecting ; }
 	BOOL HasComposition() { return (_state == State::Selecting || _state == State::Inputing); }
+	BOOL IsDirectInput(ChmFuncType tp) { return (tp == ChmFuncType::CharInputSpace) ; }
 	State GetState() { return _state ;}
 	std::wstring GetCompositionStr() ;
 

@@ -16,32 +16,12 @@ class ChmKeyEvent {
 public:
 	typedef SHORT (__stdcall *KeyStateProvider)(int);
 
-    enum class Type {
-        None = 0,
-        CharInput,          // 通常文字入力
-        CharInputSpace,     // 空白文字の入力(Compositionがない場合用)
-        CompFinish,         // 見たまま確定(ENTER)
-        CompFinishHiragana, // ひらがな確定(Alt+Enter)
-        CompFinishKatakana, // カタカナ確定(Shift+Enter)
-        CompFinishKey,      // キーどおり確定(TAB)
-        CompFinishKeyWide,  // キーどおり確定ワイド(Shift+TAB)
-        CompSelect,         // 選択開始(かな漢字変換)
-        SelectNextPage,     // 選択中の次ページ
-        SelectPrevPage,     // 選択中の次ページ
-        SelectCancel,       // 選択中のキャンセル
-        Cancel,             // キャンセル(ESC)
-        Backspace,          // 後退(BS)
-        UnFinish,           // 確定取消（将来）(CTRL+Z)
-        VersionInfo,        // バージョン表示
-		ReloadIni,          // iniファイルのリロード
-    };
-
     struct FuncKeyDef {
         WPARAM wp;
         bool   needShift;
         bool   needCtrl;
         bool   needAlt;
-        Type   type;
+        ChmFuncType   type;
     };
 
     struct CharKeyDef {
@@ -66,7 +46,7 @@ public:
 
     // --- ctor ---
     ChmKeyEvent(WPARAM wp, LPARAM lp,  ChmEngine::State state = ChmEngine::State::Inputing);
-	ChmKeyEvent(ChmKeyEvent::Type type); // マウスクリックなどの特殊用途（OnEndEditで使用）
+	ChmKeyEvent(ChmKeyEvent::ChmFuncType type); // マウスクリックなどの特殊用途（OnEndEditで使用）
 
     // --- function-key table helpers ---
     static void ClearFunctionKey();
@@ -80,7 +60,7 @@ public:
 	static void SetKeyStateProvider(KeyStateProvider pFunc);
 
     // --- accessors ---
-    Type GetType() const { return _type; }
+    ChmFuncType GetType() const { return _type; }
 	wchar_t GetChar() const ;
     bool IsShift() const { return _shift; }
 	// ナビゲーションキーか？(処理はしないが、確定処理が必要なキーの判定用)
@@ -101,7 +81,7 @@ public:
 
 private:
     // --- KeyTable helper ---
-	static bool _ResolveActionName(const std::wstring& name, ChmKeyEvent::Type& outType);
+	static bool _ResolveActionName(const std::wstring& name, ChmFuncType& outType);
 	static bool _ResolveKeyName(const std::wstring& name, UINT& outVk);
     // --- Win32::GetKeyState hook ---
 	static KeyStateProvider pFunc_keyStateProvider;
@@ -115,5 +95,5 @@ private:
     bool   _caps    = false;
     ChmEngine::State _state = ChmEngine::State::None;
 
-    Type _type = Type::None;
+    ChmFuncType _type = ChmFuncType::None;
 };

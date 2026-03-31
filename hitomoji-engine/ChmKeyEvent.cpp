@@ -90,32 +90,32 @@ struct FuncKeyDef {
     bool needCtrl;
     bool needAlt;
     ChmEngine::State _state;
-    ChmKeyEvent::Type type;
+    ChmFuncType type;
 };
 
 // デフォルト定義（ビルド時固定）
 static const FuncKeyDef g_functionKeyTable[] = {
-    // WPARAM      SHIFT  CTRL   ALT    State                   Type
-    { VK_SPACE,    false, false, false, ChmEngine::State::None,      ChmKeyEvent::Type::CharInputSpace },
-    { VK_RETURN,   false, false, false, ChmEngine::State::Inputing,  ChmKeyEvent::Type::CompFinish     },
-    { VK_RETURN,   false, false, true,  ChmEngine::State::Inputing,  ChmKeyEvent::Type::CompFinishHiragana },
-    { VK_RETURN,   true,  false, false, ChmEngine::State::Inputing,  ChmKeyEvent::Type::CompFinishKatakana },
-    { VK_TAB,      false, false, false, ChmEngine::State::Inputing,  ChmKeyEvent::Type::CompFinishKey  },
-    { VK_TAB,      true,  false, false, ChmEngine::State::Inputing,  ChmKeyEvent::Type::CompFinishKeyWide},
-    { VK_SPACE,    false, false, false, ChmEngine::State::Inputing,  ChmKeyEvent::Type::CompSelect     },
-    { VK_BACK,     false, false, false, ChmEngine::State::Inputing,  ChmKeyEvent::Type::Backspace      },
-    { VK_ESCAPE,   false, false, false, ChmEngine::State::Inputing,  ChmKeyEvent::Type::Cancel         },
-    { VK_SPACE,    false, false, false, ChmEngine::State::Selecting, ChmKeyEvent::Type::SelectNextPage },
-    { VK_BACK,     false, false, false, ChmEngine::State::Selecting, ChmKeyEvent::Type::SelectPrevPage },
-    { VK_ESCAPE,   false, false, false, ChmEngine::State::Selecting, ChmKeyEvent::Type::SelectCancel   },
+    // WPARAM      SHIFT  CTRL   ALT    State                        Type
+    { VK_SPACE,    false, false, false, ChmEngine::State::None,      ChmFuncType::CharInputSpace },
+    { VK_RETURN,   false, false, false, ChmEngine::State::Inputing,  ChmFuncType::CompFinish     },
+    { VK_RETURN,   false, false, true,  ChmEngine::State::Inputing,  ChmFuncType::CompFinishHiragana },
+    { VK_RETURN,   true,  false, false, ChmEngine::State::Inputing,  ChmFuncType::CompFinishKatakana },
+    { VK_TAB,      false, false, false, ChmEngine::State::Inputing,  ChmFuncType::CompFinishKey  },
+    { VK_TAB,      true,  false, false, ChmEngine::State::Inputing,  ChmFuncType::CompFinishKeyWide},
+    { VK_SPACE,    false, false, false, ChmEngine::State::Inputing,  ChmFuncType::CompSelect     },
+    { VK_BACK,     false, false, false, ChmEngine::State::Inputing,  ChmFuncType::Backspace      },
+    { VK_ESCAPE,   false, false, false, ChmEngine::State::Inputing,  ChmFuncType::Cancel         },
+    { VK_SPACE,    false, false, false, ChmEngine::State::Selecting, ChmFuncType::SelectNextPage },
+    { VK_BACK,     false, false, false, ChmEngine::State::Selecting, ChmFuncType::SelectPrevPage },
+    { VK_ESCAPE,   false, false, false, ChmEngine::State::Selecting, ChmFuncType::SelectCancel   },
     // CTRL+*
-    { 'H',         false, true,  false, ChmEngine::State::Selecting, ChmKeyEvent::Type::Backspace      },
-    { 'I',         false, true,  false, ChmEngine::State::Selecting, ChmKeyEvent::Type::CompFinishKey  },
-    { 'I',         true,  true,  false, ChmEngine::State::Selecting, ChmKeyEvent::Type::CompFinishKeyWide},
-    { 'M',         false, true,  false, ChmEngine::State::Selecting, ChmKeyEvent::Type::CompFinish     },
+    { 'H',         false, true,  false, ChmEngine::State::Selecting, ChmFuncType::Backspace      },
+    { 'I',         false, true,  false, ChmEngine::State::Selecting, ChmFuncType::CompFinishKey  },
+    { 'I',         true,  true,  false, ChmEngine::State::Selecting, ChmFuncType::CompFinishKeyWide},
+    { 'M',         false, true,  false, ChmEngine::State::Selecting, ChmFuncType::CompFinish     },
 #ifdef _DEBUG
-    { 'V',         true,  true,  false, ChmEngine::State::None,      ChmKeyEvent::Type::VersionInfo    },
-    { 'R',         true,  true,  false, ChmEngine::State::None,      ChmKeyEvent::Type::ReloadIni      },
+    { 'V',         true,  true,  false, ChmEngine::State::None,      ChmFuncType::VersionInfo    },
+    { 'R',         true,  true,  false, ChmEngine::State::None,      ChmFuncType::ReloadIni      },
 #endif
 };
 
@@ -134,7 +134,7 @@ struct KeySignature {
 };
 
 // ---- FunctionKeyTableのていぎとしょきかしょり ----
-static std::map<KeySignature, ChmKeyEvent::Type> s_currentKeyTable;
+static std::map<KeySignature, ChmFuncType> s_currentKeyTable;
 
 void ChmKeyEvent::ClearFunctionKey()
 {
@@ -153,23 +153,23 @@ void ChmKeyEvent::InitFunctionKey()
 }
 
 // ---- actionName → Type 変換テーブル ----
-static const std::map<std::wstring, ChmKeyEvent::Type> s_actionNameMap = {
-    { L"finish",             ChmKeyEvent::Type::CompFinish },
-    { L"finish-hiragana",    ChmKeyEvent::Type::CompFinishHiragana },
-    { L"finish-katakana",    ChmKeyEvent::Type::CompFinishKatakana },
-    { L"finish-raw",         ChmKeyEvent::Type::CompFinishKey },
-    { L"finish-raw-wide",    ChmKeyEvent::Type::CompFinishKeyWide },
-    { L"select",             ChmKeyEvent::Type::CompSelect },
-    { L"backspace",          ChmKeyEvent::Type::Backspace },
-    { L"cancel",             ChmKeyEvent::Type::Cancel },
-    { L"cancel-finish",      ChmKeyEvent::Type::UnFinish },
+static const std::map<std::wstring, ChmFuncType> s_actionNameMap = {
+    { L"finish",             ChmFuncType::CompFinish },
+    { L"finish-hiragana",    ChmFuncType::CompFinishHiragana },
+    { L"finish-katakana",    ChmFuncType::CompFinishKatakana },
+    { L"finish-raw",         ChmFuncType::CompFinishKey },
+    { L"finish-raw-wide",    ChmFuncType::CompFinishKeyWide },
+    { L"select",             ChmFuncType::CompSelect },
+    { L"backspace",          ChmFuncType::Backspace },
+    { L"cancel",             ChmFuncType::Cancel },
+    { L"cancel-finish",      ChmFuncType::UnFinish },
 #ifdef _DEBUG
-    { L"version-info",       ChmKeyEvent::Type::VersionInfo },
-    { L"reload-ini",         ChmKeyEvent::Type::ReloadIni },
+    { L"version-info",       ChmFuncType::VersionInfo },
+    { L"reload-ini",         ChmFuncType::ReloadIni },
 #endif
 };
 
-bool ChmKeyEvent::_ResolveActionName(const std::wstring& name, ChmKeyEvent::Type& outType)
+bool ChmKeyEvent::_ResolveActionName(const std::wstring& name, ChmFuncType& outType)
 {
     auto it = s_actionNameMap.find(name);
     if (it != s_actionNameMap.end())
@@ -231,7 +231,7 @@ void ChmKeyEvent::SetKeyStateProvider(ChmKeyEvent::KeyStateProvider pFunc)
 }
 
 ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/, ChmEngine::State isSelect)
-    : _wp(wp), _type(Type::None)
+    : _wp(wp), _type(ChmFuncType::None)
 {
     _shift   = (pFunc_keyStateProvider(VK_SHIFT)   & 0x8000) != 0;
     _control = (pFunc_keyStateProvider(VK_CONTROL) & 0x8000) != 0;
@@ -242,7 +242,7 @@ ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/, ChmEngine::State isSelect)
 }
 
 // 特殊用途コンストラクタ（マウスクリックなど）
-ChmKeyEvent::ChmKeyEvent(ChmKeyEvent::Type type)
+ChmKeyEvent::ChmKeyEvent(ChmFuncType type)
     : _wp(VK_HITOMOJI), _shift(false), _control(false), _alt(false), _type(type)
 {
 	_caps    = false;
@@ -263,7 +263,7 @@ BOOL ChmKeyEvent::ParseFunctionKey(const std::wstring& key,
 
     // 右辺: action 名
     std::wstring actionName = ChmConfig::Canonize(value);
-    ChmKeyEvent::Type actionType;
+    ChmFuncType actionType;
     if (!_ResolveActionName(actionName, actionType))
     {
 		ChmConfig::SetError(errorMsg,L"unknown function-key action: " + actionName);
@@ -391,7 +391,7 @@ std::wstring ChmKeyEvent::Dump()
 		}
 		std::wstring FunctionName = L"?";
 		{
-			ChmKeyEvent::Type funcType = pair.second;
+			ChmFuncType funcType = pair.second;
 			for (const auto& p : s_actionNameMap )
 			{
 				if (p.second == funcType)
@@ -419,13 +419,13 @@ void ChmKeyEvent::_TranslateByTable()
 
     if (IsNavigationKey())
     {
-        _type = Type::CompFinish;
+        _type = ChmFuncType::CompFinish;
         return;
     }
 
     if (_control || _alt)
     {
-        _type = Type::None;
+        _type = ChmFuncType::None;
         return;
     }
 
@@ -433,11 +433,11 @@ void ChmKeyEvent::_TranslateByTable()
     wchar_t ch = 0;
     if (ChmKeyLayout::Translate(_wp, _shift, _caps, ch))
     {
-        _type = Type::CharInput;
+        _type = ChmFuncType::CharInput;
         return;
     }
 
-    _type = Type::None;
+    _type = ChmFuncType::None;
 }
 
 wchar_t ChmKeyEvent::GetChar() const {

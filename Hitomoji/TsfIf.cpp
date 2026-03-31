@@ -22,8 +22,10 @@ public:
 		TfClientId tid, 
 		ChmTsfInterface* pTsfIf,
 		std::wstring compositionStr,
-		BOOL fEnd)
-		: _pic(pic), _pTsfIf(pTsfIf), _tid(tid), _compositionStr(compositionStr), _fEnd(fEnd), _cRef(1) {
+		BOOL fEnd,
+		BOOL fDirectInsert = FALSE) // 直接確定時にTrue(未入力時のSPACE入力など)
+		: _pic(pic), _pTsfIf(pTsfIf), _tid(tid), _compositionStr(compositionStr), _fEnd(fEnd), 
+		  _fDirectInsert(fDirectInsert), _cRef(1) {
 	}
 
 	STDMETHODIMP QueryInterface(REFIID riid, void** ppv) {
@@ -45,10 +47,25 @@ public:
 		OutputDebugStringWithString(L"[hitomoji] DoEditSession:>>%s<<",_compositionStr.c_str());
 		ITfRange* pRange = nullptr;
 
-		// 1. Compositionの準備
+		// 1. 未入力状態での確定処理
+		if (_fDirectInsert) {
+			ITfInsertAtSelection* pInsert = nullptr;
+			HRESULT hr = _pic->QueryInterface(IID_ITfInsertAtSelection, (void**)&pInsert);
+			if (SUCCEEDED(hr) && pInsert) {
+				pInsert->InsertTextAtSelection(ec, 0,
+					_compositionStr.c_str(),
+					(LONG)_compositionStr.length(),
+					nullptr);
+				pInsert->Release();
+			}
+			_pTsfIf->SetMyEditSessionTick();
+			return S_OK;
+		}
+
+		// 2. Compositionの準備
 		if (FAILED(_GetOrStartComposition(ec, &pRange))) return S_OK;
 
-		// 2. 確定処理／未確定表示（共通 SetText）
+		// 3. 確定処理／未確定表示（共通 SetText）
 		pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
 
 		if (_fEnd ) {
@@ -159,6 +176,7 @@ private:
 	ChmTsfInterface* _pTsfIf;
 	std::wstring _compositionStr;
 	BOOL _fEnd;
+	BOOL _fDirectInsert;
 	LONG _cRef;
 };
 
@@ -338,7 +356,7 @@ STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, B
 		bool fEnd = false;
         ChmKeyEvent kEv(wp, lp,_pEngine->GetState());
 		_pEngine->UpdateComposition(kEv,fEnd);
-		_InvokeEditSession(pic, fEnd);
+		_InvokeEditSession(pic, fEnd, _pEngine->IsDirectInput(kEv.GetType()));
 		_pEngine->PostUpdateComposition();
     }
     return S_OK;
@@ -359,9 +377,9 @@ STDMETHODIMP ChmTsfInterface::OnPreservedKey(ITfContext* pic, REFGUID rguid, BOO
 		if ( _pEngine->IsON() && _pEngine->HasComposition() ) {
 			bool fEnd = true;
 			// OFFになる時にCompositionが残っている場合は、それを確定させる
-			ChmKeyEvent kEv(ChmKeyEvent::Type::CompFinish);
+			ChmKeyEvent kEv(ChmFuncType::CompFinish);
 			_pEngine->UpdateComposition(kEv,fEnd);
-			_InvokeEditSession(pic, fEnd);
+			_InvokeEditSession(pic, fEnd, FALSE);
 			_pEngine->PostUpdateComposition();
 		}
 
@@ -408,7 +426,7 @@ void ChmTsfInterface::_UninitPreservedKey() {
 	}
 }
 
-HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
+HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd, BOOL fDirectInput) {
 	// ---- pre-check: composition / context validity ----
 	if (_pComposition) {
 		// context mismatch -> clear
@@ -435,12 +453,10 @@ HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
 
 	// ---- normal edit session request ----
 	HRESULT hr;
-	CEditSession* pES = new CEditSession(pic, _tfClientId, this, _pEngine->GetCompositionStr(), fEnd);
+	CEditSession* pES = new CEditSession(pic, _tfClientId, this, _pEngine->GetCompositionStr(), fEnd, fDirectInput);
 	if (!pES) return E_OUTOFMEMORY;
 	HRESULT hrSession = pic->RequestEditSession(_tfClientId, pES, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hr);
-	if (!SUCCEEDED(hrSession)) {
-		OUTPUT_HR("_InvokeEditSession/RequestEditSession", hrSession);
-	}
+	OUTPUT_HR_ON_ERROR("_InvokeEditSession/RequestEditSession", hrSession);
 	pES->Release();
 	return hrSession;
 }
@@ -530,7 +546,7 @@ STDMETHODIMP ChmTsfInterface::OnEndEdit(
 	// Composition の属する Context と異なる編集が入った場合のみ確定
 	if (_pContextForComposition && pic != GetCompositionContext()) {
 		OutputDebugString(L"   > InvokeEditSession via composition context");
-		_InvokeEditSession(GetCompositionContext(), TRUE);
+		_InvokeEditSession(GetCompositionContext(), TRUE, FALSE);
 		_pEngine->ResetStatus();
 	}
     return S_OK;

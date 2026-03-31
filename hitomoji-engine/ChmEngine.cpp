@@ -5,7 +5,7 @@
 #include "ChmRawInputStore.h"
 #include "ChmEngine.h"
 #include "ChmRomajiConverter.h"
-#include "ChmConfig.h"
+//#include "ChmConfig.h"
 #include "ChmKeyEvent.h"
 #include "Hitomoji.h"
 
@@ -62,26 +62,32 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
     ChmKeyEvent ev(wp, 0, _state);
 
 	// 文字入力なら、常にIMEが食う
-	if (ev.GetType() == ChmKeyEvent::Type::CharInput) return TRUE;
+	if (ev.GetType() == ChmFuncType::CharInput) return TRUE;
 
 #ifdef _DEBUG
 	// バージョン情報キーもIMEが食う
-	if (ev.GetType() == ChmKeyEvent::Type::VersionInfo) return TRUE;
+	if (ev.GetType() == ChmFuncType::VersionInfo) return TRUE;
 #endif
 
 	// Compositonが存在する状態の特殊キーはIMEが食う
-	if (HasComposition() && ev.GetType() != ChmKeyEvent::Type::None) return TRUE;
+	if (HasComposition() && ev.GetType() != ChmFuncType::None) return TRUE;
 
 	// それ以外は食わない
     return FALSE;
 }
 
 void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition){
-	ChmKeyEvent::Type _type = keyEvent.GetType();
+	ChmFuncType _type = keyEvent.GetType();
 
 	// 確定キー
 	switch (_type) {
-		case ChmKeyEvent::Type::ReloadIni: {
+		case ChmFuncType::CharInputSpace:
+			// TODO: configで全角空白か半角かを選べるようにする
+			_converted = L" ";
+			_pending = L"";
+			_state = State::None;
+			break;
+		case ChmFuncType::ReloadIni: {
 			bool bRet = _pConfig->LoadFile();
 			if (bRet) {
 				_converted = L"ok";
@@ -92,43 +98,43 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			_state = State::Inputing;
 			break;
 		}
-		case ChmKeyEvent::Type::VersionInfo:
+		case ChmFuncType::VersionInfo:
 			_converted = HM_VERSION L"(" __DATE__ L" " __TIME__ L")";
 			_pending = L"";
 			_state = State::Inputing;
 			break;
-		case ChmKeyEvent::Type::CompFinishHiragana: // ひらがな変換
+		case ChmFuncType::CompFinishHiragana: // ひらがな変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
 			_state = State::None;
 			break ;
-		case ChmKeyEvent::Type::CompFinishKatakana: // カタカナ変換
+		case ChmFuncType::CompFinishKatakana: // カタカナ変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
 			_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
 			_converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
 			_state = State::None;
 			break ;
-		case ChmKeyEvent::Type::CompFinish:     // 見たまま変換
+		case ChmFuncType::CompFinish:     // 見たまま変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
 			_state = State::None;
 			break;
-		case ChmKeyEvent::Type::CompFinishKey:    // ASCII確定
+		case ChmFuncType::CompFinishKey:    // ASCII確定
 			_converted = _pRawInputStore->get();
 			_pending = L"";
 			_state = State::None;
 			break;
-		case ChmKeyEvent::Type::CompFinishKeyWide: // 全角ASCII確定
+		case ChmFuncType::CompFinishKeyWide: // 全角ASCII確定
 			_converted = AsciiToWide(_pRawInputStore->get());
 			_pending = L"";
 			_state = State::None;
 			break;
-		case ChmKeyEvent::Type::Cancel:         // ESCキャンセル
+		case ChmFuncType::Cancel:         // ESCキャンセル
 			_converted = L"";
 			_pending = L"";
 			_state = State::None;
 			break;
-		case ChmKeyEvent::Type::CharInput:
+		case ChmFuncType::CharInput:
 			// 通常の文字入力
 			if (!HasComposition()) {
 				_pRawInputStore->clear();
@@ -139,7 +145,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
 				;
 			break;
-		case ChmKeyEvent::Type::Backspace: {
+		case ChmFuncType::Backspace: {
 			if (!HasComposition()) break;
 			size_t len = _pRawInputStore->get().size();
 			size_t del = ChmRomajiConverter::GetLastRawUnitLength();
