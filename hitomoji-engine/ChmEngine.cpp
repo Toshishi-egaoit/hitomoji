@@ -5,7 +5,6 @@
 #include "ChmRawInputStore.h"
 #include "ChmEngine.h"
 #include "ChmRomajiConverter.h"
-//#include "ChmConfig.h"
 #include "ChmKeyEvent.h"
 #include "Hitomoji.h"
 
