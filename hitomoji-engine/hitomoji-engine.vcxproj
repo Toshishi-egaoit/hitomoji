@@ -149,6 +149,7 @@
     <ClInclude Include="ChmConfig.h" />
     <ClInclude Include="ChmEngine.h" />
     <ClInclude Include="ChmKeyEvent.h" />
+    <ClInclude Include="ChmL3Kanji.h" />
     <ClInclude Include="ChmRawInputStore.h" />
     <ClInclude Include="ChmRomajiConverter.h" />
     <ClInclude Include="Hitomoji.h" />
