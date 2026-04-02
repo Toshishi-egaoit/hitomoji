@@ -62,6 +62,7 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
 
 	// 文字入力なら、常にIMEが食う
 	if (ev.GetType() == ChmFuncType::CharInput) return TRUE;
+	if (ev.GetType() == ChmFuncType::CharInputSpace) return TRUE;
 
 #ifdef _DEBUG
 	// バージョン情報キーもIMEが食う
@@ -137,7 +138,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			// 通常の文字入力
 			if (!HasComposition()) {
 				_pRawInputStore->clear();
-				_state = State::None;
+				_state = State::Inputing;
 			}
 			_pRawInputStore->push(keyEvent.GetChar());
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 

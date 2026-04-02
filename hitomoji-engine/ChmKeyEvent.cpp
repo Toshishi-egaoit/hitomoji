@@ -89,7 +89,7 @@ struct FuncKeyDef {
     bool needShift;
     bool needCtrl;
     bool needAlt;
-    ChmEngine::State _state;
+    ChmEngine::State state;
     ChmFuncType type;
 };
 
@@ -146,8 +146,7 @@ void ChmKeyEvent::InitFunctionKey()
     ClearFunctionKey();
     for (const auto& k : g_functionKeyTable)
     {
-		// TODO: v0.4で、configの指定方法を変更する必要がある
-		KeySignature sig{ k.wp, k.needShift, k.needCtrl, k.needAlt, ChmEngine::State::Inputing};
+		KeySignature sig{ k.wp, k.needShift, k.needCtrl, k.needAlt, k.state};
 		s_currentKeyTable[sig] = k.type;
     }
 }
@@ -159,10 +158,14 @@ static const std::map<std::wstring, ChmFuncType> s_actionNameMap = {
     { L"finish-katakana",    ChmFuncType::CompFinishKatakana },
     { L"finish-raw",         ChmFuncType::CompFinishKey },
     { L"finish-raw-wide",    ChmFuncType::CompFinishKeyWide },
-    { L"select",             ChmFuncType::CompSelect },
     { L"backspace",          ChmFuncType::Backspace },
     { L"cancel",             ChmFuncType::Cancel },
     { L"cancel-finish",      ChmFuncType::UnFinish },
+    { L"select",             ChmFuncType::CompSelect },
+	{ L"next-page" ,         ChmFuncType::SelectNextPage },     // 選択中の次ページ
+	{ L"prev-page" ,         ChmFuncType::SelectPrevPage },     // 選択中の次ページ
+	{ L"cancel-select" ,     ChmFuncType::SelectCancel },       // 選択中のキャンセル
+	{ L"space-char",         ChmFuncType::CharInputSpace },
 #ifdef _DEBUG
     { L"version-info",       ChmFuncType::VersionInfo },
     { L"reload-ini",         ChmFuncType::ReloadIni },
@@ -231,7 +234,7 @@ void ChmKeyEvent::SetKeyStateProvider(ChmKeyEvent::KeyStateProvider pFunc)
 }
 
 ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/, ChmEngine::State isSelect)
-    : _wp(wp), _type(ChmFuncType::None)
+	: _wp(wp), _type(ChmFuncType::None), _state(isSelect)
 {
     _shift   = (pFunc_keyStateProvider(VK_SHIFT)   & 0x8000) != 0;
     _control = (pFunc_keyStateProvider(VK_CONTROL) & 0x8000) != 0;
@@ -398,10 +401,19 @@ std::wstring ChmKeyEvent::Dump()
 					FunctionName = p.first;
 			}
 		}
+#ifdef _DEBUG
+		// デバッグビルドのときは、ぜんていぎをひょうじ
+#else
+		if (pair.first.state != ChmEngine::State::Inputing) continue ;
+#endif
 		result += (std::wstring)(pair.first.shift ? L" Shift+" : L"") +
 				  (pair.first.ctrl  ? L" Ctrl+"  : L"") +
 				  (pair.first.alt   ? L" Alt+"   : L"") +
 				  keyName +
+#ifdef _DEBUG
+				  (pair.first.state == ChmEngine::State::Selecting  ? L" (Selecting)" : 
+				   pair.first.state == ChmEngine::State::None  ? L" (noInputing)" : L"") +
+#endif
 			L" = <" + FunctionName + L">\n";
 	}
 	return result;

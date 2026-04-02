@@ -42,15 +42,17 @@ public:
         return S_OK;
     }
 
-	// 現状で使用している実用版のDoEditSession（ある程度の構造化をしてある）
+	// アプリへの文字列の挿入や、Compositionの終了処理などを行う
 	STDMETHODIMP DoEditSession(TfEditCookie ec) {
 		OutputDebugStringWithString(L"[hitomoji] DoEditSession:>>%s<<",_compositionStr.c_str());
 		ITfRange* pRange = nullptr;
 
 		// 1. 未入力状態での確定処理
 		if (_fDirectInsert) {
+			OutputDebugString(L"   > DirectInsert");
 			ITfInsertAtSelection* pInsert = nullptr;
 			HRESULT hr = _pic->QueryInterface(IID_ITfInsertAtSelection, (void**)&pInsert);
+			OUTPUT_HR_n_RETURN_ON_ERROR(L"   > QueryInterface(ITfInsertAtSelection)", hr);
 			if (SUCCEEDED(hr) && pInsert) {
 				pInsert->InsertTextAtSelection(ec, 0,
 					_compositionStr.c_str(),
@@ -341,7 +343,7 @@ STDMETHODIMP ChmTsfInterface::OnSetFocus(BOOL fFocus)
 // ITfKeyEventSink Implementation
 STDMETHODIMP ChmTsfInterface::OnTestKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten) {
 	*pfEaten = _pEngine->IsKeyEaten(wp);
-	ChmKeyEvent kEv(wp,lp);
+	ChmKeyEvent kEv(wp, lp,_pEngine->GetState());
 	OutputDebugStringWithString(((std::wstring)L"[Hitomoji] OnTestKeyDown eat=%s" + kEv.toString()).c_str(), *pfEaten ? L"TRUE" : L"FALSE") ;
 
 	return S_OK;
@@ -356,6 +358,8 @@ STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, B
 		bool fEnd = false;
         ChmKeyEvent kEv(wp, lp,_pEngine->GetState());
 		_pEngine->UpdateComposition(kEv,fEnd);
+		OutputDebugStringWithInt(L"   > funcKey=%d\n", (int)kEv.GetType());
+		OutputDebugStringWithInt(L"   > GetState=%d\n", (int)_pEngine->GetState());
 		_InvokeEditSession(pic, fEnd, _pEngine->IsDirectInput(kEv.GetType()));
 		_pEngine->PostUpdateComposition();
     }
