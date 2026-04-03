@@ -41,20 +41,6 @@ void OutputDebugStringWithGuid(wchar_t const* format, const IID iid)
     return;
 }
 
-std::wstring GetBasePath()
-{
-    // デフォルト basePath = Roaming\hitomoji\  となる。
-    PWSTR path = nullptr;
-	std::wstring retPath ;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &path)))
-    {
-        retPath = path;
-        CoTaskMemFree(path);
-        retPath += L"\\hitomoji\\";
-    }
-	return retPath;
-}
-
 // --- ChmLogger Implementation ---
 ChmLogger::LogLevel ChmLogger::_logLevel = ChmLogger::LogLevel::InfoLevel; 
 

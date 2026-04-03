@@ -9,6 +9,7 @@
 #include "ChmConfig.h"
 #include "ChmRomajiConverter.h"
 #include "ChmKeyEvent.h"
+#include "ChmEnvironment.h"
 #include "utils.h"
 
 #define MAX_ERROR_COUNT 100
@@ -16,8 +17,7 @@
 
 ChmConfig::ChmConfig()
 {
-	
-	m_basePath = GetBasePath(); // %appdata%\hitomoji\ ‚É‚È‚é
+	m_basePath = g_environment.GetBasePath(); // %appdata%\hitomoji\ ‚É‚È‚é
     InitConfig();
 }
 
