@@ -37,7 +37,7 @@ if not exist "%TARGET_DIR%" (
     mkdir "%TARGET_DIR%"
 )
 
-:: 3. 使用中の現行版を .old に退避（これが「上書き不可」を回避するコツ）
+:: 3. 使用中の現行版を .old に退避
 if exist "%TARGET_DLL%" (
     move /y "%TARGET_DLL%" "%TARGET_DLL%.old" >nul 2>&1
 )
@@ -52,10 +52,8 @@ copy /y "x64\hitomoji.dll" "%TARGET_DIR%"
 "%SYSTEM_DIR%\regsvr32.exe" /s "%TARGET_DIR%\hitomoji.dll"
 
 echo 32ビット版DLLのコピーと登録
-if exist "%SYSTEM_DIR32%" (
-	if not exist "%TARGET_DIR32%" mkdir "%TARGET_DIR32%"
-    copy /y "x86\hitomoji.dll" "%TARGET_DIR32%"
-    "%SYSTEM_DIR32%\regsvr32.exe" /s "%TARGET_DIR32%\hitomoji.dll"
+copy /y "x86\hitomoji.dll" "%TARGET_DIR32%"
+"%SYSTEM_DIR32%\regsvr32.exe" /s "%TARGET_DIR32%\hitomoji.dll"
 )
 
 echo プロファイル登録
@@ -67,6 +65,8 @@ copy /y "x86\regHitomoji.exe" "%TARGET_DIR32%"
 echo "設定ファイルのコピー"
 copy /y "hitomoji.ini" "%CONFIG_DIR%"
 copy /y "layer2.sample.ini" "%CONFIG_DIR%"
+echo "辞書ファイルのコピー"
+copy /y "hitomoji.dic" "%CONFIG_DIR%"
 
 echo インストール工程が完了しました。
 echo 必要なファイルは全てコピーされました。
