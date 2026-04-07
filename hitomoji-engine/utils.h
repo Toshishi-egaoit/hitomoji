@@ -29,6 +29,6 @@ private:
 	static void _WriteFile(const std::wstring& line);
 
 	static std::wstring _logBase ;
-	static enum LogLevel _logLevel;
+	static enum LogLevel _logLevel ;
 };
 

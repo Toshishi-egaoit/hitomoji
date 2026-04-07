@@ -141,6 +141,7 @@
   <ItemGroup>
     <ClCompile Include="ChmConfig.cpp" />
     <ClCompile Include="ChmEngine.cpp" />
+    <ClCompile Include="ChmEnvironment.cpp" />
     <ClCompile Include="ChmKeyEvent.cpp" />
     <ClCompile Include="ChmRomajiConverter.cpp" />
     <ClCompile Include="utils.cpp" />
@@ -148,6 +149,7 @@
   <ItemGroup>
     <ClInclude Include="ChmConfig.h" />
     <ClInclude Include="ChmEngine.h" />
+    <ClInclude Include="ChmEnvironment.h" />
     <ClInclude Include="ChmKeyEvent.h" />
     <ClInclude Include="ChmL3Kanji.h" />
     <ClInclude Include="ChmRawInputStore.h" />

@@ -6,17 +6,38 @@
 #include "ChmEngine.h"
 #include "ChmRomajiConverter.h"
 #include "ChmKeyEvent.h"
+#include "ChmL3Kanji.h"
 #include "Hitomoji.h"
 
-ChmConfig* ChmEngine::_pConfig = nullptr;
+ChmEnvironment g_environment ;
 
 ChmEngine::ChmEngine() 
 	: _isON(FALSE), _state(State::None), _converted(L""), _pending(L"") {
+	ChmLogger::Debug(L"ChmEngine::Activate");
 	_pRawInputStore = new ChmRawInputStore();
 }
 
 ChmEngine::~ChmEngine() {
 	if (_pRawInputStore) delete _pRawInputStore;
+}
+
+void ChmEngine::Activate() {
+	ChmLogger::Debug(L"ChmEngine::Activate");
+	InitConfig();
+	_initLayer2();
+	_initLayer3();
+}
+
+void ChmEngine::Deactivate() {
+	ResetStatus();
+	delete _pConfig;
+	_pConfig = nullptr ;
+
+	delete _pL3Kanji;
+	_pL3Kanji = nullptr ;
+	
+	delete _pL3Helper;
+	_pL3Helper = nullptr ;
 }
 
 void ChmEngine::InitConfig() {
@@ -43,6 +64,20 @@ void ChmEngine::InitConfig() {
 		ChmLogger::Info((std::wstring(L"=== Function-Keys ===\n") + ChmKeyEvent::Dump()).c_str());
 	}
 
+	// Loggerのログレベルを設定
+	{
+		std::wstring logLevelStr = ChmConfig::Canonize(newConfig->GetString(L"UI", L"loglevel"));
+		if ( logLevelStr == L"error")     ChmLogger::SetLogLevel(ChmLogger::ErrorLevel);
+		else if (logLevelStr == L"warn")  ChmLogger::SetLogLevel(ChmLogger::WarnLevel);
+		else if (logLevelStr == L"info")  ChmLogger::SetLogLevel(ChmLogger::InfoLevel);
+		else if (logLevelStr == L"debug") ChmLogger::SetLogLevel(ChmLogger::DebugLevel);
+		else {
+			ChmLogger::SetLogLevel(ChmLogger::InfoLevel);
+			ChmLogger::Warn(L"   > Invalid LogLevel in config, defaulting to Info");
+		}
+
+	}
+
 	return ;
 }
 
@@ -50,15 +85,23 @@ std::wstring ChmEngine::GetConfigFile() {
 	return _pConfig->GetConfigFile(); 
 }
 
-std::wstring ChmEngine::GetConfigPath() { 
-	return _pConfig->GetConfigPath(); 
+void ChmEngine::_initLayer2() {
+	// TODO: いまはnullかんすう
+
+}
+
+void ChmEngine::_initLayer3() {
+	if (_pL3Kanji == nullptr )
+		_pL3Kanji = new ChmL3Kanji ;
+	if (_pL3Helper == nullptr )
+		_pL3Helper = new ChmL3Helper ;
 }
 
 BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
-    // IMEがOFFなら全てfalse
-    if (!_isON) return FALSE;
+	// IMEがOFFなら全てfalse
+	if (!_isON) return FALSE;
 
-    ChmKeyEvent ev(wp, 0, _state);
+	ChmKeyEvent ev(wp, 0, _state);
 
 	// 文字入力なら、常にIMEが食う
 	if (ev.GetType() == ChmFuncType::CharInput) return TRUE;
@@ -73,7 +116,13 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
 	if (HasComposition() && ev.GetType() != ChmFuncType::None) return TRUE;
 
 	// それ以外は食わない
-    return FALSE;
+	return FALSE;
+}
+
+void ChmEngine::SetError(void) {
+	// TODO:Beep音を出す。（confiファイルでON/OFFできるようにする）
+	_pending += L"?";
+	_state = State::Inputing;
 }
 
 void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition){
@@ -86,6 +135,19 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			_converted = L" ";
 			_pending = L"";
 			_state = State::None;
+			break;
+		case ChmFuncType::CompSelect:
+			// かな漢字変換の選択開始
+			// エラーチェック：pendingに文字がある?
+			if (!_pending.empty() ) {
+				SetError();
+				break ;
+			}
+			// (未実装)エラーチェック２：_convertedの読みを検索しても見つからない?
+			// (未実装)候補リストの更新
+			// (未実装)選択候補のスレッドへの通知
+
+			_state = State::Selecting;
 			break;
 		case ChmFuncType::ReloadIni: {
 			bool bRet = _pConfig->LoadFile();
@@ -172,9 +234,9 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			}
 			break;
 		}
-        default:
-            // その他のキーは何もしない
-            break;
+		default:
+			// その他のキーは何もしない
+			break;
 	}
 	pEndComposition = !HasComposition();
 
@@ -191,28 +253,28 @@ void ChmEngine::PostUpdateComposition(){
 
 void ChmEngine::ResetStatus() {
 	_state = State::None;
-    _pRawInputStore->clear();
-    _converted = L"";
-    _pending = L"";
+	_pRawInputStore->clear();
+	_converted = L"";
+	_pending = L"";
 	return;
 }
 
 std::wstring ChmEngine::AsciiToWide(const std::wstring& src)
 {
-    std::wstring out;
-    out.reserve(src.size());
+	std::wstring out;
+	out.reserve(src.size());
 
-    for (wchar_t c : src) {
-        // 英数字・基本記号のみ対象
-        if (c >= 0x21 && c <= 0x7E) {
-            // 0x21–0x7E は Fullwidth に +0xFEE0
-            out.push_back(static_cast<wchar_t>(c + 0xFEE0));
-        } else {
-            // それ以外はそのまま（保険）
-            out.push_back(static_cast<wchar_t>(c));
-        }
-    }
-    return out;
+	for (wchar_t c : src) {
+		// 英数字・基本記号のみ対象
+		if (c >= 0x21 && c <= 0x7E) {
+			// 0x21–0x7E は Fullwidth に +0xFEE0
+			out.push_back(static_cast<wchar_t>(c + 0xFEE0));
+		} else {
+			// それ以外はそのまま（保険）
+			out.push_back(static_cast<wchar_t>(c));
+		}
+	}
+	return out;
 }
 
 std::wstring ChmEngine::GetCompositionStr(){

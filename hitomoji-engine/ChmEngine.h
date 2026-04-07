@@ -10,6 +10,8 @@
 class ChmRawInputStore;
 class ChmConfig;
 class ChmKeyEvent ;
+class ChmL3Kanji ;
+class ChmL3Helper ;
 
 #define VK_HITOMOJI 0 // 仮想キーコード: マウスイベントなどの特殊用途
 
@@ -21,22 +23,26 @@ public:
 		Selecting,
 	} ;
 
-    ChmEngine();
-    ~ChmEngine();
+	ChmEngine();
+	~ChmEngine();
 
-    // ChmConfigの処理ヘルパ
-	static void InitConfig();
+	// Activate/Deactivate
+	void Activate();
+	void Deactivate();
+
+	// ChmConfigの処理ヘルパ
+	void InitConfig();
 	std::wstring GetConfigFile() ; 
 	std::wstring GetConfigPath() ; 
-    
-    // キーをIMEで処理すべきか判定
-    BOOL IsKeyEaten(WPARAM wp);
-    
-    // IMEのON/OFF
-    void ToggleIME() { _isON = !_isON; }
+	
+	// キーをIMEで処理すべきか判定
+	BOOL IsKeyEaten(WPARAM wp);
+	
+	// IMEのON/OFF
+	void ToggleIME() { _isON = !_isON; }
 
-    BOOL IsON() const { return _isON; }
-    BOOL IsSelecting() const { return _state == State::Selecting ; }
+	BOOL IsON() const { return _isON; }
+	BOOL IsSelecting() const { return _state == State::Selecting ; }
 	BOOL HasComposition() { return (_state == State::Selecting || _state == State::Inputing); }
 	BOOL IsDirectInput(ChmFuncType tp) { return (tp == ChmFuncType::CharInputSpace) ; }
 	State GetState() { return _state ;}
@@ -47,15 +53,24 @@ public:
 	void ResetStatus() ;
 
 private:
-    // ASCII -> 全角 変換（v0.1.3 簡易実装）
-    static std::wstring AsciiToWide(const std::wstring& src);
+	// Activate/Deactivateでの初期処理
+	void _initLayer3();
+	void _initLayer2();
+
+	// ASCII -> 全角 変換（v0.1.3 簡易実装）
+	static std::wstring AsciiToWide(const std::wstring& src);
+
+	void SetError(void) ;
 
 	// --- static members ---
-	static ChmConfig* _pConfig;
+	ChmConfig* _pConfig;
 
-    State _state ;
+	State _state ;
 	BOOL _isON;
 	ChmRawInputStore* _pRawInputStore; // 入力されたローマ字列
+	ChmL3Kanji* _pL3Kanji; // かな漢字変換
+	ChmL3Helper* _pL3Helper; // かな漢字変換の選択キー定義
+
 	std::wstring _converted; // かな変換できた部分
 	std::wstring _pending; // かなに変換できていない部分（残り）
 };
