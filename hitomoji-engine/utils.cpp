@@ -164,3 +164,14 @@ void ChmLogger::Debug(const std::wstring& msg)
 	_Output(L"DEBUG", msg);
 }
 
+std::wstring ChmLogger::Format(const wchar_t* fmt, ...)
+{
+    wchar_t buf[512];
+
+    va_list args;
+    va_start(args, fmt);
+    _vsnwprintf_s(buf, _countof(buf), _TRUNCATE, fmt, args);
+    va_end(args);
+
+    return std::wstring(buf);
+}

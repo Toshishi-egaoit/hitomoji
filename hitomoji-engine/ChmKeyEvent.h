@@ -27,13 +27,13 @@ public:
     struct CharKeyDef {
         WPARAM wp;
         bool   needShift;
-        char   ch;               // CharInput 用
+        unsigned char   ch;               // CharInput 用
     };
 
     // --- utility ---
 	const std::wstring toString() const { 
 		wchar_t buff[80];
-		wchar_t ch = GetChar();
+		unsigned char ch = GetChar();
 		wsprintf(buff, L" Type:%d ch=%d(%c) %s %s %s",
 			_type,
 			ch , 
@@ -61,7 +61,7 @@ public:
 
     // --- accessors ---
     ChmFuncType GetType() const { return _type; }
-	wchar_t GetChar() const ;
+	unsigned char GetChar() const ;
     bool IsShift() const { return _shift; }
 	// ナビゲーションキーか？(処理はしないが、確定処理が必要なキーの判定用)
     bool IsNavigationKey() const { 

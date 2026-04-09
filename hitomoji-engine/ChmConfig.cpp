@@ -207,8 +207,8 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 
 	BOOL bRet = _LoadStreamInternal(ifs, path, /*isMain*/ TRUE, L"");
 
-	OutputDebugStringWithInt(L"   > LoadFile end. m_errors.size(): %d\n", m_errors.size());
-	OutputDebugStringWithInt(L"   >               m_infos.size(): %d\n", m_infos.size());
+	OutputDebugStringWithInt(L"   > LoadFile end. m_errors.size(): %d\n", (ULONG)m_errors.size());
+	OutputDebugStringWithInt(L"   >               m_infos.size(): %d\n", (ULONG)m_infos.size());
 
 	return bRet;
 }

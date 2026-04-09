@@ -8,9 +8,10 @@
 #include "ChmEnvironment.h"
 
 
-class ChmL3Kanji {
+// かな漢字変換の辞書を管理するクラス(Activate/Deactivateが生存期間）
+class ChmL3KanjiDict {
 
-private:
+public:
 	struct DictHeader {
 		uint32_t magic;
 		uint32_t kanjiCount;
@@ -21,28 +22,27 @@ private:
 	};
 
 	struct YomiEntry {
-		char16_t yomi[6];
+		char16_t DictYomi[6];
 		uint16_t count;
 		uint32_t offset;
 	};
 	// データはファイルから読み込んでここに保持する設計
-	std::vector<YomiEntry> yomi;
+	std::vector<YomiEntry> DictYomi;
 	std::vector<uint32_t> kanjiList;
 
-public:
-	ChmL3Kanji()
-		: _active(false), _list(nullptr), _count(0), _page(0) {
+	ChmL3KanjiDict()
+	{
 		LoadDict();
 	};
 
 	bool LoadDict()
 	{
-		ChmLogger::Info(L"[hitomoji] L3kanji.LoadDict");
-		std::wstring path = g_environment.GetBasePath() + L"hitomoji.dicn";
+		Info(L"L3kanjiDict.LoadDict");
+		std::wstring path = g_environment.GetBasePath() + L"hitomoji.dic";
 
 		std::ifstream ifs(path, std::ios::binary);
 		if (!ifs) {
-			ChmLogger::Error(L"   > failed to open dic file:" + path);
+			Error(Format(L"   > failed to open dic file:%s" , path));
 			return false;
 		}
 
@@ -51,9 +51,9 @@ public:
 
 		ifs.seekg(header.yomiOffset);
 
-		yomi.resize(header.yomiCount);
-		ifs.read((char*)yomi.data(), header.yomiCount * sizeof(YomiEntry));
-		ChmLogger::Info(L"   > read yomiCount: " + header.yomiCount);
+		DictYomi.resize(header.yomiCount);
+		ifs.read((char*)DictYomi.data(), header.yomiCount * sizeof(YomiEntry));
+		Info(Format(L"   > read yomiCount: %d", header.yomiCount));
 
 		ifs.seekg(header.listOffset);
 		auto cur = ifs.tellg();
@@ -63,13 +63,74 @@ public:
 		kanjiList.resize(bytes / sizeof(uint32_t));
 		ifs.seekg(header.listOffset);
 		ifs.read((char*)kanjiList.data(), bytes);
-		ChmLogger::Info(L"   > read kanjiList: " + (int)bytes);
+		Info(Format(L"   > read kanjiList: %d" ,bytes));
 
 		return true;
 	}
+};
 
+
+// １回のかな漢字変換セッションを管理するクラス
+class ChmL3KanjiSelect {
+
+public:
+	ChmL3KanjiSelect(ChmL3KanjiDict* pDict, byte pageSize)
+		: _pDict(pDict),_list(nullptr), _count(0), _page(0),_pageSize(pageSize) {
+	};
+
+	// 変換開始
+	BOOL Start(const std::wstring& DictYomi)
+	{
+		char16_t key[6];
+		_makeYomiKey(DictYomi, key);
+		
+		const ChmL3KanjiDict::YomiEntry* e = _findYomi(key);
+		if (!e) {
+			return FALSE;
+		}
+		Debug(Format(L"   > found yomi: %s, count: %d", DictYomi.c_str(), e->count));
+
+		_list = &_pDict->kanjiList[e->offset];
+		_count = e->count;
+		_page = 0;
+		return TRUE;
+	}
+
+	void Cancel()
+	{
+		_list = nullptr;
+		_count = 0;
+		_page = 0;
+	}
+
+	void NextPage()
+	{
+		size_t maxPage = (_count + _pageSize - 1) / _pageSize;
+		if (_page + 1 < maxPage) _page++;
+	}
+
+	void PrevPage()
+	{
+		byte maxPage = (_count + _pageSize - 1) / _pageSize;
+		if (_page == 0 ) _page = maxPage - 1;
+		else if (_page > 0) _page--;
+	}
+
+	uint32_t SelectByIndex(byte index)
+	{
+		size_t actual = (_page * _pageSize) + index;
+		if (actual >= _count) return 0;
+
+		return _list[actual];
+	}
+
+	const uint32_t* GetList() const { return _list; }
+	uint16_t GetCount() const { return _count; }
+	byte GetPage() const { return _page; }
+
+private:
 	// wstringから最大5文字までのchar16_t配列に変換
-	void MakeYomiKey(const std::wstring& src, char16_t out[6])
+	void _makeYomiKey(const std::wstring& src, char16_t out[6])
 	{
 		// 0クリア
 		std::fill(out, out + 6, 0);
@@ -81,74 +142,16 @@ public:
 		}
 	}
 
-	// 変換開始
-	bool Start(const std::wstring& yomi)
-	{
-		char16_t key[6];
-		MakeYomiKey(yomi, key);
-		
-		const YomiEntry* e = _findYomi(key);
-		if (!e) {
-			_active = false;
-			return false;
-		}
-
-		_list = &kanjiList[e->offset];
-		_count = e->count;
-		_page = 0;
-		_active = true;
-		return true;
-	}
-
-	void Cancel()
-	{
-		_active = false;
-		_list = nullptr;
-		_count = 0;
-		_page = 0;
-	}
-
-	bool IsActive() const { return _active; }
-
-	void NextPage(size_t pageSize)
-	{
-		if (!_active) return;
-		size_t maxPage = (_count + pageSize - 1) / pageSize;
-		if (_page + 1 < maxPage) _page++;
-	}
-
-	void PrevPage()
-	{
-		if (!_active) return;
-		if (_page > 0) _page--;
-	}
-
-	uint32_t SelectByIndex(size_t index, size_t pageSize)
-	{
-		if (!_active) return 0;
-
-		size_t actual = (_page * pageSize) + index;
-		if (actual >= _count) return 0;
-
-		_active = false;
-		return _list[actual];
-	}
-
-	const uint32_t* GetList() const { return _list; }
-	uint16_t GetCount() const { return _count; }
-	size_t GetPage() const { return _page; }
-
-private:
-	const YomiEntry* _findYomi(const char16_t* key)
+	const ChmL3KanjiDict::YomiEntry* _findYomi(const char16_t* key)
 	{
 		int left = 0;
-		int right = (int)yomi.size() - 1;
+		int right = (int)_pDict->DictYomi.size() - 1;
 
 		while (left <= right) {
 			int mid = (left + right) / 2;
-			const auto& e = yomi[mid];
+			const auto& e = _pDict->DictYomi[mid];
 
-			int cmp = std::memcmp(key, e.yomi, 6 * sizeof(char16_t));
+			int cmp = std::memcmp(key, e.DictYomi, 6 * sizeof(char16_t));
 
 			if (cmp == 0) return &e;
 			if (cmp < 0) right = mid - 1;
@@ -158,10 +161,11 @@ private:
 	}
 
 private:
-	bool _active;
+	ChmL3KanjiDict* _pDict;
 	const uint32_t* _list;
 	uint16_t _count;
-	size_t _page;
+	byte _page;
+	byte _pageSize;
 };
 
 
@@ -211,17 +215,17 @@ private:
 			if (!isspace((unsigned char)c)) map.push_back(c);
 		}
 
-		_pageSize = map.size();
+		_pageSize = (byte)map.size();
 
 		for (size_t i = 0; i < map.size(); ++i) {
 			_keyToIndex[(unsigned char)map[i]] = (int)i;
 		}
 #ifdef _DEBUG
-		OutputDebugString(L"[Hitomoji] L3Helper::BuidTable\n1234567890123456789012345678901234567890");
+		OutputDebugString(L"[Hitomoji] L3Helper::BuildTable\n1234567890123456789012345678901234567890");
 		OutputDebugStringA(map.c_str());
 #endif
 	};
 
 	int _keyToIndex[256];
-	size_t _pageSize;
+	byte _pageSize;
 };

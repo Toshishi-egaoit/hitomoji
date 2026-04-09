@@ -1,6 +1,8 @@
 #pragma once
 #include "ChmEnvironment.h"
 
+ChmEnvironment g_environment;
+
 std::wstring ChmEnvironment::_getDefaultBasePath() {
 	// デフォルト basePath = %appdata%\hitomoji\  となる。
 	PWSTR path = nullptr;

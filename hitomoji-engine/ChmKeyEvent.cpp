@@ -10,11 +10,11 @@ class ChmKeyLayout {
 public:
     struct KeyDef {
         WPARAM  vk;
-        wchar_t normal;
-        wchar_t shift;
+        unsigned char normal;
+        unsigned char shift;
     };
 
-    static bool Translate(WPARAM vk, bool shift, bool caps, wchar_t& out)
+    static bool Translate(WPARAM vk, bool shift, bool caps, unsigned char& out)
     {
         bool logicalShift = shift;
         if (vk >= 'A' && vk <= 'Z') {
@@ -44,41 +44,41 @@ private:
 	static void _TranslateByTable();
     static constexpr KeyDef g_keyTable[] = {
         // digits
-        { '0', L'0', L')' },
-        { '1', L'1', L'!' },
-        { '2', L'2', L'@' },
-        { '3', L'3', L'#' },
-        { '4', L'4', L'$' },
-        { '5', L'5', L'%' },
-        { '6', L'6', L'^' },
-        { '7', L'7', L'&' },
-        { '8', L'8', L'*' },
-        { '9', L'9', L'(' },
+        { '0', '0', ')' },
+        { '1', '1', '!' },
+        { '2', '2', '@' },
+        { '3', '3', '#' },
+        { '4', '4', '$' },
+        { '5', '5', '%' },
+        { '6', '6', '^' },
+        { '7', '7', '&' },
+        { '8', '8', '*' },
+        { '9', '9', '(' },
 
         // letters (A–Z)
-        { 'A', L'a', L'A' }, { 'B', L'b', L'B' }, { 'C', L'c', L'C' },
-        { 'D', L'd', L'D' }, { 'E', L'e', L'E' }, { 'F', L'f', L'F' },
-        { 'G', L'g', L'G' }, { 'H', L'h', L'H' }, { 'I', L'i', L'I' },
-        { 'J', L'j', L'J' }, { 'K', L'k', L'K' }, { 'L', L'l', L'L' },
-        { 'M', L'm', L'M' }, { 'N', L'n', L'N' }, { 'O', L'o', L'O' },
-        { 'P', L'p', L'P' }, { 'Q', L'q', L'Q' }, { 'R', L'r', L'R' },
-        { 'S', L's', L'S' }, { 'T', L't', L'T' }, { 'U', L'u', L'U' },
-        { 'V', L'v', L'V' }, { 'W', L'w', L'W' }, { 'X', L'x', L'X' },
-        { 'Y', L'y', L'Y' }, { 'Z', L'z', L'Z' },
+        { 'A', 'a', 'A' }, { 'B', 'b', 'B' }, { 'C', 'c', 'C' },
+        { 'D', 'd', 'D' }, { 'E', 'e', 'E' }, { 'F', 'f', 'F' },
+        { 'G', 'g', 'G' }, { 'H', 'h', 'H' }, { 'I', 'i', 'I' },
+        { 'J', 'j', 'J' }, { 'K', 'k', 'K' }, { 'L', 'l', 'L' },
+        { 'M', 'm', 'M' }, { 'N', 'n', 'N' }, { 'O', 'o', 'O' },
+        { 'P', 'p', 'P' }, { 'Q', 'q', 'Q' }, { 'R', 'r', 'R' },
+        { 'S', 's', 'S' }, { 'T', 't', 'T' }, { 'U', 'u', 'U' },
+        { 'V', 'v', 'V' }, { 'W', 'w', 'W' }, { 'X', 'x', 'X' },
+        { 'Y', 'y', 'Y' }, { 'Z', 'z', 'Z' },
 
         // basic symbols (US keyboard)
-        { VK_SPACE,          L' ',  L' ' },
-        { VK_OEM_MINUS,      L'-',  L'_' },
-        { VK_OEM_PLUS,       L'=',  L'+' },
-        { VK_OEM_4,          L'[',  L'{' },
-        { VK_OEM_6,          L']',  L'}' },
-        { VK_OEM_5,          L'\\', L'|' },
-        { VK_OEM_1,          L';',  L':' },
-        { VK_OEM_7,          L'\'', L'"' },
-        { VK_OEM_COMMA,      L',',  L'<' },
-        { VK_OEM_PERIOD,     L'.',  L'>' },
-        { VK_OEM_2,          L'/',  L'?' },
-        { VK_OEM_3,          L'`',  L'~' },
+        { VK_SPACE,          ' ',  ' ' },
+        { VK_OEM_MINUS,      '-',  '_' },
+        { VK_OEM_PLUS,       '=',  '+' },
+        { VK_OEM_4,          '[',  '{' },
+        { VK_OEM_6,          ']',  '}' },
+        { VK_OEM_5,          '\\', '|' },
+        { VK_OEM_1,          ';',  ':' },
+        { VK_OEM_7,          '\'', '"' },
+        { VK_OEM_COMMA,      ',',  '<' },
+        { VK_OEM_PERIOD,     '.',  '>' },
+        { VK_OEM_2,          '/',  '?' },
+        { VK_OEM_3,          '`',  '~' },
     };
 };
 
@@ -161,10 +161,11 @@ static const std::map<std::wstring, ChmFuncType> s_actionNameMap = {
     { L"backspace",          ChmFuncType::Backspace },
     { L"cancel",             ChmFuncType::Cancel },
     { L"cancel-finish",      ChmFuncType::UnFinish },
-    { L"select",             ChmFuncType::CompSelect },
+    { L"select-start",       ChmFuncType::CompSelect },
 	{ L"next-page" ,         ChmFuncType::SelectNextPage },     // 選択中の次ページ
 	{ L"prev-page" ,         ChmFuncType::SelectPrevPage },     // 選択中の次ページ
 	{ L"cancel-select" ,     ChmFuncType::SelectCancel },       // 選択中のキャンセル
+	{ L"select-kanji" ,      ChmFuncType::SelectInput },        // 選択
 	{ L"space-char",         ChmFuncType::CharInputSpace },
 #ifdef _DEBUG
     { L"version-info",       ChmFuncType::VersionInfo },
@@ -376,7 +377,7 @@ std::wstring ChmKeyEvent::Dump()
 	for (const auto& pair : s_currentKeyTable) {
 		std::wstring keyName = L"?";
 		{
-			wchar_t ch = pair.first.wp ;
+			unsigned char ch = (unsigned char)pair.first.wp ;
 			if ((ch >= L'A' && ch <= L'Z') ||
 			    (ch >= L'0' && ch <= L'9'))
 			{
@@ -422,6 +423,7 @@ std::wstring ChmKeyEvent::Dump()
 void ChmKeyEvent::_TranslateByTable()
 {
     KeySignature sig{ _wp, _shift, _control, _alt , _state};
+	Info(Format(L" translate: WP=%d, Shift=%d, Ctrl=%d, Alt=%d, State=%d", _wp, _shift, _control, _alt, _state));
     auto it = s_currentKeyTable.find(sig);
     if (it != s_currentKeyTable.end())
     {
@@ -442,18 +444,24 @@ void ChmKeyEvent::_TranslateByTable()
     }
 
 	// 機能キーでなかった場合は、文字入力とみなす
-    wchar_t ch = 0;
+    unsigned char ch = 0;
     if (ChmKeyLayout::Translate(_wp, _shift, _caps, ch))
     {
-        _type = ChmFuncType::CharInput;
+		// select中の文字入力は確定キーとして扱う
+		if (_state == ChmEngine::State::Selecting) {
+			_type = ChmFuncType::SelectInput;
+		}
+		else {
+			_type = ChmFuncType::CharInput;
+		}
         return;
     }
 
     _type = ChmFuncType::None;
 }
 
-wchar_t ChmKeyEvent::GetChar() const {
-	wchar_t ch;
+unsigned char ChmKeyEvent::GetChar() const {
+	unsigned char ch;
 	if (ChmKeyLayout::Translate(_wp, _shift, _caps, ch)) {
 		return ch;
 	} else {

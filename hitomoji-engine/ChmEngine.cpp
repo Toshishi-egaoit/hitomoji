@@ -9,12 +9,14 @@
 #include "ChmL3Kanji.h"
 #include "Hitomoji.h"
 
-ChmEnvironment g_environment ;
-
 ChmEngine::ChmEngine() 
-	: _isON(FALSE), _state(State::None), _converted(L""), _pending(L"") {
-	ChmLogger::Debug(L"ChmEngine::Activate");
+	: _isON(FALSE), _state(State::None), _converted(L""), _pending(L"") 
+{
 	_pRawInputStore = new ChmRawInputStore();
+	_pConfig = nullptr;
+	_pL3KanjiDict = nullptr;
+	_pL3KanjiSelect = nullptr;
+	_pL3Helper = nullptr;
 }
 
 ChmEngine::~ChmEngine() {
@@ -22,7 +24,8 @@ ChmEngine::~ChmEngine() {
 }
 
 void ChmEngine::Activate() {
-	ChmLogger::Debug(L"ChmEngine::Activate");
+	Debug(L"ChmEngine::Activate");
+	_initEnv();
 	InitConfig();
 	_initLayer2();
 	_initLayer3();
@@ -33,8 +36,8 @@ void ChmEngine::Deactivate() {
 	delete _pConfig;
 	_pConfig = nullptr ;
 
-	delete _pL3Kanji;
-	_pL3Kanji = nullptr ;
+	delete _pL3KanjiDict;
+	_pL3KanjiDict = nullptr ;
 	
 	delete _pL3Helper;
 	_pL3Helper = nullptr ;
@@ -47,42 +50,45 @@ void ChmEngine::InitConfig() {
 
 	if (newConfig->HasErrors())
 	{
-		ChmLogger::Warn((std::wstring(L"===Errors===\n") + newConfig->DumpErrors()).c_str());
-		ChmLogger::Warn((std::wstring(L"===Infos===\n") + newConfig->DumpInfos()).c_str());
+		Warn((std::wstring(L"===Errors===\n") + newConfig->DumpErrors()).c_str());
+		Warn((std::wstring(L"===Infos===\n") + newConfig->DumpInfos()).c_str());
 	}
 	if (!bSuccess && _pConfig) {
 		delete newConfig;
-		ChmLogger::Warn(L"   > keeping old _pConfig");
+		Warn(L"   > keeping old _pConfig");
 	} else {
 		if (!bSuccess) {
 			newConfig->InitConfig();
-			ChmLogger::Warn(L"   > using empty config");
+			Warn(L"   > using empty config");
 		}
 		delete _pConfig;
 		_pConfig = newConfig;
-		ChmLogger::Info((std::wstring(L"=== Configs ===\n") + _pConfig->Dump()).c_str());
-		ChmLogger::Info((std::wstring(L"=== Function-Keys ===\n") + ChmKeyEvent::Dump()).c_str());
+		Info((std::wstring(L"=== Configs ===\n") + _pConfig->Dump()).c_str());
+		Info((std::wstring(L"=== Function-Keys ===\n") + ChmKeyEvent::Dump()).c_str());
 	}
 
 	// Loggerのログレベルを設定
 	{
-		std::wstring logLevelStr = ChmConfig::Canonize(newConfig->GetString(L"UI", L"loglevel"));
+		std::wstring logLevelStr = ChmConfig::Canonize(_pConfig->GetString(L"UI", L"loglevel"));
 		if ( logLevelStr == L"error")     ChmLogger::SetLogLevel(ChmLogger::ErrorLevel);
 		else if (logLevelStr == L"warn")  ChmLogger::SetLogLevel(ChmLogger::WarnLevel);
 		else if (logLevelStr == L"info")  ChmLogger::SetLogLevel(ChmLogger::InfoLevel);
 		else if (logLevelStr == L"debug") ChmLogger::SetLogLevel(ChmLogger::DebugLevel);
 		else {
 			ChmLogger::SetLogLevel(ChmLogger::InfoLevel);
-			ChmLogger::Warn(L"   > Invalid LogLevel in config, defaulting to Info");
+			Warn(L"   > Invalid LogLevel in config, defaulting to Info");
 		}
 
 	}
-
 	return ;
 }
 
 std::wstring ChmEngine::GetConfigFile() { 
 	return _pConfig->GetConfigFile(); 
+}
+
+void ChmEngine::_initEnv() {
+	g_environment.Init();
 }
 
 void ChmEngine::_initLayer2() {
@@ -91,10 +97,10 @@ void ChmEngine::_initLayer2() {
 }
 
 void ChmEngine::_initLayer3() {
-	if (_pL3Kanji == nullptr )
-		_pL3Kanji = new ChmL3Kanji ;
 	if (_pL3Helper == nullptr )
 		_pL3Helper = new ChmL3Helper ;
+	if (_pL3KanjiDict == nullptr )
+		_pL3KanjiDict = new ChmL3KanjiDict ;
 }
 
 BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
@@ -122,7 +128,6 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
 void ChmEngine::SetError(void) {
 	// TODO:Beep音を出す。（confiファイルでON/OFFできるようにする）
 	_pending += L"?";
-	_state = State::Inputing;
 }
 
 void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition){
@@ -138,16 +143,29 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			break;
 		case ChmFuncType::CompSelect:
 			// かな漢字変換の選択開始
-			// エラーチェック：pendingに文字がある?
+			_state = State::Selecting;
+			_pL3KanjiSelect = new ChmL3KanjiSelect(_pL3KanjiDict, _pL3Helper->GetPageSize());
+			_converted = L"<" + _converted + L">";
 			if (!_pending.empty() ) {
-				SetError();
-				break ;
+				// エラーチェック：pendingに文字がある?
+				_pending = L"?";
+				_state = State::Inputing;
+			} else if ( _pL3KanjiSelect->Start(_converted) == FALSE ) {
+				// エラーチェック２：_convertedの読みを検索しても見つからない?
+				_pending = L"?";
+				_state = State::Inputing;
 			}
-			// (未実装)エラーチェック２：_convertedの読みを検索しても見つからない?
 			// (未実装)候補リストの更新
 			// (未実装)選択候補のスレッドへの通知
 
-			_state = State::Selecting;
+			break;
+		case ChmFuncType::SelectNextPage:
+			_converted = _converted + L"+";
+			_pL3KanjiSelect->NextPage();
+			break;
+		case ChmFuncType::SelectPrevPage:
+			_converted = _converted + L"-";
+			_pL3KanjiSelect->PrevPage();
 			break;
 		case ChmFuncType::ReloadIni: {
 			bool bRet = _pConfig->LoadFile();
@@ -196,16 +214,41 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			_pending = L"";
 			_state = State::None;
 			break;
+		case ChmFuncType::SelectInput:
+			// 選択処理の場合
+			if ( _state == State::Selecting) {
+				// キーからindexを求める
+				int index = _pL3Helper->KeyToIndex(keyEvent.GetChar());
+				if (index < 0) {
+					// indexが見つからない場合はエラー
+					_pending = L"?idx";
+					_state = State::Selecting;
+				}
+				else {
+					uint32_t selected = _pL3KanjiSelect->SelectByIndex(index) ;
+					if ( selected == 0) {
+						// その位置に選択肢がない場合はエラー
+						_pending = L"?ch";
+						_state = State::Selecting;
+					}
+					else {
+						// 選択成功の場合は確定して終了
+						_converted = L"???"; // selectedをUTF16形式に変換（未実装）
+						_pending = L"";
+						_state = State::None;
+					}
+				}
+				delete _pL3KanjiSelect ;
+				_pL3KanjiSelect = nullptr; // 選択オブジェクトはもう不要なので破棄
+			}
+			break ;
+
 		case ChmFuncType::CharInput:
 			// 通常の文字入力
-			if (!HasComposition()) {
-				_pRawInputStore->clear();
-				_state = State::Inputing;
-			}
+			_state = State::Inputing;
 			_pRawInputStore->push(keyEvent.GetChar());
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
 				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
-				;
 			break;
 		case ChmFuncType::Backspace: {
 			if (!HasComposition()) break;

@@ -10,7 +10,8 @@
 class ChmRawInputStore;
 class ChmConfig;
 class ChmKeyEvent ;
-class ChmL3Kanji ;
+class ChmL3KanjiDict ;
+class ChmL3KanjiSelect ;
 class ChmL3Helper ;
 
 #define VK_HITOMOJI 0 // 仮想キーコード: マウスイベントなどの特殊用途
@@ -54,6 +55,7 @@ public:
 
 private:
 	// Activate/Deactivateでの初期処理
+	void _initEnv();
 	void _initLayer3();
 	void _initLayer2();
 
@@ -68,7 +70,8 @@ private:
 	State _state ;
 	BOOL _isON;
 	ChmRawInputStore* _pRawInputStore; // 入力されたローマ字列
-	ChmL3Kanji* _pL3Kanji; // かな漢字変換
+	ChmL3KanjiDict* _pL3KanjiDict; // かな漢字変換辞書
+	ChmL3KanjiSelect* _pL3KanjiSelect; // かな漢字変換中
 	ChmL3Helper* _pL3Helper; // かな漢字変換の選択キー定義
 
 	std::wstring _converted; // かな変換できた部分

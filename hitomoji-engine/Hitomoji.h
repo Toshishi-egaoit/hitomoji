@@ -12,6 +12,7 @@ enum class ChmFuncType {
 	CompFinishKey,      // キーどおり確定(TAB)
 	CompFinishKeyWide,  // キーどおり確定ワイド(Shift+TAB)
 	CompSelect,         // 選択開始(かな漢字変換)
+	SelectInput,        // 選択
 	SelectNextPage,     // 選択中の次ページ
 	SelectPrevPage,     // 選択中の次ページ
 	SelectCancel,       // 選択中のキャンセル
