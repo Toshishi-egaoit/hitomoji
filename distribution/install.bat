@@ -10,6 +10,7 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
+
 set CONFIG_DIR=%appdata%\Hitomoji
 
 set SYSTEM_DIR=%SystemRoot%\System32
@@ -20,13 +21,10 @@ set SYSTEM_DIR32=%SystemRoot%\SysWOW64
 set TARGET_DIR32=%SYSTEM_DIR32%\hitomoji
 set TARGET_DLL32=%TARGET_DIR32%\Hitomoji.dll
 
-:: 前回のゴミがあれば掃除（リブート後なら消せる）
-if exist "%TARGET_DLL%.old" (
-    del /q "%TARGET_DLL%.old" >nul 2>&1
-)
-if exist "%TARGET_DLL32%.old" (
-    del /q "%TARGET_DLL32%.old" >nul 2>&1
-)
+set FORCE=0
+
+REM オプション解析
+if /i "%1"=="/f" set FORCE=1
 
 :: 2. フォルダがなければ作成
 if not exist "%CONFIG_DIR%" (
@@ -62,13 +60,31 @@ copy /y "x64\regHitomoji.exe" "%TARGET_DIR%"
 copy /y "x86\regHitomoji.exe" "%TARGET_DIR32%"
 "%TARGET_DIR32%\regHitomoji.exe"
 
-echo "設定ファイルのコピー"
+echo 設定ファイルのコピー
+if exist "%CONFIG_DIR%\hitomoji.ini" (
+    if "%FORCE%"=="0" (
+        echo "   hitomoji.ini が存在します。(上書きする場合は install.bat /f )"
+		goto skip
+	)
+)
 copy /y "hitomoji.ini" "%CONFIG_DIR%"
+:skip
+
 copy /y "layer2.sample.ini" "%CONFIG_DIR%"
 echo "辞書ファイルのコピー"
 copy /y "hitomoji.dic" "%CONFIG_DIR%"
 
+:: 前回のゴミがあれば掃除（リブート後なら消せる）
+if exist "%TARGET_DLL%.old" (
+    del /q "%TARGET_DLL%.old" >nul 2>&1
+)
+if exist "%TARGET_DLL32%.old" (
+    del /q "%TARGET_DLL32%.old" >nul 2>&1
+)
+
+
 echo インストール工程が完了しました。
 echo 必要なファイルは全てコピーされました。
-echo このディレクトリは削除しても構いません。
+echo このディレクトリの内容は削除できます
+cd
 pause
