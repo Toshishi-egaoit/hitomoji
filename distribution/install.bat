@@ -6,10 +6,9 @@ cd /d %~dp0
 openfiles >nul 2>&1
 if %errorlevel% neq 0 (
     echo 管理者権限が必要です。昇格ダイアログを表示します...
-    powershell -Command "Start-Process '%~f0' -Verb RunAs"
+	powershell -Command "Start-Process '%~f0' -Verb RunAs -WorkingDirectory '%~dp0'"
     exit /b
 )
-
 
 set CONFIG_DIR=%appdata%\Hitomoji
 
@@ -21,10 +20,11 @@ set SYSTEM_DIR32=%SystemRoot%\SysWOW64
 set TARGET_DIR32=%SYSTEM_DIR32%\hitomoji
 set TARGET_DLL32=%TARGET_DIR32%\Hitomoji.dll
 
-set FORCE=0
 
 REM オプション解析
-if /i "%1"=="/f" set FORCE=1
+if not defined FORCE (
+    if /i "%1"=="/f" set FORCE=1
+)
 
 :: 2. フォルダがなければ作成
 if not exist "%CONFIG_DIR%" (
@@ -46,6 +46,7 @@ if exist "%TARGET_DLL32%" (
 echo 管理者権限で実行中...
 
 echo 64ビット版DLLのコピーと登録
+echo "copy /y x64\hitomoji.dll %TARGET_DIR%
 copy /y "x64\hitomoji.dll" "%TARGET_DIR%"
 "%SYSTEM_DIR%\regsvr32.exe" /s "%TARGET_DIR%\hitomoji.dll"
 
