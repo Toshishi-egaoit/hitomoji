@@ -251,24 +251,23 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 				if (index < 0) {
 					// indexが見つからない場合はエラー
 					_pending = L"?idx";
-					_state = State::Selecting;
 				}
 				else {
 					uint32_t selected = _pL3KanjiSelect->SelectByIndex(index) ;
 					if ( selected == 0) {
 						// その位置に選択肢がない場合はエラー
 						_pending = L"?ch";
-						_state = State::Selecting;
 					}
 					else {
 						// 選択成功の場合は確定して終了
 						_converted = ChmL3Helper::Utf32ToWString(selected);
 						_pending = L"";
 						_state = State::None;
+						// 選択オブジェクトはもう不要なので破棄
+						delete _pL3KanjiSelect ;
+						_pL3KanjiSelect = nullptr; 
 					}
 				}
-				delete _pL3KanjiSelect ;
-				_pL3KanjiSelect = nullptr; // 選択オブジェクトはもう不要なので破棄
 			}
 			break ;
 
