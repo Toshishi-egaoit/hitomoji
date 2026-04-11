@@ -145,16 +145,16 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			// かな漢字変換の選択開始
 			_state = State::Selecting;
 			_pL3KanjiSelect = new ChmL3KanjiSelect(_pL3KanjiDict, _pL3Helper->GetPageSize());
-			_converted = L"<" + _converted + L">";
 			if (!_pending.empty() ) {
 				// エラーチェック：pendingに文字がある?
-				_pending = L"?";
+				_pending = L"?pd";
 				_state = State::Inputing;
 			} else if ( _pL3KanjiSelect->Start(_converted) == FALSE ) {
 				// エラーチェック２：_convertedの読みを検索しても見つからない?
-				_pending = L"?";
+				_pending = L"?NF";
 				_state = State::Inputing;
 			}
+			_converted = L"<" + _converted + L">";
 			// (未実装)候補リストの更新
 			// (未実装)選択候補のスレッドへの通知
 
@@ -233,7 +233,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 					}
 					else {
 						// 選択成功の場合は確定して終了
-						_converted = L"???"; // selectedをUTF16形式に変換（未実装）
+						_converted = ChmL3Helper::Utf32ToWString(selected);
 						_pending = L"";
 						_state = State::None;
 					}
