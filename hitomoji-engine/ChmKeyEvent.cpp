@@ -113,6 +113,7 @@ static const FuncKeyDef g_functionKeyTable[] = {
     { 'I',         false, true,  false, ChmEngine::State::Selecting, ChmFuncType::CompFinishKey  },
     { 'I',         true,  true,  false, ChmEngine::State::Selecting, ChmFuncType::CompFinishKeyWide},
     { 'M',         false, true,  false, ChmEngine::State::Selecting, ChmFuncType::CompFinish     },
+    { 'Z',         false, true,  false, ChmEngine::State::None,      ChmFuncType::UnFinish       },
 #ifdef _DEBUG
     { 'V',         true,  true,  false, ChmEngine::State::None,      ChmFuncType::VersionInfo    },
     { 'R',         true,  true,  false, ChmEngine::State::None,      ChmFuncType::ReloadIni      },

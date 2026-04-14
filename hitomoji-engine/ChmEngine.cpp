@@ -118,6 +118,9 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
 	if (ev.GetType() == ChmFuncType::VersionInfo) return TRUE;
 #endif
 
+	// UNDOに限っては確定直後の入力をIMEが食う
+	if (!HasComposition() && ev.GetType() == ChmFuncType::UnFinish) return TRUE;
+
 	// Compositonが存在する状態の特殊キーはIMEが食う
 	if (HasComposition() && ev.GetType() != ChmFuncType::None) return TRUE;
 
@@ -182,6 +185,13 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			_pending = L"";
 			_state = State::None;
 			break;
+		case ChmFuncType::UnFinish:         // CTRL+Zで未確定状態に戻す
+			// TODO:直前の確定文字列を削除する処理が必要
+			_pRawInputStore->restore();
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
+				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
+			_state = State::Inputing;
+			break;
 
 		// --------
 		// 漢字変換に関する処理
@@ -212,6 +222,8 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			_pL3KanjiSelect->PrevPage();
 			break;
 		case ChmFuncType::SelectCancel:         // 選択中のキャンセルは入力に戻す
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
+				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
 			_state = State::Inputing;
 			break;
 

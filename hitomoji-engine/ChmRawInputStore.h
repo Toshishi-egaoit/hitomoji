@@ -9,39 +9,45 @@ class ChmRawInputStore {
 public:
     // ASCII 1文字入力
     void push(wchar_t c) {
-        rawInput_.push_back(c);
-    }
+		_rawInput.push_back(c);
+	}
+
+    void restore() {
+		if (_rawInput.empty() || _backup.empty()) return;
+		_rawInput = _backup ;
+		_backup.clear();
+	}
 
     // rawInput 全消去（確定・ESC 用）
     void clear() {
-        rawInput_.clear();
+        _backup = _rawInput ;
+        _rawInput.clear();
     }
 
     const std::wstring& get() const {
-        return rawInput_;
+        return _rawInput;
     }
 
     bool empty() const {
-        return rawInput_.empty();
+        return _rawInput.empty();
     }
 
     size_t size() const {
-        return rawInput_.size();
+        return _rawInput.size();
     }
 
     // rawInput から指定数の文字を巻き戻す
     bool pop(size_t deleteRawLength) {
         if (deleteRawLength == 0) return false;
-        if (deleteRawLength > rawInput_.size()) {
-            rawInput_.clear();
+        if (deleteRawLength > _rawInput.size()) {
+            _rawInput.clear();
         } else {
-            rawInput_.erase(rawInput_.size() - deleteRawLength);
+            _rawInput.erase(_rawInput.size() - deleteRawLength);
         }
         return true;
     }
 
 private:
-    std::wstring rawInput_;
+    std::wstring _rawInput;
+	std::wstring _backup; // undo用
 };
-
-
