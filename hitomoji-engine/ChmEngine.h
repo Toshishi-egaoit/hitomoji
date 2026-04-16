@@ -22,6 +22,7 @@ public:
 		None = 1,
 		Inputing ,
 		Selecting,
+		Committing, // 仮確定（Undo処理用）
 	} ;
 
 	ChmEngine();
@@ -52,6 +53,10 @@ public:
 	void UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition);
 	void PostUpdateComposition();
 	void ResetStatus() ;
+
+	void CommitVisual() ;
+	void CommitFinal() ;
+	void RevertCommit() ;
 
 private:
 	// Activate/Deactivateでの初期処理

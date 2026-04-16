@@ -12,15 +12,8 @@ public:
 		_rawInput.push_back(c);
 	}
 
-    void restore() {
-		if (_rawInput.empty() || _backup.empty()) return;
-		_rawInput = _backup ;
-		_backup.clear();
-	}
-
     // rawInput 全消去（確定・ESC 用）
     void clear() {
-        _backup = _rawInput ;
         _rawInput.clear();
     }
 
@@ -49,5 +42,4 @@ public:
 
 private:
     std::wstring _rawInput;
-	std::wstring _backup; // undo用
 };

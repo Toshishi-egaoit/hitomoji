@@ -128,6 +128,11 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
 	return FALSE;
 }
 
+void ChmEngine::CommitFinal() {
+	_state = State::None;
+	ResetStatus();
+}
+
 void ChmEngine::SetError(void) {
 	// TODO:Beep音を出す。（confiファイルでON/OFFできるようにする）
 	_pending += L"?";
@@ -186,8 +191,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			_state = State::None;
 			break;
 		case ChmFuncType::UnFinish:         // CTRL+Zで未確定状態に戻す
-			// TODO:直前の確定文字列を削除する処理が必要
-			_pRawInputStore->restore();
+			
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
 			_state = State::Inputing;
@@ -232,28 +236,28 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 		case ChmFuncType::CompFinishHiragana: // ひらがな変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
-			_state = State::None;
+			_state = State::Committing;
 			break ;
 		case ChmFuncType::CompFinishKatakana: // カタカナ変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
 			_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
 			_converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
-			_state = State::None;
+			_state = State::Committing;
 			break ;
 		case ChmFuncType::CompFinish:     // 見たまま変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
-			_state = State::None;
+			_state = State::Committing;
 			break;
 		case ChmFuncType::CompFinishKey:    // ASCII確定
 			_converted = _pRawInputStore->get();
 			_pending = L"";
-			_state = State::None;
+			_state = State::Committing;
 			break;
 		case ChmFuncType::CompFinishKeyWide: // 全角ASCII確定
 			_converted = AsciiToWide(_pRawInputStore->get());
 			_pending = L"";
-			_state = State::None;
+			_state = State::Committing;
 			break;
 		case ChmFuncType::SelectInput:
 			// 選択処理の場合
@@ -314,7 +318,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 void ChmEngine::PostUpdateComposition(){
 	// 変換中でなくなった場合は、残りかすを処分
 	if (!HasComposition()) {
-		ResetStatus();
+		// ResetStatus();
 	}
 	return;
 }
