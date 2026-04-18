@@ -12,6 +12,18 @@ public:
 		_rawInput.push_back(c);
 	}
 
+    // UnFinish用のバックアップ
+    void backup() {
+		_lastInput = _rawInput ;
+        _rawInput.clear();
+    }
+
+    // UnFinish時に戻す処理
+    void restore() {
+		_rawInput = _lastInput ;
+        _lastInput.clear();
+    }
+
     // rawInput 全消去（確定・ESC 用）
     void clear() {
         _rawInput.clear();
@@ -42,4 +54,5 @@ public:
 
 private:
     std::wstring _rawInput;
+    std::wstring _lastInput;
 };

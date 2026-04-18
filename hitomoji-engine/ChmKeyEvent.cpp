@@ -113,7 +113,7 @@ static const FuncKeyDef g_functionKeyTable[] = {
     { 'I',         false, true,  false, ChmEngine::State::Selecting, ChmFuncType::CompFinishKey  },
     { 'I',         true,  true,  false, ChmEngine::State::Selecting, ChmFuncType::CompFinishKeyWide},
     { 'M',         false, true,  false, ChmEngine::State::Selecting, ChmFuncType::CompFinish     },
-    { 'Z',         false, true,  false, ChmEngine::State::None,      ChmFuncType::UnFinish       },
+    { 'Z',         false, true,  false, ChmEngine::State::Committing,ChmFuncType::UnFinish       },
 #ifdef _DEBUG
     { 'V',         true,  true,  false, ChmEngine::State::None,      ChmFuncType::VersionInfo    },
     { 'R',         true,  true,  false, ChmEngine::State::None,      ChmFuncType::ReloadIni      },
@@ -424,7 +424,6 @@ std::wstring ChmKeyEvent::Dump()
 void ChmKeyEvent::_TranslateByTable()
 {
     KeySignature sig{ _wp, _shift, _control, _alt , _state};
-	Info(Format(L" translate: WP=%d, Shift=%d, Ctrl=%d, Alt=%d, State=%d", _wp, _shift, _control, _alt, _state));
     auto it = s_currentKeyTable.find(sig);
     if (it != s_currentKeyTable.end())
     {
