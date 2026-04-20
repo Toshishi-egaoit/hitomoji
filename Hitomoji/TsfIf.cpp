@@ -24,8 +24,10 @@ public:
 		ChmTsfInterface* pTsfIf,
 		std::wstring compositionStr,
 		ChmEngine::State state,
-		BOOL fTerminateComposition)
-		: _pic(pic), _pTsfIf(pTsfIf), _tid(tid), _compositionStr(compositionStr), _state(state), _fTerminateComposition(fTerminateComposition), _cRef(1) {
+		BOOL fTerminateComposition,
+		BOOL fReturnOnTerminate = FALSE)
+		: _pic(pic), _pTsfIf(pTsfIf), _tid(tid), _compositionStr(compositionStr), _state(state), 
+		  _fTerminateComposition(fTerminateComposition), _fReturnOnTerminate(fReturnOnTerminate), _cRef(1) {
 	}
 
 	STDMETHODIMP QueryInterface(REFIID riid, void** ppv) {
@@ -44,7 +46,7 @@ public:
 
 	// アプリへの文字列の挿入や、Compositionの終了処理などを行う
 	STDMETHODIMP DoEditSession(TfEditCookie ec) {
-		Info(Format(L"DoEditSession:>>%s<< term=%d state=%d",_compositionStr.c_str(), _fTerminateComposition, _state));
+		Info(Format(L"DoEditSession:>>%s<< term=%d state=%d return=%d",_compositionStr.c_str(), _fTerminateComposition, _state));
 		ITfRange* pRange = nullptr;
 
 		// 確定処理（CommitFinal)
@@ -70,7 +72,8 @@ public:
 				_TerminateComposition(ec);
 			}
 			// ここでセッションを終わらせると、正しく反映されなかったので、ここでは終わらせない
-			// return S_OK;
+			if (_fReturnOnTerminate == FALSE)
+				return S_OK;
 		} 
 
 		// 新規／更新
@@ -185,6 +188,7 @@ private:
 	std::wstring _compositionStr;
 	ChmEngine::State _state;
 	BOOL _fTerminateComposition;
+	BOOL _fReturnOnTerminate = FALSE;
 	LONG _cRef;
 };
 
@@ -266,7 +270,7 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 
 STDMETHODIMP ChmTsfInterface::Deactivate() {
 	ChmLogger::Info(L"Deactivate()");
-	ClearComposition();
+	_FlushComposition();
 	if (_dwThreadFocusSinkCookie != TF_INVALID_COOKIE) {
 		ITfSource* pSource = nullptr;
 		if (SUCCEEDED(_pThreadMgr->QueryInterface(IID_ITfSource, (void**)&pSource))) {
@@ -341,10 +345,35 @@ STDMETHODIMP ChmTsfInterface::OnSetFocus(BOOL fFocus)
 {
 	return S_OK;
 	if (fFocus == TRUE) { // フォーカス取得時
-		ClearComposition();
-		_pEngine->ResetStatus();
+		_FlushComposition();
 	}
 	return S_OK;
+}
+
+// Compositionがある場合に、それをEndCompositionするための関数。
+// フォーカス移動、仮確定時のアプリ側での編集（カーソルキー）などでの整合性を保つ。
+void ChmTsfInterface::_FlushComposition() {
+	Info(Format(L"_FlushComposition:pComposition=%x state=%d",_pComposition, _pEngine->GetState()));
+	if ( _pEngine->GetState() != ChmEngine::State::Committing ) return ;
+
+	if ( _pComposition == nullptr ) return ;
+	ITfRange* pRange = nullptr ;
+	if (FAILED(_pComposition->GetRange(&pRange))) {
+		ClearComposition();
+		_pEngine->ResetStatus();
+		return ;
+	}
+	pRange->Release();
+
+	ITfContext* pic = GetCompositionContext();
+	CEditSession* pES = new CEditSession(pic, _tfClientId, this, _pEngine->GetCompositionStr(), _pEngine->GetState(), TRUE, TRUE); 
+	if (!pES) return ;
+	HRESULT hr;
+	HRESULT hrSession = pic->RequestEditSession(_tfClientId, pES, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hr);
+	OUTPUT_HR_ON_ERROR("_InvokeEditSession/RequestEditSession", hrSession);
+	pES->Release();
+
+	return ;
 }
 
 // ITfKeyEventSink Implementation
@@ -441,8 +470,7 @@ HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
 		// context mismatch -> clear
 		if (_pContextForComposition != pic) {
 			Info(L"_InvokeEditSession: context mismatch -> clear");
-			ClearComposition();
-			_pEngine->ResetStatus();
+			_FlushComposition();
 		} else {
 			// context match -> check view existence
 			ITfCompositionView* pView = nullptr;
@@ -452,8 +480,7 @@ HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
 				// 　　　 ここを通ると、エンジン側のRawInputがクリアされ、フォーカス移動直後の1文字が消失するが、
 				// 　　　 現状では対抗手段がないので、この仕様を受容する。
 				Info(L"_InvokeEditSession: no view -> clear");
-				ClearComposition();
-				_pEngine->ResetStatus();
+				_FlushComposition();
 			} else {
 				pView->Release();
 			}
@@ -524,10 +551,8 @@ STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 	OutputDebugString(L"[Hitomoji] OnSetThreadFocus()");
 
 	// フォーカス取得時は Composition 側のみを基準に整理
-	if (GetCompositionContext()) {
-		ClearComposition();
-		_pEngine->ResetStatus();
-	}
+	_FlushComposition();
+
 	return S_OK;
 }
 

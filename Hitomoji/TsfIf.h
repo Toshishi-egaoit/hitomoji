@@ -122,6 +122,7 @@ private:
     HRESULT _InitPreservedKey();
     void _UninitPreservedKey();
 	HRESULT _InvokeEditSession(ITfContext* pic, BOOL fEnd) ;
+	void _FlushComposition();
 
 	// ITfDisplayAttributeProvider
     HRESULT _InitDisplayAttributeInfo();
