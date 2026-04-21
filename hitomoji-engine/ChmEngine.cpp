@@ -118,6 +118,9 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
 	if (ev.GetType() == ChmFuncType::VersionInfo) return TRUE;
 #endif
 
+	// UNDOは仮確定の直後のみ有効
+	if (_state == State::Committing && ev.GetType() == ChmFuncType::UnFinish) return TRUE;
+
 	// Compositonが存在する状態の特殊キーはIMEが食う
 	if (HasComposition() && ev.GetType() != ChmFuncType::None) return TRUE;
 
@@ -133,116 +136,34 @@ void ChmEngine::SetError(void) {
 void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition){
 	ChmFuncType _type = keyEvent.GetType();
 
+	// 仮確定後の最初の1文字は確定かUnFinishかを先に判定する。
+	if (_state == State::Committing) {
+		if (_type == ChmFuncType::UnFinish) {
+			// UnFinishでは、RawInputをrestoreした上で状態をInputingに戻す。
+			_pRawInputStore->restore();
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
+				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
+			_state = State::Inputing;
+			// この場合、Compositionは削除せず、以降の処理もスキップ
+			pEndComposition = FALSE; 
+			return ;
+		} else {
+			// それ以外は仮確定->確定なので、Compositionは削除する
+			Info(L"Committing final.");
+			pEndComposition = TRUE;
+		}
+	}
+
 	// 確定キー
 	switch (_type) {
-		case ChmFuncType::CharInputSpace:
+		// --------
+		// 文字入力
+		case ChmFuncType::CharInputSpace: // 1文字目のスペース入力
 			// TODO: configで全角空白か半角かを選べるようにする
 			_converted = L" ";
 			_pending = L"";
-			_state = State::None;
+			_state = State::None; // 空白は変換なしで確定扱い
 			break;
-		case ChmFuncType::CompSelect:
-			// かな漢字変換の選択開始
-			_state = State::Selecting;
-			_pL3KanjiSelect = new ChmL3KanjiSelect(_pL3KanjiDict, _pL3Helper->GetPageSize());
-			_converted = L"<" + _converted + L">";
-			if (!_pending.empty() ) {
-				// エラーチェック：pendingに文字がある?
-				_pending = L"?";
-				_state = State::Inputing;
-			} else if ( _pL3KanjiSelect->Start(_converted) == FALSE ) {
-				// エラーチェック２：_convertedの読みを検索しても見つからない?
-				_pending = L"?";
-				_state = State::Inputing;
-			}
-			// (未実装)候補リストの更新
-			// (未実装)選択候補のスレッドへの通知
-
-			break;
-		case ChmFuncType::SelectNextPage:
-			_converted = _converted + L"+";
-			_pL3KanjiSelect->NextPage();
-			break;
-		case ChmFuncType::SelectPrevPage:
-			_converted = _converted + L"-";
-			_pL3KanjiSelect->PrevPage();
-			break;
-		case ChmFuncType::ReloadIni: {
-			bool bRet = _pConfig->LoadFile();
-			if (bRet) {
-				_converted = L"ok";
-			}else {
-				_converted = L"ng";
-			}
-			_pending = L"";
-			_state = State::Inputing;
-			break;
-		}
-		case ChmFuncType::VersionInfo:
-			_converted = HM_VERSION L"(" __DATE__ L" " __TIME__ L")";
-			_pending = L"";
-			_state = State::Inputing;
-			break;
-		case ChmFuncType::CompFinishHiragana: // ひらがな変換
-			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
-				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
-			_state = State::None;
-			break ;
-		case ChmFuncType::CompFinishKatakana: // カタカナ変換
-			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
-			_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
-			_converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
-			_state = State::None;
-			break ;
-		case ChmFuncType::CompFinish:     // 見たまま変換
-			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
-				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
-			_state = State::None;
-			break;
-		case ChmFuncType::CompFinishKey:    // ASCII確定
-			_converted = _pRawInputStore->get();
-			_pending = L"";
-			_state = State::None;
-			break;
-		case ChmFuncType::CompFinishKeyWide: // 全角ASCII確定
-			_converted = AsciiToWide(_pRawInputStore->get());
-			_pending = L"";
-			_state = State::None;
-			break;
-		case ChmFuncType::Cancel:         // ESCキャンセル
-			_converted = L"";
-			_pending = L"";
-			_state = State::None;
-			break;
-		case ChmFuncType::SelectInput:
-			// 選択処理の場合
-			if ( _state == State::Selecting) {
-				// キーからindexを求める
-				int index = _pL3Helper->KeyToIndex(keyEvent.GetChar());
-				if (index < 0) {
-					// indexが見つからない場合はエラー
-					_pending = L"?idx";
-					_state = State::Selecting;
-				}
-				else {
-					uint32_t selected = _pL3KanjiSelect->SelectByIndex(index) ;
-					if ( selected == 0) {
-						// その位置に選択肢がない場合はエラー
-						_pending = L"?ch";
-						_state = State::Selecting;
-					}
-					else {
-						// 選択成功の場合は確定して終了
-						_converted = L"???"; // selectedをUTF16形式に変換（未実装）
-						_pending = L"";
-						_state = State::None;
-					}
-				}
-				delete _pL3KanjiSelect ;
-				_pL3KanjiSelect = nullptr; // 選択オブジェクトはもう不要なので破棄
-			}
-			break ;
-
 		case ChmFuncType::CharInput:
 			// 通常の文字入力
 			_state = State::Inputing;
@@ -277,19 +198,143 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			}
 			break;
 		}
+		case ChmFuncType::Cancel:         // ESCキャンセル
+			_converted = L"";
+			_pending = L"";
+			_state = State::None;
+			break;
+		case ChmFuncType::UnFinish:         // CTRL+Zで未確定状態に戻す
+			_pRawInputStore->restore();
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
+				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
+			_state = State::Inputing;
+			break;
+
+		// --------
+		// 漢字変換に関する処理
+		case ChmFuncType::CompSelect:
+			// かな漢字変換の選択開始
+			_state = State::Selecting;
+			_pL3KanjiSelect = new ChmL3KanjiSelect(_pL3KanjiDict, _pL3Helper->GetPageSize());
+			if (!_pending.empty() ) {
+				// エラーチェック：pendingに文字がある?
+				_pending += L"?";
+				_state = State::Inputing;
+			} else if ( _pL3KanjiSelect->Start(_converted) == FALSE ) {
+				// エラーチェック２：_convertedの読みを検索しても見つからない?
+				_pending = L"?ym";
+				_state = State::Inputing;
+			}
+			_converted = L"<" + _converted + L">";
+			// TODO:(未実装)候補リストの更新
+			// TODO:(未実装)選択候補のスレッドへの通知
+
+			break;
+		case ChmFuncType::SelectNextPage:
+			_converted = _converted + L"+";
+			_pL3KanjiSelect->NextPage();
+			break;
+		case ChmFuncType::SelectPrevPage:
+			_converted = _converted + L"-";
+			_pL3KanjiSelect->PrevPage();
+			break;
+		case ChmFuncType::SelectCancel:         // 選択中のキャンセルは入力に戻す
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
+				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
+			_state = State::Inputing;
+			break;
+
+		// --------
+		// 各種の確定キーの処理
+		case ChmFuncType::CompFinishHiragana: // ひらがな変換
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
+				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
+			_state = State::Committing;
+			break ;
+		case ChmFuncType::CompFinishKatakana: // カタカナ変換
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
+			_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
+			_converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
+			_state = State::Committing;
+			break ;
+		case ChmFuncType::CompFinish:     // 見たまま変換
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
+			_state = State::Committing;
+			break;
+		case ChmFuncType::CompFinishKey:    // ASCII確定
+			_converted = _pRawInputStore->get();
+			_pending = L"";
+			_state = State::Committing;
+			break;
+		case ChmFuncType::CompFinishKeyWide: // 全角ASCII確定
+			_converted = AsciiToWide(_pRawInputStore->get());
+			_pending = L"";
+			_state = State::Committing;
+			break;
+		case ChmFuncType::SelectInput:
+			// 漢字選択完了
+			if ( _state == State::Selecting) {
+				// キーからindexを求める
+				int index = _pL3Helper->KeyToIndex(keyEvent.GetChar());
+				if (index < 0) {
+					// indexが見つからない場合はエラー
+					_pending = L"?idx";
+				}
+				else {
+					uint32_t selected = _pL3KanjiSelect->SelectByIndex(index) ;
+					if ( selected == 0) {
+						// その位置に選択肢がない場合はエラー
+						_pending = L"?ch";
+					}
+					else {
+						// 選択成功の場合は確定して終了
+						_converted = ChmL3Helper::Utf32ToWString(selected);
+						_pending = L"";
+						_state = State::Committing;
+						// 選択オブジェクトはもう不要なので破棄
+						delete _pL3KanjiSelect ;
+						_pL3KanjiSelect = nullptr; 
+					}
+				}
+			}
+			break ;
+
+		// --------
+		// その他の機能キー
+		case ChmFuncType::ReloadIni: {
+			bool bRet = _pConfig->LoadFile();
+			if (bRet) {
+				_converted = L"ok";
+			}else {
+				_converted = L"ng";
+			}
+			_pending = L"";
+			_state = State::Inputing;
+			break;
+		}
+		case ChmFuncType::VersionInfo:
+			_converted = HM_VERSION L"(" __DATE__ L" " __TIME__ L")";
+			_pending = L"";
+			_state = State::Inputing;
+			break;
+
 		default:
 			// その他のキーは何もしない
 			break;
 	}
-	pEndComposition = !HasComposition();
 
 	return ;
 }
 
 void ChmEngine::PostUpdateComposition(){
-	// 変換中でなくなった場合は、残りかすを処分
-	if (!HasComposition()) {
-		ResetStatus();
+	// 仮確定になったら、RawInputのみ残して全てクリア
+	// ただし、ステータスはCommittingのままとするので、ResetStatusは使わない
+	if (_state == State::Committing ) {
+		_pRawInputStore->backup();
+		_pRawInputStore->clear();
+		_converted = L"";
+		_pending = L"";
 	}
 	return;
 }

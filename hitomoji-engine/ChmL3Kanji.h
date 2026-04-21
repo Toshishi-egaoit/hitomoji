@@ -105,7 +105,7 @@ public:
 
 	void NextPage()
 	{
-		size_t maxPage = (_count + _pageSize - 1) / _pageSize;
+		byte maxPage = (_count + _pageSize - 1) / _pageSize;
 		if (_page + 1 < maxPage) _page++;
 	}
 
@@ -118,10 +118,11 @@ public:
 
 	uint32_t SelectByIndex(byte index)
 	{
-		size_t actual = (_page * _pageSize) + index;
-		if (actual >= _count) return 0;
+		size_t slotNo = (_page * _pageSize) + index;
+		Debug(Format(L"SelectByIndex: index=%d, page=%d, slotNo=%d", index, _page, slotNo));
+		if (slotNo >= _count) return 0;
 
-		return _list[actual];
+		return _list[slotNo];
 	}
 
 	const uint32_t* GetList() const { return _list; }
@@ -140,6 +141,7 @@ private:
 		for (size_t i = 0; i < len; ++i) {
 			out[i] = (char16_t)src[i];
 		}
+		Debug(Format(L"   Search:>>%s<<", out));
 	}
 
 	const ChmL3KanjiDict::YomiEntry* _findYomi(const char16_t* key)
@@ -152,6 +154,7 @@ private:
 			const auto& e = _pDict->DictYomi[mid];
 
 			int cmp = std::memcmp(key, e.DictYomi, 6 * sizeof(char16_t));
+			Debug(Format(L"   B-tree:%s cmp=%d", e.DictYomi, cmp ));
 
 			if (cmp == 0) return &e;
 			if (cmp < 0) right = mid - 1;
@@ -195,6 +198,7 @@ public:
 
 	int KeyToIndex(unsigned char key) const
 	{
+		Debug(Format(L"KeyToIndex: key=%c(%02X) -> index=%d", key, key, _keyToIndex[key]));
 		return _keyToIndex[key];
 	}
 
@@ -203,7 +207,27 @@ public:
 		return _pageSize;
 	}
 
+	// UTF32コードポイントをwstringに変換するユーティリティ（選択候補の表示に使う）
+	static std::wstring Utf32ToWString(uint32_t cp)
+	{
+		std::wstring result;
 
+		if (cp <= 0xFFFF) {
+			// BMP（そのまま）
+			result.push_back((wchar_t)cp);
+		}
+		else {
+			// サロゲートペア
+			cp -= 0x10000;
+			wchar_t high = 0xD800 + (cp >> 10);
+			wchar_t low  = 0xDC00 + (cp & 0x3FF);
+
+			result.push_back(high);
+			result.push_back(low);
+		}
+
+		return result;
+	}
 
 private:
 	void BuildTable(const std::string& raw)

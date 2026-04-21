@@ -23,8 +23,11 @@ public:
 		TfClientId tid, 
 		ChmTsfInterface* pTsfIf,
 		std::wstring compositionStr,
-		BOOL fEnd)
-		: _pic(pic), _pTsfIf(pTsfIf), _tid(tid), _compositionStr(compositionStr), _fEnd(fEnd), _cRef(1) {
+		ChmEngine::State state,
+		BOOL fTerminateComposition,
+		BOOL fReturnOnTerminate = FALSE)
+		: _pic(pic), _pTsfIf(pTsfIf), _tid(tid), _compositionStr(compositionStr), _state(state), 
+		  _fTerminateComposition(fTerminateComposition), _fReturnOnTerminate(fReturnOnTerminate), _cRef(1) {
 	}
 
 	STDMETHODIMP QueryInterface(REFIID riid, void** ppv) {
@@ -43,33 +46,56 @@ public:
 
 	// アプリへの文字列の挿入や、Compositionの終了処理などを行う
 	STDMETHODIMP DoEditSession(TfEditCookie ec) {
-		OutputDebugStringWithString(L"[hitomoji] DoEditSession:>>%s<<",_compositionStr.c_str());
+		Info(Format(L"DoEditSession:>>%s<< term=%d state=%d return=%d",_compositionStr.c_str(), _fTerminateComposition, _state));
 		ITfRange* pRange = nullptr;
 
-		// 1. Compositionの準備
+		// 確定処理（CommitFinal)
+
+		// ホントの確定時はCompositionを終了させる
+		if (_fTerminateComposition) {
+			ITfComposition* pComp = _pTsfIf->GetComposition();
+			if (!pComp) {
+				Warn(L"   > composition do not exist");
+			}
+			HRESULT hr = pComp->GetRange(&pRange);
+			OUTPUT_HR_n_RETURN_ON_ERROR(L"   > GetRange", hr);
+			if (SUCCEEDED(hr) && pRange) {
+				// 確定：キャレットを末尾へ移動して Composition 終了
+				pRange->Collapse(ec, TF_ANCHOR_END);
+
+				// 【追加】アプリ側のキャレット位置をこの Range の場所に同期させる
+				TF_SELECTION sel;
+				sel.range = pRange;
+				sel.style.ase = TF_AE_NONE; // アクティブな末尾
+				sel.style.fInterimChar = FALSE;
+				_pic->SetSelection(ec, 1, &sel);
+				_TerminateComposition(ec);
+			}
+			// ここでセッションを終わらせると、正しく反映されなかったので、ここでは終わらせない
+			if (_fReturnOnTerminate == FALSE)
+				return S_OK;
+		} 
+
+		// 新規／更新
+
+		// Compositionの準備
 		if (FAILED(_GetOrStartComposition(ec, &pRange))) return S_OK;
 
-		// 2. 確定処理／未確定表示（共通 SetText）
-		pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
+		// 確定処理／未確定表示（共通 SetText）
+		if ( !_compositionStr.empty() ) {
+			pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
+		}
 
-		if (_fEnd ) {
-			// 確定：キャレットを末尾へ移動して Composition 終了
-			pRange->Collapse(ec, TF_ANCHOR_END);
+		// 未確定：末尾をアクティブにし、そこから左へ未確定範囲を構成
+		LONG cch = (LONG)_compositionStr.length();
+		LONG shifted = 0;
+		pRange->ShiftEnd(ec, cch, &shifted, nullptr);
+		// TODO: キャレット位置がつねに左端になってしまっている
 
-			// 【追加】アプリ側のキャレット位置をこの Range の場所に同期させる
-			TF_SELECTION sel;
-			sel.range = pRange;
-			sel.style.ase = TF_AE_NONE; // アクティブな末尾
-			sel.style.fInterimChar = FALSE;
-			_pic->SetSelection(ec, 1, &sel);
-
-			_TerminateComposition(ec);
+		if (_state == ChmEngine::State::Committing) {
+			// 仮確定なので下線を消す。何もしなくてOK。
 		} else {
-			// 未確定：末尾をアクティブにし、そこから左へ未確定範囲を構成
-			LONG cch = (LONG)_compositionStr.length();
-			LONG shifted = 0;
-			pRange->ShiftEnd(ec, cch, &shifted, nullptr);
-			// TODO: キャレット位置がつねに左端になってしまっている
+			// 変換中は波線を引く
 			_ApplyDisplayAttribute(ec, pRange);
 		}
 
@@ -148,6 +174,7 @@ private:
 	}
 
 	void _TerminateComposition(TfEditCookie ec) {
+		Info(L"   > TerminateComposition");
 		ITfComposition* pComp = _pTsfIf->GetComposition();
 		if (!pComp) return; // 事前に Clear されている可能性があるため防御
 		pComp->EndComposition(ec);
@@ -159,7 +186,9 @@ private:
 	TfClientId _tid; 
 	ChmTsfInterface* _pTsfIf;
 	std::wstring _compositionStr;
-	BOOL _fEnd;
+	ChmEngine::State _state;
+	BOOL _fTerminateComposition;
+	BOOL _fReturnOnTerminate = FALSE;
 	LONG _cRef;
 };
 
@@ -241,7 +270,7 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 
 STDMETHODIMP ChmTsfInterface::Deactivate() {
 	ChmLogger::Info(L"Deactivate()");
-	ClearComposition();
+	_FlushComposition();
 	if (_dwThreadFocusSinkCookie != TF_INVALID_COOKIE) {
 		ITfSource* pSource = nullptr;
 		if (SUCCEEDED(_pThreadMgr->QueryInterface(IID_ITfSource, (void**)&pSource))) {
@@ -316,31 +345,55 @@ STDMETHODIMP ChmTsfInterface::OnSetFocus(BOOL fFocus)
 {
 	return S_OK;
 	if (fFocus == TRUE) { // フォーカス取得時
-		ClearComposition();
-		_pEngine->ResetStatus();
+		_FlushComposition();
 	}
 	return S_OK;
+}
+
+// Compositionがある場合に、それをEndCompositionするための関数。
+// フォーカス移動、仮確定時のアプリ側での編集（カーソルキー）などでの整合性を保つ。
+void ChmTsfInterface::_FlushComposition() {
+	Info(Format(L"_FlushComposition:pComposition=%x state=%d",_pComposition, _pEngine->GetState()));
+	if ( _pEngine->GetState() != ChmEngine::State::Committing ) return ;
+
+	if ( _pComposition == nullptr ) return ;
+	ITfRange* pRange = nullptr ;
+	if (FAILED(_pComposition->GetRange(&pRange))) {
+		ClearComposition();
+		_pEngine->ResetStatus();
+		return ;
+	}
+	pRange->Release();
+
+	ITfContext* pic = GetCompositionContext();
+	CEditSession* pES = new CEditSession(pic, _tfClientId, this, _pEngine->GetCompositionStr(), _pEngine->GetState(), TRUE, TRUE); 
+	if (!pES) return ;
+	HRESULT hr;
+	HRESULT hrSession = pic->RequestEditSession(_tfClientId, pES, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hr);
+	OUTPUT_HR_ON_ERROR("_InvokeEditSession/RequestEditSession", hrSession);
+	pES->Release();
+
+	return ;
 }
 
 // ITfKeyEventSink Implementation
 STDMETHODIMP ChmTsfInterface::OnTestKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten) {
 	*pfEaten = _pEngine->IsKeyEaten(wp);
 	ChmKeyEvent kEv(wp, lp,_pEngine->GetState());
-	OutputDebugStringWithString(((std::wstring)L"[Hitomoji] OnTestKeyDown eat=%s" + kEv.toString()).c_str(), *pfEaten ? L"TRUE" : L"FALSE") ;
+	Info(Format(L"OnTestKeyDown eat=%s %s", kEv.toString().c_str(), *pfEaten ? L"TRUE" : L"FALSE"));
 
 	return S_OK;
 }
 
 STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten)
 {
-	OutputDebugString(L"[Hitomoji] OnKeyDown");
+	Info(L"OnKeyDown");
 	*pfEaten = _pEngine->IsKeyEaten(wp);
 	if (*pfEaten) {
-
-		bool fEnd = false;
+		bool fTerminateComposition = false;
 		ChmKeyEvent kEv(wp, lp,_pEngine->GetState());
-		_pEngine->UpdateComposition(kEv,fEnd);
-		_InvokeEditSession(pic, fEnd);
+		_pEngine->UpdateComposition(kEv, fTerminateComposition);
+		_InvokeEditSession(pic, fTerminateComposition);
 		_pEngine->PostUpdateComposition();
 	}
 	return S_OK;
@@ -412,12 +465,12 @@ void ChmTsfInterface::_UninitPreservedKey() {
 
 HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
 	// ---- pre-check: composition / context validity ----
+	Info(Format(L"_InfokeEditSession:pComposition=%x fEnd=%d",_pComposition , fEnd));
 	if (_pComposition) {
 		// context mismatch -> clear
 		if (_pContextForComposition != pic) {
-			OutputDebugString(L"[Hitomoji] _InvokeEditSession: context mismatch -> clear");
-			ClearComposition();
-			_pEngine->ResetStatus();
+			Info(L"_InvokeEditSession: context mismatch -> clear");
+			_FlushComposition();
 		} else {
 			// context match -> check view existence
 			ITfCompositionView* pView = nullptr;
@@ -426,18 +479,18 @@ HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
 				// TODO： OnEndEditが届かない場合、_pCompositionが初期化されずここに来る。でも、その検出手段がない。
 				// 　　　 ここを通ると、エンジン側のRawInputがクリアされ、フォーカス移動直後の1文字が消失するが、
 				// 　　　 現状では対抗手段がないので、この仕様を受容する。
-				OutputDebugString(L"[Hitomoji] _InvokeEditSession: no view -> clear");
-				ClearComposition();
-				_pEngine->ResetStatus();
+				Info(L"_InvokeEditSession: no view -> clear");
+				_FlushComposition();
 			} else {
 				pView->Release();
 			}
+
 		}
 	}
 
 	// ---- normal edit session request ----
 	HRESULT hr;
-	CEditSession* pES = new CEditSession(pic, _tfClientId, this, _pEngine->GetCompositionStr(), fEnd);
+	CEditSession* pES = new CEditSession(pic, _tfClientId, this, _pEngine->GetCompositionStr(), _pEngine->GetState(), fEnd); 
 	if (!pES) return E_OUTOFMEMORY;
 	HRESULT hrSession = pic->RequestEditSession(_tfClientId, pES, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hr);
 	OUTPUT_HR_ON_ERROR("_InvokeEditSession/RequestEditSession", hrSession);
@@ -498,10 +551,8 @@ STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 	OutputDebugString(L"[Hitomoji] OnSetThreadFocus()");
 
 	// フォーカス取得時は Composition 側のみを基準に整理
-	if (GetCompositionContext()) {
-		ClearComposition();
-		_pEngine->ResetStatus();
-	}
+	_FlushComposition();
+
 	return S_OK;
 }
 
