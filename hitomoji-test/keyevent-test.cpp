@@ -74,7 +74,7 @@ TEST_F(FunctionKeyTestBase, InitAndClear)
     // クリア
     ChmKeyEvent::ClearFunctionKey();
     ChmKeyEvent ev2(VK_RETURN, 0);
-    EXPECT_EQ(ChmFuncType::None, ev2.GetType());
+    EXPECT_EQ(ChmFuncType::NoNeed, ev2.GetType());
 }
 
 // ---------------------------------------------
@@ -92,7 +92,7 @@ TEST_F(FunctionKeyTestBase, ParseAndApply)
             L"finish-raw-wide",
             error));
 
-    EXPECT_TRUE(error.level == ChmConfig::ParseLevel::None);
+    EXPECT_TRUE(error.level == ChmConfig::ParseLevel::NoNeed);
 
                   // CTRLのみON
     SetKeyState(false, true, false);
@@ -112,14 +112,14 @@ TEST_F(FunctionKeyTestBase, SpecialKeyNames)
 
     // ENTER
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"RETURN", L"finish", error));
-    EXPECT_TRUE(error.level == ChmConfig::ParseLevel::None);
+    EXPECT_TRUE(error.level == ChmConfig::ParseLevel::NoNeed);
 
     ChmKeyEvent ev1(VK_RETURN, 0);
     EXPECT_EQ(ChmFuncType::CompFinish, ev1.GetType());
 
     // ESC
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(L"ESC", L"cancel", error));
-    EXPECT_TRUE(error.level == ChmConfig::ParseLevel::None);
+    EXPECT_TRUE(error.level == ChmConfig::ParseLevel::NoNeed);
 
     ChmKeyEvent ev2(VK_ESCAPE, 0);
     EXPECT_EQ(ChmFuncType::Cancel, ev2.GetType());
@@ -139,7 +139,7 @@ TEST_F(FunctionKeyTestBase, ShiftWithSpecialKey)
         L"finish-raw",
         error));
 
-    EXPECT_TRUE(error.level == ChmConfig::ParseLevel::None);
+    EXPECT_TRUE(error.level == ChmConfig::ParseLevel::NoNeed);
 
     // SHIFTのみON
     SetKeyState(true, false, false);
@@ -306,7 +306,7 @@ TEST_F(FunctionKeyTestBase, DuplicateDefinitionWarning)
         L"CTRL+Z",
         L"finish",
         error));
-    EXPECT_TRUE(error.level == ChmConfig::ParseLevel::None);
+    EXPECT_TRUE(error.level == ChmConfig::ParseLevel::NoNeed);
 
     // 2回目（duplicate）
     EXPECT_TRUE(ChmKeyEvent::ParseFunctionKey(

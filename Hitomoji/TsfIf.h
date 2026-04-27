@@ -35,6 +35,13 @@ class ChmTsfInterface : public ITfTextInputProcessor,
 		public ITfThreadFocusSink,
 		public ITfTextEditSink{
 public:
+	enum DisplayMode {
+		NoNeed, // Äİ’è•s—v
+		Inputing, //“ü—Í’†(”gü)
+		Selecting, // •ÏŠ·’†(”gü{”wŒiF”½“]) TODO:”wŒiF”½“]‚ÍÀ‘•‚µ‚Ä‚¢‚È‚¢
+		Committing // ‰¼Šm’è’†i‰ºü‚È‚µBŠm’è‚ÉŒ©‚¦‚é)
+	};
+
     ChmTsfInterface();
     ~ChmTsfInterface();
 
@@ -121,7 +128,7 @@ private:
     void _UninitKeyEventSink();
     HRESULT _InitPreservedKey();
     void _UninitPreservedKey();
-	HRESULT _InvokeEditSession(ITfContext* pic, BOOL fEnd) ;
+	HRESULT _InvokeEditSession(ITfContext* pic, BOOL fTerminateCompBefore, DisplayMode dispMode, BOOL fTerminateCompAfter);
 	void _FlushComposition();
 
 	// ITfDisplayAttributeProvider
@@ -131,6 +138,9 @@ private:
 	// ITfTextEditSink
 	HRESULT _InitTextEditSink(ITfContext* pic);
 	HRESULT _UninitTextEditSink(ITfContext* pic);
+
+	// helper for GetDisplayAttributeInfo
+	DisplayMode _GetDisplayMode(ChmFuncType fType) ;
 
     ITfThreadMgr* _pThreadMgr;
     TfClientId _tfClientId;

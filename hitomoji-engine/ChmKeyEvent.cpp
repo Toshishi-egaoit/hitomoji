@@ -96,7 +96,7 @@ struct FuncKeyDef {
 // デフォルト定義（ビルド時固定）
 static const FuncKeyDef g_functionKeyTable[] = {
     // WPARAM      SHIFT  CTRL   ALT    State                        Type
-    { VK_SPACE,    false, false, false, ChmEngine::State::None,      ChmFuncType::CharInputSpace },
+    { VK_SPACE,    false, false, false, ChmEngine::State::NoNeed,      ChmFuncType::CharInputSpace },
     { VK_RETURN,   false, false, false, ChmEngine::State::Inputing,  ChmFuncType::CompFinish     },
     { VK_RETURN,   false, false, true,  ChmEngine::State::Inputing,  ChmFuncType::CompFinishHiragana },
     { VK_RETURN,   true,  false, false, ChmEngine::State::Inputing,  ChmFuncType::CompFinishKatakana },
@@ -115,8 +115,8 @@ static const FuncKeyDef g_functionKeyTable[] = {
     { 'M',         false, true,  false, ChmEngine::State::Selecting, ChmFuncType::CompFinish     },
     { 'Z',         false, true,  false, ChmEngine::State::Committing,ChmFuncType::UnFinish       },
 #ifdef _DEBUG
-    { 'V',         true,  true,  false, ChmEngine::State::None,      ChmFuncType::VersionInfo    },
-    { 'R',         true,  true,  false, ChmEngine::State::None,      ChmFuncType::ReloadIni      },
+    { 'V',         true,  true,  false, ChmEngine::State::NoNeed,      ChmFuncType::VersionInfo    },
+    { 'R',         true,  true,  false, ChmEngine::State::NoNeed,      ChmFuncType::ReloadIni      },
 #endif
 };
 
@@ -236,7 +236,7 @@ void ChmKeyEvent::SetKeyStateProvider(ChmKeyEvent::KeyStateProvider pFunc)
 }
 
 ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/, ChmEngine::State isSelect)
-	: _wp(wp), _type(ChmFuncType::None), _state(isSelect)
+	: _wp(wp), _type(ChmFuncType::NoNeed), _state(isSelect)
 {
     _shift   = (pFunc_keyStateProvider(VK_SHIFT)   & 0x8000) != 0;
     _control = (pFunc_keyStateProvider(VK_CONTROL) & 0x8000) != 0;
@@ -414,7 +414,7 @@ std::wstring ChmKeyEvent::Dump()
 				  keyName +
 #ifdef _DEBUG
 				  (pair.first.state == ChmEngine::State::Selecting  ? L" (Selecting)" : 
-				   pair.first.state == ChmEngine::State::None  ? L" (noInputing)" : L"") +
+				   pair.first.state == ChmEngine::State::NoNeed  ? L" (noInputing)" : L"") +
 #endif
 			L" = <" + FunctionName + L">\n";
 	}
@@ -439,7 +439,7 @@ void ChmKeyEvent::_TranslateByTable()
 
     if (_control || _alt)
     {
-        _type = ChmFuncType::None;
+        _type = ChmFuncType::NoNeed;
         return;
     }
 
@@ -457,7 +457,7 @@ void ChmKeyEvent::_TranslateByTable()
         return;
     }
 
-    _type = ChmFuncType::None;
+    _type = ChmFuncType::NoNeed;
 }
 
 unsigned char ChmKeyEvent::GetChar() const {
