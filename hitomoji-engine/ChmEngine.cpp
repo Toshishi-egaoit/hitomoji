@@ -98,7 +98,7 @@ void ChmEngine::_initLayer2() {
 
 void ChmEngine::_initLayer3() {
 	if (_pL3Helper == nullptr )
-		_pL3Helper = new ChmL3Helper ;
+		_pL3Helper = new ChmL3Helper(_pConfig) ;
 	if (_pL3KanjiDict == nullptr )
 		_pL3KanjiDict = new ChmL3KanjiDict ;
 }
@@ -284,7 +284,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndCompBef
 				int index = _pL3Helper->KeyToIndex(keyEvent.GetChar());
 				if (index < 0) {
 					// indexが見つからない場合はエラー
-					_pending = L"?idx";
+					_pending = L"?map";
 				}
 				else {
 					uint32_t selected = _pL3KanjiSelect->SelectByIndex(index) ;

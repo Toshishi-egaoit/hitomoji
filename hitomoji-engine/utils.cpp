@@ -175,3 +175,21 @@ std::wstring ChmLogger::Format(const wchar_t* fmt, ...)
 
     return std::wstring(buf);
 }
+
+// --- utils ---
+std::string ToNarrow(const std::wstring& ws)
+{
+    std::string s;
+    s.reserve(ws.size());
+
+    for (wchar_t c : ws)
+    {
+        if (c <= 0x7E) {
+            s.push_back(static_cast<char>(c));
+        } else {
+            // ”ñASCII‚ÍƒGƒ‰[ or –³Ž‹ or '?'
+            Warn(Format(L"   > Invalid char(%c) in(%s)",c,ws.c_str()));
+        }
+    }
+    return s;
+}

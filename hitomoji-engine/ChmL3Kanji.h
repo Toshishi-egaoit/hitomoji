@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <fstream>
 #include "ChmEnvironment.h"
+#include "ChmConfig.h"
 
 
 // かな漢字変換の辞書を管理するクラス(Activate/Deactivateが生存期間）
@@ -178,16 +179,19 @@ private:
 
 class ChmL3Helper {
 public:
-	ChmL3Helper()
+	ChmL3Helper(ChmConfig* pConfig)
 	{
-		InitDefault();
+		InitDefault(pConfig);
 	}
 
 	// デフォルトの選択キー定義
-	void InitDefault()
+	void InitDefault(ChmConfig* pConfig)
 	{
-		std::string map = "dkfj ei sla; ruwoqpty c,vmx.z/bn 3847291056";
-		BuildTable(map);
+		std::wstring map = pConfig->GetString(L"UI", L"select_keymap");
+		if (map.empty()) {
+			map = L"dk fj sl gh ei ru a; wo qp ty c, vm x. z/ bn 38 47 29 10 56";
+		}
+		BuildTable(ToNarrow(map));
 	}
 
 	// ChmConfigで使うため（未実装)
