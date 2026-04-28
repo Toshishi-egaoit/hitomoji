@@ -19,7 +19,7 @@ class ChmL3Helper ;
 class ChmEngine {
 public:
 	enum class State {
-		None = 1,
+		NoNeed = 1,
 		Inputing ,
 		Selecting,
 		Committing, // 仮確定（Undo処理用）
@@ -45,18 +45,14 @@ public:
 
 	BOOL IsON() const { return _isON; }
 	BOOL IsSelecting() const { return _state == State::Selecting ; }
-	BOOL HasComposition() { return (_state == State::Selecting || _state == State::Inputing); }
+	BOOL HasComposition() { return (_state == State::Selecting || _state == State::Inputing || _state == State::Committing); }
 	BOOL IsDirectInput(ChmFuncType tp) { return (tp == ChmFuncType::CharInputSpace) ; }
 	State GetState() { return _state ;}
 	std::wstring GetCompositionStr() ;
 
-	void UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition);
+	void UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndCompBefore, bool& pEncCompAfter);
 	void PostUpdateComposition();
 	void ResetStatus() ;
-
-	void CommitVisual() ;
-	void CommitFinal() ;
-	void RevertCommit() ;
 
 private:
 	// Activate/Deactivateでの初期処理

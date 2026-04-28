@@ -93,7 +93,7 @@ private:
     bool   _control = false;
     bool   _alt     = false;
     bool   _caps    = false;
-    ChmEngine::State _state = ChmEngine::State::None;
+    ChmEngine::State _state = ChmEngine::State::NoNeed;
 
-    ChmFuncType _type = ChmFuncType::None;
+    ChmFuncType _type = ChmFuncType::NoNeed;
 };

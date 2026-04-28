@@ -20,13 +20,13 @@ public:
 	};
 
 	enum class ParseLevel {
-		None,
+		NoNeed,
 		Info,
 		Error
 	};
 
 	struct ParseResult {
-		ParseLevel level = ParseLevel::None;
+		ParseLevel level = ParseLevel::NoNeed;
 		std::wstring message;
 	};
 

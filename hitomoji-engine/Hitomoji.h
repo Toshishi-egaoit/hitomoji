@@ -1,9 +1,9 @@
 #pragma once
 
-#define HM_VERSION L"0.4.2"
+#define HM_VERSION L"0.4.2.1"
 
 enum class ChmFuncType {
-	None = 0,
+	NoNeed = 0,
 	CharInput,          // 通常文字入力
 	CharInputSpace,     // 空白文字の入力(Compositionがない場合用)
 	CompFinish,         // 見たまま確定(ENTER)
@@ -18,7 +18,7 @@ enum class ChmFuncType {
 	SelectCancel,       // 選択中のキャンセル
 	Cancel,             // キャンセル(ESC)
 	Backspace,          // 後退(BS)
-	UnFinish,           // 確定取消（将来）(CTRL+Z)
+	UnFinish,           // 確定取消(CTRL+Z)
 	VersionInfo,        // バージョン表示
 	ReloadIni,          // iniファイルのリロード
 };

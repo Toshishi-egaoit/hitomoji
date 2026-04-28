@@ -121,7 +121,7 @@ BOOL ChmConfig::_LoadStreamInternal(std::wistream& is,
 		{
 			continue;
 		}
-		if (errorMsg.level != ParseLevel::None) goto WriteLog;
+		if (errorMsg.level != ParseLevel::NoNeed) goto WriteLog;
 
 		{
 			std::wstring key;
@@ -129,12 +129,12 @@ BOOL ChmConfig::_LoadStreamInternal(std::wistream& is,
 			bRet = _divideRawTrim(rawTrim, key, value, errorMsg);
 
 			// セクション未指定チェック
-			if (errorMsg.level == ParseLevel::None && currentSection.empty())
+			if (errorMsg.level == ParseLevel::NoNeed && currentSection.empty())
 			{
 				SetError(errorMsg, L"key-value pair found before any section header");
 			}
 
-			if (errorMsg.level != ParseLevel::None)
+			if (errorMsg.level != ParseLevel::NoNeed)
 			{
 				if (_addErrorOrInfo(errorMsg, lineNo) == false)
 				    return FALSE;
