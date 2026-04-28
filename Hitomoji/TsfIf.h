@@ -99,7 +99,7 @@ public:
 	{
 		if (_pComposition)
 		{
-			OutputDebugString(L"ClearComposition");
+			Debug(L"ClearComposition");
 			_pComposition->Release();
 			_pComposition = nullptr;
 		}
@@ -129,7 +129,7 @@ private:
     HRESULT _InitPreservedKey();
     void _UninitPreservedKey();
 	HRESULT _InvokeEditSession(ITfContext* pic, BOOL fTerminateCompBefore, DisplayMode dispMode, BOOL fTerminateCompAfter);
-	void _FlushComposition();
+	void _FlushComposition(BOOL doSync = FALSE);
 
 	// ITfDisplayAttributeProvider
     HRESULT _InitDisplayAttributeInfo();

@@ -60,9 +60,11 @@ public:
 				HRESULT hr = pComp->GetRange(&pRange);
 				OUTPUT_HR_n_RETURN_ON_ERROR(L"   > GetRange", hr);
 				if (SUCCEEDED(hr) && pRange) {
+					// TODO: これでも一部アプリで入力中のキャレット位置が左端になる
 					_moveCarret(ec, pRange);
 					_TerminateComposition(ec);
-					// TODO: 一部アプリで入力中のキャレット位置が左端になる
+					pRange->Release();
+					pRange = nullptr;
 				}
 			}
 		}
@@ -366,7 +368,7 @@ STDMETHODIMP ChmTsfInterface::OnSetFocus(BOOL fFocus)
 
 // Compositionがある場合、EndCompositionし、てCompositionの矛盾を防ぐ。
 // フォーカス移動、Eatenしないキー入力時、アプリ切り替え時、Deactivate時に呼び出す。
-void ChmTsfInterface::_FlushComposition() {
+void ChmTsfInterface::_FlushComposition(BOOL doSync) {
 	Info(Format(L"_FlushComposition:pComposition=%x state=%d",_pComposition, _pEngine->GetState()));
 
 	if ( _pComposition == nullptr ) return ;
@@ -381,29 +383,41 @@ void ChmTsfInterface::_FlushComposition() {
 	pRange->Release();
 
 	ITfContext* pic = GetCompositionContext();
-	// 終了前、入力中の見た目、終了後はそのまま
-	BOOL fTerminateCompBefore = (_pEngine->GetState() == ChmEngine::State::Committing);
-	BOOL fTerminateCompAfter = (_pEngine->GetState() == ChmEngine::State::Inputing) || (_pEngine->GetState() == ChmEngine::State::Selecting);
-	DisplayMode dispMode ;
+
+	BOOL fTerminateCompBefore = FALSE;
+	BOOL fTerminateCompAfter = FALSE;
+	DisplayMode dispMode = ChmTsfInterface::DisplayMode::NoNeed;
 	
 	switch (_pEngine->GetState()) {
 		case ChmEngine::State::NoNeed: 
+		case ChmEngine::State::Committing:
+			fTerminateCompBefore  = TRUE;
 			dispMode = ChmTsfInterface::DisplayMode::NoNeed; 
 			break;
 		case ChmEngine::State::Inputing: 
 		case ChmEngine::State::Selecting:
 			dispMode = ChmTsfInterface::DisplayMode::Committing;
+			fTerminateCompAfter  = TRUE;
 			break;
-		case ChmEngine::State::Committing:
-			dispMode = ChmTsfInterface::DisplayMode::NoNeed; 
 	}
 	
 	CEditSession* pES = new CEditSession(pic, this, 
 		_pEngine->GetCompositionStr(), 
-		fTerminateCompBefore, dispMode, fTerminateCompAfter);
+		fTerminateCompBefore, 
+		dispMode, 
+		fTerminateCompAfter
+		);
 	if (!pES) return ;
 	HRESULT hr;
-	HRESULT hrSession = pic->RequestEditSession(_tfClientId, pES, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hr);
+	DWORD _fSession ;
+	if (doSync) {
+		_fSession = TF_ES_SYNC | TF_ES_READWRITE;
+	}
+	else {
+		_fSession = TF_ES_ASYNCDONTCARE | TF_ES_READWRITE;
+	}
+	HRESULT hrSession = pic->RequestEditSession(_tfClientId, pES, _fSession, &hr);
+	// TODO: hrSessionがエラーの場合、pCompositionが残ったまま（解放していない）となる。
 	OUTPUT_HR_ON_ERROR("   > RequestEditSession", hrSession);
 	pES->Release();
 
@@ -413,8 +427,14 @@ void ChmTsfInterface::_FlushComposition() {
 // ITfKeyEventSink Implementation
 STDMETHODIMP ChmTsfInterface::OnTestKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten) {
 	*pfEaten = _pEngine->IsKeyEaten(wp);
+
 	ChmKeyEvent kEv(wp, lp,_pEngine->GetState());
 	Info(Format(L"OnTestKeyDown eat=%s %s", kEv.toString().c_str(), *pfEaten ? L"TRUE" : L"FALSE"));
+
+	// Committing状態＆UnFinish以外の場合は、キーを食わなくてもCompositionを解放する。
+	if (_pEngine->GetState() == ChmEngine::State::Committing && !*pfEaten) {
+		_FlushComposition(TRUE);
+	}
 
 	return S_OK;
 }
@@ -506,7 +526,7 @@ HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fTerminateComp
 		// context mismatch -> clear
 		if (_pContextForComposition != pic) {
 			Info(L"_InvokeEditSession: context mismatch -> clear");
-			_FlushComposition();
+			ClearComposition();
 		} else {
 			// context match -> check view existence
 			ITfCompositionView* pView = nullptr;
@@ -516,7 +536,8 @@ HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fTerminateComp
 				// 　　　 ここを通ると、エンジン側のRawInputがクリアされ、フォーカス移動直後の1文字が消失するが、
 				// 　　　 現状では対抗手段がないので、この仕様を受容する。
 				Info(L"_InvokeEditSession: no view -> clear");
-				_FlushComposition();
+				ClearComposition();
+				_pEngine->ResetStatus();
 			} else {
 				pView->Release();
 			}
@@ -534,7 +555,7 @@ HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fTerminateComp
 		); 
 	if (!pES) return E_OUTOFMEMORY;
 	HRESULT hrSession = pic->RequestEditSession(_tfClientId, pES, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hr);
-	OUTPUT_HR_ON_ERROR("_InvokeEditSession/RequestEditSession", hrSession);
+	OUTPUT_HR_ON_ERROR("   > RequestEditSession", hrSession);
 	pES->Release();
 	return hrSession;
 }
@@ -589,7 +610,7 @@ void ChmTsfInterface::_UninitDisplayAttributeInfo() {
 
 STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 {
-	OutputDebugString(L"[Hitomoji] OnSetThreadFocus()");
+	Info(L"[Hitomoji] OnSetThreadFocus()");
 
 	// フォーカス取得時は Composition 側のみを基準に整理
 	_FlushComposition();
@@ -599,7 +620,7 @@ STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 
 
 STDMETHODIMP ChmTsfInterface::OnKillThreadFocus() {
-	OutputDebugString(L"OnKillThreadFocus()");
+	Info(L"OnKillThreadFocus()");
 	return S_OK;
 }
 
