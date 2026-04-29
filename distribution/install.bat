@@ -5,8 +5,8 @@ cd /d %~dp0
 :: --- 管理者権限チェック ---
 openfiles >nul 2>&1
 if %errorlevel% neq 0 (
-    echo 管理者権限が必要です。昇格ダイアログを表示します...
-	powershell -Command "Start-Process '%~f0' -Verb RunAs -WorkingDirectory '%~dp0'"
+    echo 実行には管理者権限が必要です。
+    echo 管理者権限のあるコマンドプロンプトで再実行してください。
     exit /b
 )
 
@@ -46,7 +46,6 @@ if exist "%TARGET_DLL32%" (
 echo 管理者権限で実行中...
 
 echo 64ビット版DLLのコピーと登録
-echo "copy /y x64\hitomoji.dll %TARGET_DIR%
 copy /y "x64\hitomoji.dll" "%TARGET_DIR%"
 "%SYSTEM_DIR%\regsvr32.exe" /s "%TARGET_DIR%\hitomoji.dll"
 
