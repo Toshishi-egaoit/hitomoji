@@ -22,9 +22,8 @@ set TARGET_DLL32=%TARGET_DIR32%\Hitomoji.dll
 
 
 REM オプション解析
-if not defined FORCE (
-    if /i "%1"=="/f" set FORCE=1
-)
+set FORCE=0
+if /i "%1"=="/f" set FORCE=1
 
 :: 2. フォルダがなければ作成
 if not exist "%CONFIG_DIR%" (
