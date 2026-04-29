@@ -248,10 +248,9 @@ private:
 		for (size_t i = 0; i < map.size(); ++i) {
 			_keyToIndex[(unsigned char)map[i]] = (int)i;
 		}
-#ifdef _DEBUG
-		OutputDebugString(L"[Hitomoji] L3Helper::BuildTable\n1234567890123456789012345678901234567890");
-		OutputDebugStringA(map.c_str());
-#endif
+		Info(Format(L"L3Helper::BuildTable >[%c]=%d / [%c]=%d",
+			map[0],_keyToIndex[(unsigned char)map[0]],
+			map[map.size()-1],_keyToIndex[(unsigned char)map[map.size()-1]]));
 	};
 
 	int _keyToIndex[256];
