@@ -224,11 +224,9 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndCompBef
 			if (!_pending.empty() ) {
 				// エラーチェック：pendingに文字がある?
 				_pending += L"?";
-				_state = State::Inputing;
 			} else if ( _pL3KanjiSelect->Start(_converted) == FALSE ) {
 				// エラーチェック２：_convertedの読みを検索しても見つからない?
 				_pending = L"?ym";
-				_state = State::Inputing;
 			}
 			_converted = L"<" + _converted + L">";
 			// TODO:(未実装)候補リストの更新
@@ -247,6 +245,8 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndCompBef
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending, 
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
 			_state = State::Inputing;
+			delete _pL3KanjiSelect;
+			_pL3KanjiSelect = nullptr;
 			break;
 
 		// --------

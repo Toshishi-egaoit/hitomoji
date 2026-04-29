@@ -76,9 +76,7 @@ public:
 			if (FAILED(_GetOrStartComposition(ec, &pRange))) return S_OK;
 
 			// 確定処理／未確定表示（共通 SetText）
-			if ( !_compositionStr.empty() ) {
-				pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
-			}
+			pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
 
 			// 未確定：末尾をアクティブにし、そこから左へ未確定範囲を構成
 			LONG cch = (LONG)_compositionStr.length();
@@ -429,10 +427,12 @@ STDMETHODIMP ChmTsfInterface::OnTestKeyDown(ITfContext* pic, WPARAM wp, LPARAM l
 	*pfEaten = _pEngine->IsKeyEaten(wp);
 
 	ChmKeyEvent kEv(wp, lp,_pEngine->GetState());
-	Info(Format(L"OnTestKeyDown eat=%s %s", kEv.toString().c_str(), *pfEaten ? L"TRUE" : L"FALSE"));
+	Debug(Format(L"OnTestKeyDown eat=%s key=(%s)", *pfEaten ? L"TRUE" : L"FALSE", kEv.toString().c_str()));
 
 	// Committing状態＆UnFinish以外の場合は、キーを食わなくてもCompositionを解放する。
-	if (_pEngine->GetState() == ChmEngine::State::Committing && !*pfEaten) {
+	BOOL isModifierKey =
+		wp == VK_SHIFT || wp == VK_CONTROL || wp == VK_MENU ;
+	if (_pEngine->GetState() == ChmEngine::State::Committing && !*pfEaten && !isModifierKey) {
 		_FlushComposition(TRUE);
 	}
 
