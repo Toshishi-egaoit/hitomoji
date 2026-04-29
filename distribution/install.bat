@@ -67,9 +67,9 @@ if exist "%CONFIG_DIR%\hitomoji.ini" (
 	)
 )
 copy /y "hitomoji.ini" "%CONFIG_DIR%"
+copy /y "layer2.sample.ini" "%CONFIG_DIR%"
 :skip
 
-copy /y "layer2.sample.ini" "%CONFIG_DIR%"
 echo "辞書ファイルのコピー"
 copy /y "hitomoji.dic" "%CONFIG_DIR%"
 
