@@ -12,6 +12,24 @@ public:
         rawInput_.push_back(c);
     }
 
+    // UnFinish 用のバックアップ
+    void backup() {
+        backupInput_ = rawInput_;
+    }
+
+    // UnFinish 時に戻す
+    void restore() {
+        rawInput_ = backupInput_;
+    }
+
+    bool hasBackup() const {
+        return !backupInput_.empty();
+    }
+
+    void clearBackup() {
+        backupInput_.clear();
+    }
+
     // rawInput 全消去（確定・ESC 用）
     void clear() {
         rawInput_.clear();
@@ -42,6 +60,7 @@ public:
 
 private:
     std::wstring rawInput_;
+    std::wstring backupInput_;
 };
 
 

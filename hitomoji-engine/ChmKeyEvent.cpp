@@ -109,6 +109,7 @@ static const FuncKeyDef g_functionKeyTable[] = {
     { VK_BACK,     false, false, false, ChmEngine::State::Selecting, ChmFuncType::SelectPrevPage },
     { VK_ESCAPE,   false, false, false, ChmEngine::State::Selecting, ChmFuncType::SelectCancel   },
     // CTRL+*
+    { 'Z',         false, true,  false, ChmEngine::State::None,      ChmFuncType::UnFinish       },
     { 'H',         false, true,  false, ChmEngine::State::Selecting, ChmFuncType::Backspace      },
     { 'I',         false, true,  false, ChmEngine::State::Selecting, ChmFuncType::CompFinishKey  },
     { 'I',         true,  true,  false, ChmEngine::State::Selecting, ChmFuncType::CompFinishKeyWide},

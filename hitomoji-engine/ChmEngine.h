@@ -45,6 +45,9 @@ public:
 	BOOL IsON() const { return _isON; }
 	BOOL IsSelecting() const { return _state == State::Selecting ; }
 	BOOL HasComposition() { return (_state == State::Selecting || _state == State::Inputing); }
+	BOOL CanUnFinish() const;
+	BOOL UseUndoEditSession() const { return _useUndoEditSession; }
+	LONG GetUndoDeleteLength() const { return _undoDeleteLength; }
 	BOOL IsDirectInput(ChmFuncType tp) { return (tp == ChmFuncType::CharInputSpace) ; }
 	State GetState() { return _state ;}
 	std::wstring GetCompositionStr() ;
@@ -63,6 +66,8 @@ private:
 	static std::wstring AsciiToWide(const std::wstring& src);
 
 	void SetError(void) ;
+	void _PrepareUnFinish();
+	void _ClearUnFinish();
 
 	// --- static members ---
 	ChmConfig* _pConfig;
@@ -76,4 +81,6 @@ private:
 
 	std::wstring _converted; // ‚©‚È•ÏŠ·‚Å‚«‚½•”•ª
 	std::wstring _pending; // ‚©‚È‚É•ÏŠ·‚Å‚«‚Ä‚¢‚È‚¢•”•ªic‚èj
+	BOOL _useUndoEditSession;
+	LONG _undoDeleteLength;
 };
