@@ -64,6 +64,7 @@ private:
 
 	// ASCII -> ‘SŠp •ÏŠ·iv0.1.3 ŠÈˆÕÀ‘•j
 	static std::wstring AsciiToWide(const std::wstring& src);
+	static LONG CountUndoDeleteLength(const std::wstring& src);
 
 	void SetError(void) ;
 	void _PrepareUnFinish();

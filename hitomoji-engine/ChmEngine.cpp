@@ -133,8 +133,13 @@ BOOL ChmEngine::CanUnFinish() const {
 	return _pRawInputStore && _pRawInputStore->hasBackup() && _undoDeleteLength > 0;
 }
 
+LONG ChmEngine::CountUndoDeleteLength(const std::wstring& src) {
+	// TODO: Verify IVS / combining characters where UTF-16 length may differ from TSF delete units.
+	return (LONG)src.length();
+}
+
 void ChmEngine::_PrepareUnFinish() {
-	_undoDeleteLength = (LONG)GetCompositionStr().length();
+	_undoDeleteLength = CountUndoDeleteLength(GetCompositionStr());
 	if (_undoDeleteLength > 0) {
 		_pRawInputStore->backup();
 	}

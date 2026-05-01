@@ -183,13 +183,15 @@ copy /y "$(TargetPath)" "$(SolutionDir)distribution\x64\"
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="CEditSession.h" />
+    <ClInclude Include="ChmLangBar.h" />
+    <ClInclude Include="DisplayAttribute.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="TsfIf.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ChmLangBar.h" />
+    <ClCompile Include="CEditSession.cpp" />
     <ClCompile Include="DisplayAttribute.cpp" />
-    <ClCompile Include="DisplayAttribute.h" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="TsfIf.cpp" />
   </ItemGroup>

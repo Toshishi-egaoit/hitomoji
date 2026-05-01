@@ -9,159 +9,12 @@
 #include <objbase.h>
 #include <shellapi.h>
 #include "TsfIf.h"
+#include "CEditSession.h"
 #include "ChmKeyEvent.h"
 #include "DisplayAttribute.h"
 #include "ChmLangBar.h"
 #include "ChmConfig.h"
 #include "ChmEnvironment.h"
-
-class CEditSession : public ITfEditSession , public ITfCompositionSink{
-
-public:
-	CEditSession(
-		ITfContext* pic, 
-		TfClientId tid, 
-		ChmTsfInterface* pTsfIf,
-		std::wstring compositionStr,
-		BOOL fEnd)
-		: _pic(pic), _pTsfIf(pTsfIf), _tid(tid), _compositionStr(compositionStr), _fEnd(fEnd), _cRef(1) {
-	}
-
-	STDMETHODIMP QueryInterface(REFIID riid, void** ppv) {
-		if (IsEqualIID(riid, IID_IUnknown) || IsEqualIID(riid, IID_ITfEditSession)) {
-			*ppv = this; AddRef(); return S_OK;
-		}
-		return E_NOINTERFACE;
-	}
-	STDMETHODIMP_(ULONG) AddRef() { return ++_cRef; }
-	STDMETHODIMP_(ULONG) Release() { if (--_cRef == 0) { delete this; return 0; } return _cRef; }
-
-// ----- ITfCompositionSink の実装
-	STDMETHODIMP OnCompositionTerminated(TfEditCookie ecWrite, ITfComposition *pComposition) {
-		return S_OK;
-	}
-
-	// アプリへの文字列の挿入や、Compositionの終了処理などを行う
-	STDMETHODIMP DoEditSession(TfEditCookie ec) {
-		OutputDebugStringWithString(L"[hitomoji] DoEditSession:>>%s<<",_compositionStr.c_str());
-		ITfRange* pRange = nullptr;
-
-		// 1. Compositionの準備
-		if (FAILED(_GetOrStartComposition(ec, &pRange))) return S_OK;
-
-		// 2. 確定処理／未確定表示（共通 SetText）
-		pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
-
-		if (_fEnd ) {
-			// 確定：キャレットを末尾へ移動して Composition 終了
-			pRange->Collapse(ec, TF_ANCHOR_END);
-
-			// 【追加】アプリ側のキャレット位置をこの Range の場所に同期させる
-			TF_SELECTION sel;
-			sel.range = pRange;
-			sel.style.ase = TF_AE_NONE; // アクティブな末尾
-			sel.style.fInterimChar = FALSE;
-			_pic->SetSelection(ec, 1, &sel);
-
-			_TerminateComposition(ec);
-		} else {
-			// 未確定：末尾をアクティブにし、そこから左へ未確定範囲を構成
-			LONG cch = (LONG)_compositionStr.length();
-			LONG shifted = 0;
-			pRange->ShiftEnd(ec, cch, &shifted, nullptr);
-			// TODO: キャレット位置がつねに左端になってしまっている
-			_ApplyDisplayAttribute(ec, pRange);
-		}
-
-		if (pRange) pRange->Release();
-		_pTsfIf->SetMyEditSessionTick(); 
-		return S_OK;
-	}
-
-private:
-
-	// 既存のCompositionを取得するか、なければ新しく開始する（簡略版）
-	HRESULT _GetOrStartComposition(TfEditCookie ec, ITfRange** ppRange) {
-		if (!ppRange) return E_INVALIDARG;
-		*ppRange = nullptr;
-
-		// --- 既存 Composition があれば無条件で再利用 ---
-		ITfComposition* pComp = _pTsfIf->GetComposition();
-		if (pComp) {
-			HRESULT hr = pComp->GetRange(ppRange);
-			if (SUCCEEDED(hr) && *ppRange) {
-				return S_OK;
-			}
-		}
-
-		// --- 新規 Composition 開始 ---
-		ITfInsertAtSelection* pInsert = nullptr;
-		HRESULT hr = _pic->QueryInterface(IID_ITfInsertAtSelection, (void**)&pInsert);
-		if (FAILED(hr) || !pInsert) {
-			return E_FAIL;
-		}
-
-		hr = pInsert->InsertTextAtSelection(ec, TS_IAS_QUERYONLY, L"", 0, ppRange);
-		pInsert->Release();
-		if (FAILED(hr) || !*ppRange) {
-			return E_FAIL;
-		}
-
-		ITfContextComposition* pCtxComp = nullptr;
-		hr = _pic->QueryInterface(IID_ITfContextComposition, (void**)&pCtxComp);
-		if (FAILED(hr) || !pCtxComp) {
-			(*ppRange)->Release();
-			*ppRange = nullptr;
-			return E_FAIL;
-		}
-
-		ITfComposition* pNewComp = nullptr;
-		hr = pCtxComp->StartComposition(ec, *ppRange, this, &pNewComp);
-		pCtxComp->Release();
-
-		if (FAILED(hr) || !pNewComp) {
-			(*ppRange)->Release();
-			*ppRange = nullptr;
-			return E_FAIL;
-		}
-
-		_pTsfIf->SetComposition(_pic, pNewComp);
-		return S_OK;
-	}
-
-	// 下線を引くための詳細実装を切り出す
-	HRESULT _ApplyDisplayAttribute(TfEditCookie ec, ITfRange* pRange) {
-		ITfProperty* pProp = nullptr;
-		HRESULT hr;
-		hr = _pic->GetProperty(GUID_PROP_ATTRIBUTE, &pProp);
-		OUTPUT_HR_n_RETURN_ON_ERROR(L"GetProperty", hr);
-
-		VARIANT var;
-		VariantInit(&var);
-		var.vt = VT_I4;
-		var.lVal = (LONG)CDisplayAttributeInfo::GetAtom();
-		hr = pProp->SetValue(ec, pRange, &var);
-		OUTPUT_HR_n_RETURN_ON_ERROR(L"SetValue", hr);
-		pProp->Release();
-
-		return S_OK;
-	}
-
-	void _TerminateComposition(TfEditCookie ec) {
-		ITfComposition* pComp = _pTsfIf->GetComposition();
-		if (!pComp) return; // 事前に Clear されている可能性があるため防御
-		pComp->EndComposition(ec);
-		_pTsfIf->ClearComposition();
-	}
-
-	// メンバ変数
-	ITfContext* _pic; 
-	TfClientId _tid; 
-	ChmTsfInterface* _pTsfIf;
-	std::wstring _compositionStr;
-	BOOL _fEnd;
-	LONG _cRef;
-};
 
 // --- CTsfInterface クラスの実装 ---
 
@@ -435,9 +288,14 @@ HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
 		}
 	}
 
-	// ---- normal edit session request ----
+	// ---- edit session request ----
 	HRESULT hr;
-	CEditSession* pES = new CEditSession(pic, _tfClientId, this, _pEngine->GetCompositionStr(), fEnd);
+	CEditSessionBase* pES = nullptr;
+	if (_pEngine->UseUndoEditSession()) {
+		pES = new CUndoEditSession(pic, _tfClientId, this, _pEngine->GetCompositionStr(), _pEngine->GetUndoDeleteLength());
+	} else {
+		pES = new CEditSession(pic, _tfClientId, this, _pEngine->GetCompositionStr(), fEnd);
+	}
 	if (!pES) return E_OUTOFMEMORY;
 	HRESULT hrSession = pic->RequestEditSession(_tfClientId, pES, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hr);
 	OUTPUT_HR_ON_ERROR("_InvokeEditSession/RequestEditSession", hrSession);
