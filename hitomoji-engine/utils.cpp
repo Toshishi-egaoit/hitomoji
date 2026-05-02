@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include <windows.h>
 #include <shellapi.h>
 #include <shlobj.h>
@@ -11,7 +11,7 @@
 void OutputDebugStringWithInt(wchar_t const* format, ULONG lvalue)
 {
 	wchar_t buff[255];
-	// TODO: assert‚Å255‚ğ‰z‚¦‚½‚ç—‚¿‚é‚æ‚¤‚É‚·‚é
+	// TODO: assertã§255ã‚’è¶ŠãˆãŸã‚‰è½ã¡ã‚‹ã‚ˆã†ã«ã™ã‚‹
 
 	wsprintf(buff, format, lvalue);
 	OutputDebugStringW(buff);
@@ -21,7 +21,7 @@ void OutputDebugStringWithInt(wchar_t const* format, ULONG lvalue)
 void OutputDebugStringWithString(wchar_t const* format, wchar_t const* value)
 {
 	wchar_t buff[255];
-	// TODO: assert‚Å255‚ğ‰z‚¦‚½‚ç—‚¿‚é‚æ‚¤‚É‚·‚é
+	// TODO: assertã§255ã‚’è¶ŠãˆãŸã‚‰è½ã¡ã‚‹ã‚ˆã†ã«ã™ã‚‹
 
 	wsprintf(buff, format, value);
 	OutputDebugStringW(buff);
@@ -30,11 +30,11 @@ void OutputDebugStringWithString(wchar_t const* format, wchar_t const* value)
 
 void OutputDebugStringWithGuid(wchar_t const* format, const IID iid)
 {
-	// TODO: assert‚Å255‚ğ‰z‚¦‚½‚ç—‚¿‚é‚æ‚¤‚É‚·‚é
+	// TODO: assertã§255ã‚’è¶ŠãˆãŸã‚‰è½ã¡ã‚‹ã‚ˆã†ã«ã™ã‚‹
 	wchar_t buff[255];
-	wchar_t guidStr[40] = {0}; // GUID•¶š—ñ—pƒoƒbƒtƒ@
+	wchar_t guidStr[40] = {0}; // GUIDæ–‡å­—åˆ—ç”¨ãƒãƒƒãƒ•ã‚¡
 
-	// GUID‚ğ•¶š—ñ‚É•ÏŠ·
+	// GUIDã‚’æ–‡å­—åˆ—ã«å¤‰æ›
 	StringFromGUID2(iid, guidStr, ARRAYSIZE(guidStr));
 
 	wsprintf(buff, format, guidStr);
@@ -96,7 +96,7 @@ void ChmLogger::_WriteFile(const std::wstring& msg)
 
 	if (hFile != INVALID_HANDLE_VALUE)
 	{
-		// ===== V‹Kƒtƒ@ƒCƒ‹”»’è(BOM‘‚«‚İ‚Ì‚½‚ß =====
+		// ===== æ–°è¦ãƒ•ã‚¡ã‚¤ãƒ«åˆ¤å®š(BOMæ›¸ãè¾¼ã¿ã®ãŸã‚ =====
 		DWORD fileSize = GetFileSize(hFile, NULL);
 
 		if (fileSize == 0)
@@ -107,7 +107,7 @@ void ChmLogger::_WriteFile(const std::wstring& msg)
 			WriteFile(hFile, &bom, sizeof(bom), &written, NULL);
 		}
 
-		// ===== “ú¶¬ =====
+		// ===== æ—¥æ™‚ç”Ÿæˆ =====
 		SYSTEMTIME st;
 		GetLocalTime(&st);
 
@@ -154,7 +154,7 @@ void ChmLogger::Warn(const std::wstring& msg)
 
 void ChmLogger::Error(const std::wstring& msg)
 {
-	// Error‚Íí‚Éo—Í‚·‚é
+	// Errorã¯å¸¸ã«å‡ºåŠ›ã™ã‚‹
 	_Output(L"ERROR", msg);
 }
 

@@ -1,4 +1,4 @@
-#include "gtest/gtest.h"
+Ôªø#include "gtest/gtest.h"
 #include "ChmRomajiConverter.h"
 
 class ConvertOverrideTest : public ::testing::Test {
@@ -19,51 +19,51 @@ static std::wstring ConvertWithPending(const std::wstring& input,
 }
 
 //
-// äÓñ{
+// Âü∫Êú¨
 //
 TEST(ConvertTest, BasicVowel)
 {
-    EXPECT_EQ(L"Ç†:", ConvertWithPending(L"a"));
+    EXPECT_EQ(L"„ÅÇ:", ConvertWithPending(L"a"));
 }
 
 TEST(ConvertTest, BasicConsonant)
 {
-    EXPECT_EQ(L"Ç©:", ConvertWithPending(L"ka"));
+    EXPECT_EQ(L"„Åã:", ConvertWithPending(L"ka"));
 }
 
 TEST(ConvertTest, Nn)
 {
-    EXPECT_EQ(L"ÇÒ:", ConvertWithPending(L"nn"));
+    EXPECT_EQ(L"„Çì:", ConvertWithPending(L"nn"));
 }
 
 //
-// ùXâπ
+// ÊãóÈü≥
 //
 TEST(ConvertTest, Youon)
 {
-    EXPECT_EQ(L"Ç´Ç·:", ConvertWithPending(L"kya"));
-    EXPECT_EQ(L"ÇµÇ·:", ConvertWithPending(L"sha"));
-    EXPECT_EQ(L"ÇËÇÂ:", ConvertWithPending(L"ryo"));
+    EXPECT_EQ(L"„Åç„ÇÉ:", ConvertWithPending(L"kya"));
+    EXPECT_EQ(L"„Åó„ÇÉ:", ConvertWithPending(L"sha"));
+    EXPECT_EQ(L"„Çä„Çá:", ConvertWithPending(L"ryo"));
 }
 
 //
-// ë£âπ
+// ‰øÉÈü≥
 //
 TEST(ConvertTest, Sokuon)
 {
-    EXPECT_EQ(L"Ç¡ÇΩ:", ConvertWithPending(L"tta"));
-    EXPECT_EQ(L"Ç¡Ç©:", ConvertWithPending(L"kka"));
+    EXPECT_EQ(L"„Å£„Åü:", ConvertWithPending(L"tta"));
+    EXPECT_EQ(L"„Å£„Åã:", ConvertWithPending(L"kka"));
 }
 
 //
-// ãLçÜ
+// Ë®òÂè∑
 //
 TEST(ConvertTest, Symbols)
 {
-    EXPECT_EQ(L"ÅB:", ConvertWithPending(L"."));
-    EXPECT_EQ(L"ÅA:", ConvertWithPending(L","));
-    EXPECT_EQ(L"ÅH:", ConvertWithPending(L"?"));
-    EXPECT_EQ(L"Åu:", ConvertWithPending(L"["));
+    EXPECT_EQ(L"„ÄÇ:", ConvertWithPending(L"."));
+    EXPECT_EQ(L"„ÄÅ:", ConvertWithPending(L","));
+    EXPECT_EQ(L"Ôºü:", ConvertWithPending(L"?"));
+    EXPECT_EQ(L"„Äå:", ConvertWithPending(L"["));
 }
 
 //
@@ -73,11 +73,11 @@ TEST(ConvertTest, PendingCases)
 {
     EXPECT_EQ(L":k", ConvertWithPending(L"k"));
     EXPECT_EQ(L":ky", ConvertWithPending(L"ky"));
-    EXPECT_EQ(L"Ç¡:t", ConvertWithPending(L"tt"));
+    EXPECT_EQ(L"„Å£:t", ConvertWithPending(L"tt"));
 }
 
 //
-// ÉtÉâÉOç∑ï™
+// „Éï„É©„Ç∞Â∑ÆÂàÜ
 //
 TEST(ConvertTest, BackspaceMode)
 {
@@ -88,11 +88,11 @@ TEST(ConvertTest, BackspaceMode)
     EXPECT_EQ(1, ChmRomajiConverter::GetLastRawUnitLength());
     EXPECT_EQ(L":ky", ConvertWithPending(L"ky"));
     EXPECT_EQ(2, ChmRomajiConverter::GetLastRawUnitLength());
-    EXPECT_EQ(L"dcÇ†:", ConvertWithPending(L"dca"));
+    EXPECT_EQ(L"dc„ÅÇ:", ConvertWithPending(L"dca"));
     EXPECT_EQ(1, ChmRomajiConverter::GetLastRawUnitLength());
-    EXPECT_EQ(L"chÇ‹:", ConvertWithPending(L"chma"));
+    EXPECT_EQ(L"ch„Åæ:", ConvertWithPending(L"chma"));
     EXPECT_EQ(2, ChmRomajiConverter::GetLastRawUnitLength());
-    EXPECT_EQ(L"Ç¡:t", ConvertWithPending(L"tt"));
+    EXPECT_EQ(L"„Å£:t", ConvertWithPending(L"tt"));
     EXPECT_EQ(1, ChmRomajiConverter::GetLastRawUnitLength());
 
     EXPECT_EQ(L":ky", ConvertWithPending(L"ky",false));
@@ -117,7 +117,7 @@ TEST(ConvertTest, RawLengthPending)
     EXPECT_EQ(2, ChmRomajiConverter::GetLastRawUnitLength());
     EXPECT_EQ(L":chm", ConvertWithPending(L"chm"));
     EXPECT_EQ(3, ChmRomajiConverter::GetLastRawUnitLength());
-    EXPECT_EQ(L"chÇ‹:t", ConvertWithPending(L"chmat"));
+    EXPECT_EQ(L"ch„Åæ:t", ConvertWithPending(L"chmat"));
     EXPECT_EQ(1, ChmRomajiConverter::GetLastRawUnitLength());
 }
 
@@ -126,20 +126,20 @@ TEST(ConvertTest, RawLengthPending)
 //
 TEST_F(ConvertOverrideTest, OverrideLongestMatch)
 {
-    ChmKeytableParser::RegisterOverrideTable(L"wi", L"Ç§Ç°");
-    ChmKeytableParser::RegisterOverrideTable(L"wwi", L"ÇÓ");
+    ChmKeytableParser::RegisterOverrideTable(L"wi", L"„ÅÜ„ÅÉ");
+    ChmKeytableParser::RegisterOverrideTable(L"wwi", L"„Çê");
 
-    EXPECT_EQ(L"ÇÓ:", ConvertWithPending(L"wwi"));
-    EXPECT_EQ(L"Ç§Ç°:", ConvertWithPending(L"wi"));
+    EXPECT_EQ(L"„Çê:", ConvertWithPending(L"wwi"));
+    EXPECT_EQ(L"„ÅÜ„ÅÉ:", ConvertWithPending(L"wi"));
 }
 
 TEST_F(ConvertOverrideTest, OverrideSymbols)
 {
-    ChmKeytableParser::RegisterOverrideTable(L"<<", L"Ås");
-    ChmKeytableParser::RegisterOverrideTable(L">>", L"Åt");
+    ChmKeytableParser::RegisterOverrideTable(L"<<", L"„Ää");
+    ChmKeytableParser::RegisterOverrideTable(L">>", L"„Äã");
 
-    EXPECT_EQ(L"Ås:", ConvertWithPending(L"<<"));
-    EXPECT_EQ(L"Åt:", ConvertWithPending(L">>"));
+    EXPECT_EQ(L"„Ää:", ConvertWithPending(L"<<"));
+    EXPECT_EQ(L"„Äã:", ConvertWithPending(L">>"));
 }
 
 TEST_F(ConvertOverrideTest, OverrideFallbackToBase)
@@ -148,5 +148,5 @@ TEST_F(ConvertOverrideTest, OverrideFallbackToBase)
     EXPECT_EQ(L"X:", ConvertWithPending(L"ka"));
 
     // base still works for others
-    EXPECT_EQ(L"Ç†:", ConvertWithPending(L"a"));
+    EXPECT_EQ(L"„ÅÇ:", ConvertWithPending(L"a"));
 }

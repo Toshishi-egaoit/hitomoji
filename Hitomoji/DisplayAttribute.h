@@ -1,4 +1,4 @@
-#include <windows.h>
+ï»¿#include <windows.h>
 #include <msctf.h>
 #include <cstdio>
 #include "TsfIf.h"
@@ -7,7 +7,7 @@ class CDisplayAttributeInfo : public ITfDisplayAttributeInfo {
 public:
     CDisplayAttributeInfo() : _cRef(1) {}
 
-    // --- IUnknown À‘• ---
+    // --- IUnknown å®Ÿè£… ---
     STDMETHODIMP QueryInterface(REFIID riid, void **ppvObj) {
         if (!ppvObj) return E_INVALIDARG;
         if (IsEqualIID(riid, IID_IUnknown) || IsEqualIID(riid, IID_ITfDisplayAttributeInfo)) {
@@ -24,7 +24,7 @@ public:
         return res;
     }
 
-    // --- ITfDisplayAttributeInfo À‘• ---
+    // --- ITfDisplayAttributeInfo å®Ÿè£… ---
     STDMETHODIMP GetGUID(GUID *pguid) { if (!pguid) return E_INVALIDARG; *pguid = s_myGuid; return S_OK; }
     STDMETHODIMP GetDescription(BSTR *pbstr) { if (!pbstr) return E_INVALIDARG; *pbstr = SysAllocString(L"Hitomoji Attr"); return S_OK; }
     
@@ -32,11 +32,11 @@ public:
         if (!pda) return E_INVALIDARG;
         ZeroMemory(pda, sizeof(TF_DISPLAYATTRIBUTE));
         
-        // ”OŠè‚Ìu”güvw’è
-        pda->lsStyle = TF_LS_SQUIGGLE;      // ”gü
+        // å¿µé¡˜ã®ã€Œæ³¢ç·šã€æŒ‡å®š
+        pda->lsStyle = TF_LS_SQUIGGLE;      // æ³¢ç·š
         pda->fBoldLine = FALSE;
         pda->crLine.type = TF_CT_COLORREF;
-        pda->crLine.nIndex = RGB(0, 0, 0); // •i‚¨D‚İ‚ÅRGB(255,0,0)‚É‚·‚é‚ÆÔ”güIj
+        pda->crLine.nIndex = RGB(0, 0, 0); // é»’ï¼ˆãŠå¥½ã¿ã§RGB(255,0,0)ã«ã™ã‚‹ã¨èµ¤æ³¢ç·šï¼ï¼‰
         pda->bAttr = TF_ATTR_INPUT;
         return S_OK;
     }
@@ -44,7 +44,7 @@ public:
     STDMETHODIMP SetAttributeInfo(const TF_DISPLAYATTRIBUTE *pda) { return E_NOTIMPL; }
     STDMETHODIMP Reset() { return S_OK; }
 
-	// CDisplayAttributeInfo “Æ©ˆ—‚ÌÀ‘•
+	// CDisplayAttributeInfo ç‹¬è‡ªå‡¦ç†ã®å®Ÿè£…
     static HRESULT InitGuid(ITfCategoryMgr* pCategoryMgr) ;
     static TfGuidAtom GetAtom() ;
 	static BOOL IsMyGuid(REFGUID guid) ;
@@ -52,5 +52,5 @@ public:
 private:
     long _cRef;
     static TfGuidAtom s_attrAtom;
-	static const GUID s_myGuid; // DisplayAttribute.cpp‚Å’è‹`
+	static const GUID s_myGuid; // DisplayAttribute.cppã§å®šç¾©
 };

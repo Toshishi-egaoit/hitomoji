@@ -1,4 +1,4 @@
-// Minimal TSF-enabled Win32 application with a single-line edit box
+﻿// Minimal TSF-enabled Win32 application with a single-line edit box
 #include <windows.h>
 #include <msctf.h>
 #include <tchar.h>
