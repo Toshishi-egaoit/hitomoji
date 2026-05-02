@@ -136,6 +136,15 @@ BOOL ChmEngine::CanUnFinish() const {
 	return _pRawInputStore && _pRawInputStore->hasBackup() && _undoDeleteLength > 0;
 }
 
+void ChmEngine::InvalidateUnFinishByKey(WPARAM wp) {
+	if (_state != State::None || !CanUnFinish()) return;
+
+	ChmKeyEvent ev(wp, 0, _state);
+	if (ev.IsNavigationKey()) {
+		_ClearUnFinish();
+	}
+}
+
 LONG ChmEngine::CountUndoDeleteLength(const std::wstring& src) {
 	// TODO: Verify IVS / combining characters where UTF-16 length may differ from TSF delete units.
 	return (LONG)src.length();

@@ -48,6 +48,7 @@ public:
 	BOOL CanUnFinish() const;
 	BOOL UseUndoEditSession() const { return _useUndoEditSession; }
 	LONG GetUndoDeleteLength() const { return _undoDeleteLength; }
+	void InvalidateUnFinishByKey(WPARAM wp);
 	BOOL IsDirectInput(ChmFuncType tp) { return (tp == ChmFuncType::CharInputSpace) ; }
 	State GetState() { return _state ;}
 	std::wstring GetCompositionStr() ;
