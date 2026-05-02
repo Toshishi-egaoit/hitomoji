@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <windows.h>
 #include <string>
 
@@ -6,7 +6,6 @@
 extern void OutputDebugStringWithInt(wchar_t const* format, ULONG lvalue);
 extern void OutputDebugStringWithString(wchar_t const* format, wchar_t const* value);
 extern void OutputDebugStringWithGuid(wchar_t const* format, const IID value);
-extern std::string ToNarrow(const std::wstring& ws);
 
 class ChmLogger
 {
@@ -40,3 +39,4 @@ private:
 #define Error(msg) ChmLogger::Error(msg)
 #define Format(form, ...) ChmLogger::Format(form, __VA_ARGS__)
 
+extern std::string ToNarrow(const std::wstring& ws);

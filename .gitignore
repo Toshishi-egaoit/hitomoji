@@ -1,4 +1,4 @@
-.vs/
+﻿.vs/
 *.user
 Debug/
 Release/
@@ -29,5 +29,4 @@ Release/
 /SQLite
 /dbg_distribution/x86/regHitomoji.exe
 /distribution/*.zip
-/Document/~$各機能キー使用時のEngineとTsfInterfaceの状態遷移.xlsx
 /dbg_distribution/Hitomoji.log.old

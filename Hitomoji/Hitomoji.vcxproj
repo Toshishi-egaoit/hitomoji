@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -183,13 +183,15 @@ copy /y "$(TargetPath)" "$(SolutionDir)distribution\x64\"
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="CEditSession.h" />
+    <ClInclude Include="ChmLangBar.h" />
+    <ClInclude Include="DisplayAttribute.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="TsfIf.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ChmLangBar.h" />
+    <ClCompile Include="CEditSession.cpp" />
     <ClCompile Include="DisplayAttribute.cpp" />
-    <ClCompile Include="DisplayAttribute.h" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="TsfIf.cpp" />
   </ItemGroup>

@@ -96,7 +96,7 @@ struct FuncKeyDef {
 // デフォルト定義（ビルド時固定）
 static const FuncKeyDef g_functionKeyTable[] = {
     // WPARAM      SHIFT  CTRL   ALT    State                        Type
-    { VK_SPACE,    false, false, false, ChmEngine::State::NoNeed,      ChmFuncType::CharInputSpace },
+    { VK_SPACE,    false, false, false, ChmEngine::State::None,      ChmFuncType::CharInputSpace },
     { VK_RETURN,   false, false, false, ChmEngine::State::Inputing,  ChmFuncType::CompFinish     },
     { VK_RETURN,   false, false, true,  ChmEngine::State::Inputing,  ChmFuncType::CompFinishHiragana },
     { VK_RETURN,   true,  false, false, ChmEngine::State::Inputing,  ChmFuncType::CompFinishKatakana },
@@ -109,14 +109,14 @@ static const FuncKeyDef g_functionKeyTable[] = {
     { VK_BACK,     false, false, false, ChmEngine::State::Selecting, ChmFuncType::SelectPrevPage },
     { VK_ESCAPE,   false, false, false, ChmEngine::State::Selecting, ChmFuncType::SelectCancel   },
     // CTRL+*
+    { 'Z',         false, true,  false, ChmEngine::State::None,      ChmFuncType::UnFinish       },
     { 'H',         false, true,  false, ChmEngine::State::Selecting, ChmFuncType::Backspace      },
     { 'I',         false, true,  false, ChmEngine::State::Selecting, ChmFuncType::CompFinishKey  },
     { 'I',         true,  true,  false, ChmEngine::State::Selecting, ChmFuncType::CompFinishKeyWide},
     { 'M',         false, true,  false, ChmEngine::State::Selecting, ChmFuncType::CompFinish     },
-    { 'Z',         false, true,  false, ChmEngine::State::Committing,ChmFuncType::UnFinish       },
 #ifdef _DEBUG
-    { 'V',         true,  true,  false, ChmEngine::State::NoNeed,      ChmFuncType::VersionInfo    },
-    { 'R',         true,  true,  false, ChmEngine::State::NoNeed,      ChmFuncType::ReloadIni      },
+    { 'V',         true,  true,  false, ChmEngine::State::None,      ChmFuncType::VersionInfo    },
+    { 'R',         true,  true,  false, ChmEngine::State::None,      ChmFuncType::ReloadIni      },
 #endif
 };
 
@@ -236,7 +236,7 @@ void ChmKeyEvent::SetKeyStateProvider(ChmKeyEvent::KeyStateProvider pFunc)
 }
 
 ChmKeyEvent::ChmKeyEvent(WPARAM wp, LPARAM /*lp*/, ChmEngine::State isSelect)
-	: _wp(wp), _type(ChmFuncType::NoNeed), _state(isSelect)
+	: _wp(wp), _type(ChmFuncType::None), _state(isSelect)
 {
     _shift   = (pFunc_keyStateProvider(VK_SHIFT)   & 0x8000) != 0;
     _control = (pFunc_keyStateProvider(VK_CONTROL) & 0x8000) != 0;
@@ -357,7 +357,10 @@ BOOL ChmKeyEvent::ParseFunctionKey(const std::wstring& key,
         return FALSE;
     }
 	// TODO: 本来はfunctionキーにisSelectのモードも指定させるべきだが、今はInputing固定
-    KeySignature sig{ vk, needShift, needCtrl, needAlt, ChmEngine::State::Inputing};
+	ChmEngine::State state = actionType == ChmFuncType::UnFinish
+		? ChmEngine::State::None
+		: ChmEngine::State::Inputing;
+    KeySignature sig{ vk, needShift, needCtrl, needAlt, state};
     
     // duplicate 検出
     auto it = s_currentKeyTable.find(sig);
@@ -414,7 +417,7 @@ std::wstring ChmKeyEvent::Dump()
 				  keyName +
 #ifdef _DEBUG
 				  (pair.first.state == ChmEngine::State::Selecting  ? L" (Selecting)" : 
-				   pair.first.state == ChmEngine::State::NoNeed  ? L" (noInputing)" : L"") +
+				   pair.first.state == ChmEngine::State::None  ? L" (noInputing)" : L"") +
 #endif
 			L" = <" + FunctionName + L">\n";
 	}
@@ -434,12 +437,13 @@ void ChmKeyEvent::_TranslateByTable()
     if (IsNavigationKey())
     {
         _type = ChmFuncType::CompFinish;
+		_isNavigationFinish = true;
         return;
     }
 
     if (_control || _alt)
     {
-        _type = ChmFuncType::NoNeed;
+        _type = ChmFuncType::None;
         return;
     }
 
@@ -457,7 +461,7 @@ void ChmKeyEvent::_TranslateByTable()
         return;
     }
 
-    _type = ChmFuncType::NoNeed;
+    _type = ChmFuncType::None;
 }
 
 unsigned char ChmKeyEvent::GetChar() const {
@@ -467,4 +471,10 @@ unsigned char ChmKeyEvent::GetChar() const {
 	} else {
 		return  '\0' ;
 	}
+}
+
+bool ChmKeyEvent::IsUnFinishKey() const {
+	KeySignature sig{ _wp, _shift, _control, _alt, ChmEngine::State::None };
+	auto it = s_currentKeyTable.find(sig);
+	return it != s_currentKeyTable.end() && it->second == ChmFuncType::UnFinish;
 }

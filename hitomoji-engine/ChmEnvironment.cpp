@@ -1,10 +1,10 @@
-#pragma once
+ï»¿#pragma once
 #include "ChmEnvironment.h"
 
 ChmEnvironment g_environment;
 
 std::wstring ChmEnvironment::_getDefaultBasePath() {
-	// ƒfƒtƒHƒ‹ƒg basePath = %appdata%\hitomoji\  ‚Æ‚È‚éB
+	// ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆ basePath = %appdata%\hitomoji\  ã¨ãªã‚‹ã€‚
 	PWSTR path = nullptr;
 	std::wstring retPath ;
 	if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &path)))

@@ -1,4 +1,4 @@
-LIBRARY "Hitomoji.dll"
+﻿LIBRARY "Hitomoji.dll"
 EXPORTS
     DllGetClassObject   PRIVATE
     DllCanUnloadNow     PRIVATE
