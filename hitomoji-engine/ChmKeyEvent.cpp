@@ -437,6 +437,7 @@ void ChmKeyEvent::_TranslateByTable()
     if (IsNavigationKey())
     {
         _type = ChmFuncType::CompFinish;
+		_isNavigationFinish = true;
         return;
     }
 

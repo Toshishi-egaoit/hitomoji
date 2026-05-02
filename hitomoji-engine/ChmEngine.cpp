@@ -286,7 +286,11 @@ BOOL ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 		case ChmFuncType::CompFinish:     // 見たまま変換
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
-			_PrepareUnFinish();
+			if (keyEvent.IsNavigationFinish()) {
+				_ClearUnFinish();
+			} else {
+				_PrepareUnFinish();
+			}
 			_state = State::None;
 			break;
 		case ChmFuncType::CompFinishKey:    // ASCII確定

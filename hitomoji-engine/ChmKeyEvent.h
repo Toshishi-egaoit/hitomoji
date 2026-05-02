@@ -64,6 +64,7 @@ public:
 	unsigned char GetChar() const ;
     bool IsShift() const { return _shift; }
 	bool IsUnFinishKey() const;
+	bool IsNavigationFinish() const { return _isNavigationFinish; }
 	// ナビゲーションキーか？(処理はしないが、確定処理が必要なキーの判定用)
     bool IsNavigationKey() const { 
 		switch (_wp) {
@@ -97,4 +98,5 @@ private:
     ChmEngine::State _state = ChmEngine::State::None;
 
     ChmFuncType _type = ChmFuncType::None;
+	bool _isNavigationFinish = false;
 };
