@@ -119,6 +119,9 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
 	if (ev.GetType() == ChmFuncType::VersionInfo) return TRUE;
 #endif
 
+	// 入力中の UnFinish はアプリ側Undoに流さず、IME側で握りつぶす
+	if (HasComposition() && ev.IsUnFinishKey()) return TRUE;
+
 	// Compositonが存在する状態の特殊キーはIMEが食う
 	if (HasComposition() && ev.GetType() != ChmFuncType::None) return TRUE;
 
@@ -158,9 +161,14 @@ void ChmEngine::SetError(void) {
 	_pending += L"?";
 }
 
-void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition){
+BOOL ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition){
 	ChmFuncType _type = keyEvent.GetType();
 	_useUndoEditSession = FALSE;
+
+	if (_type == ChmFuncType::None) {
+		pEndComposition = FALSE;
+		return FALSE;
+	}
 
 	if (_type == ChmFuncType::UnFinish && CanUnFinish()) {
 		_pRawInputStore->restore();
@@ -169,7 +177,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 		_state = State::Inputing;
 		_useUndoEditSession = TRUE;
 		pEndComposition = FALSE;
-		return;
+		return TRUE;
 	}
 
 	if (_state == State::None) {
@@ -347,7 +355,7 @@ void ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 	}
 	pEndComposition = !HasComposition();
 
-	return ;
+	return TRUE;
 }
 
 void ChmEngine::PostUpdateComposition(){

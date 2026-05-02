@@ -52,7 +52,7 @@ public:
 	State GetState() { return _state ;}
 	std::wstring GetCompositionStr() ;
 
-	void UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition);
+	BOOL UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition);
 	void PostUpdateComposition();
 	void ResetStatus() ;
 

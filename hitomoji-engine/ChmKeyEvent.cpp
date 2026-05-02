@@ -357,7 +357,10 @@ BOOL ChmKeyEvent::ParseFunctionKey(const std::wstring& key,
         return FALSE;
     }
 	// TODO: 本来はfunctionキーにisSelectのモードも指定させるべきだが、今はInputing固定
-    KeySignature sig{ vk, needShift, needCtrl, needAlt, ChmEngine::State::Inputing};
+	ChmEngine::State state = actionType == ChmFuncType::UnFinish
+		? ChmEngine::State::None
+		: ChmEngine::State::Inputing;
+    KeySignature sig{ vk, needShift, needCtrl, needAlt, state};
     
     // duplicate 検出
     auto it = s_currentKeyTable.find(sig);
@@ -467,4 +470,10 @@ unsigned char ChmKeyEvent::GetChar() const {
 	} else {
 		return  '\0' ;
 	}
+}
+
+bool ChmKeyEvent::IsUnFinishKey() const {
+	KeySignature sig{ _wp, _shift, _control, _alt, ChmEngine::State::None };
+	auto it = s_currentKeyTable.find(sig);
+	return it != s_currentKeyTable.end() && it->second == ChmFuncType::UnFinish;
 }

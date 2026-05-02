@@ -192,7 +192,7 @@ STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, B
 
 		bool fEnd = false;
 		ChmKeyEvent kEv(wp, lp,_pEngine->GetState());
-		_pEngine->UpdateComposition(kEv,fEnd);
+		if (!_pEngine->UpdateComposition(kEv,fEnd)) return S_OK;
 		_InvokeEditSession(pic, fEnd);
 		_pEngine->PostUpdateComposition();
 	}
@@ -215,9 +215,10 @@ STDMETHODIMP ChmTsfInterface::OnPreservedKey(ITfContext* pic, REFGUID rguid, BOO
 			bool fEnd = true;
 			// OFFになる時にCompositionが残っている場合は、それを確定させる
 			ChmKeyEvent kEv(ChmFuncType::CompFinish);
-			_pEngine->UpdateComposition(kEv,fEnd);
-			_InvokeEditSession(pic, fEnd);
-			_pEngine->PostUpdateComposition();
+			if (_pEngine->UpdateComposition(kEv,fEnd)) {
+				_InvokeEditSession(pic, fEnd);
+				_pEngine->PostUpdateComposition();
+			}
 		}
 
 		ToggleIME();

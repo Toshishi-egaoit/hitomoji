@@ -63,6 +63,7 @@ public:
     ChmFuncType GetType() const { return _type; }
 	unsigned char GetChar() const ;
     bool IsShift() const { return _shift; }
+	bool IsUnFinishKey() const;
 	// ナビゲーションキーか？(処理はしないが、確定処理が必要なキーの判定用)
     bool IsNavigationKey() const { 
 		switch (_wp) {
