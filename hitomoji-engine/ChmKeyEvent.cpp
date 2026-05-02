@@ -424,7 +424,6 @@ std::wstring ChmKeyEvent::Dump()
 void ChmKeyEvent::_TranslateByTable()
 {
     KeySignature sig{ _wp, _shift, _control, _alt , _state};
-	Info(Format(L" translate: WP=%d, Shift=%d, Ctrl=%d, Alt=%d, State=%d", _wp, _shift, _control, _alt, _state));
     auto it = s_currentKeyTable.find(sig);
     if (it != s_currentKeyTable.end())
     {

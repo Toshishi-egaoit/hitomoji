@@ -80,6 +80,7 @@ HRESULT CEditSessionBase::_GetOrStartComposition(TfEditCookie ec, ITfRange** ppR
 	}
 
 	hr = pInsert->InsertTextAtSelection(ec, TS_IAS_QUERYONLY, L"", 0, ppRange);
+	OUTPUT_HR_ON_ERROR(L"InsertTextAtSelection", hr)
 	pInsert->Release();
 	if (FAILED(hr) || !*ppRange) {
 		return E_FAIL;
@@ -96,6 +97,7 @@ HRESULT CEditSessionBase::_GetOrStartComposition(TfEditCookie ec, ITfRange** ppR
 	ITfComposition* pNewComp = nullptr;
 	hr = pCtxComp->StartComposition(ec, *ppRange, this, &pNewComp);
 	pCtxComp->Release();
+	OUTPUT_HR_ON_ERROR(L"StartComposition", hr)
 
 	if (FAILED(hr) || !pNewComp) {
 		(*ppRange)->Release();
@@ -137,6 +139,7 @@ void CEditSessionBase::_MoveCaretToRangeEnd(TfEditCookie ec, ITfRange* pRange) {
 void CEditSessionBase::_TerminateComposition(TfEditCookie ec) {
 	ITfComposition* pComp = _pTsfIf->GetComposition();
 	if (!pComp) return;
+	Debug(L"Terminating composition");
 	pComp->EndComposition(ec);
 	_pTsfIf->ClearComposition();
 }
@@ -151,7 +154,7 @@ CEditSession::CEditSession(
 }
 
 STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
-	OutputDebugStringWithString(L"[hitomoji] DoEditSession:>>%s<<", _compositionStr.c_str());
+	Info(Format(L"DoEditSession: end=%d >>%s<<", _fEnd, _compositionStr.c_str()));
 	ITfRange* pRange = nullptr;
 
 	if (FAILED(_GetOrStartComposition(ec, &pRange))) return S_OK;
@@ -183,24 +186,36 @@ CUndoEditSession::CUndoEditSession(
 }
 
 STDMETHODIMP CUndoEditSession::DoEditSession(TfEditCookie ec) {
-	OutputDebugStringWithString(L"[hitomoji] UndoEditSession:>>%s<<", _compositionStr.c_str());
+	Debug(Format(L"UndoEditSession:del=%d str=>>%s<<", _deleteLength, _compositionStr.c_str()));
 
 	ITfRange* pRange = nullptr;
 	if (FAILED(_GetDeleteRange(ec, &pRange))) return S_OK;
 
 	HRESULT hr = pRange->SetText(ec, TF_ST_CORRECTION, L"", 0);
+	OUTPUT_HR_ON_ERROR(L"SetText", hr);
 	if (FAILED(hr)) {
 		pRange->Release();
 		return S_OK;
 	}
+	pRange->Collapse(ec, TF_ANCHOR_START);
 
-	hr = _StartComposition(ec, pRange);
+	TF_SELECTION sel;
+	sel.range = pRange;
+	sel.style.ase = TF_AE_NONE;
+	sel.style.fInterimChar = FALSE;
+	_pic->SetSelection(ec, 1, &sel);
+	pRange->Release();
+	pRange = nullptr;
+
+	if (FAILED(_GetOrStartComposition(ec, &pRange))) {
+		return S_OK;
+	}
+
+	hr = pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
 	if (FAILED(hr)) {
 		pRange->Release();
 		return S_OK;
 	}
-
-	pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
 	LONG cch = (LONG)_compositionStr.length();
 	LONG shifted = 0;
 	pRange->ShiftEnd(ec, cch, &shifted, nullptr);
@@ -223,16 +238,36 @@ HRESULT CUndoEditSession::_GetDeleteRange(TfEditCookie ec, ITfRange** ppRange) {
 		return E_FAIL;
 	}
 
-	ITfRange* pRange = sel.range;
-	pRange->Collapse(ec, TF_ANCHOR_START);
+    // 2. 文書の「絶対的な先頭」から新しい Range を作成
+    ITfRange* pFullRange = nullptr;
+    if (FAILED(_pic->GetStart(ec, &pFullRange))) {
+		Debug(L"GetStart failed");
+        sel.range->Release();
+        return E_FAIL;
+    }
 
-	LONG shifted = 0;
-	hr = pRange->ShiftStart(ec, -_deleteLength, &shifted, nullptr);
-	if (FAILED(hr) || shifted != -_deleteLength) {
-		pRange->Release();
-		return E_FAIL;
-	}
+    // 3. この pFullRange の終端(End)を、今のカーソル位置にぶつける
+    // これにより、pFullRange は「文書の最初から今の位置まで」を完全にカバーする
+    pFullRange->ShiftEndToRange(ec, sel.range, TF_ANCHOR_END);
+    sel.range->Release();
 
-	*ppRange = pRange;
-	return S_OK;
+    // 4. End 位置で Collapse する（この時点では見た目上 GetSelection と同じ位置）
+    pFullRange->Collapse(ec, TF_ANCHOR_END);
+
+    // 5. 左へ ShiftStart
+    // 起点から繋がっている Range なので、壁を越えて左へ ShiftStart できる可能性が高い
+    LONG shifted = 0;
+    pFullRange->ShiftStart(ec, -_deleteLength, &shifted, nullptr);
+    Debug(Format(L"Absolute Range ShiftStart: %d / Required: %d", shifted, -_deleteLength));
+
+	// TODO: shifted == 0 の場合、Range が壁にぶつかった可能性がある。(標準エディットボックスで発生することを確認済み)
+	// SendInput(VK_BACK) で物理的に削除する？
+
+    if (shifted == 0) {
+        pFullRange->Release();
+        return E_FAIL;
+    }
+
+    *ppRange = pFullRange;
+    return S_OK;
 }
