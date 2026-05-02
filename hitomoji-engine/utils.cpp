@@ -175,3 +175,16 @@ std::wstring ChmLogger::Format(const wchar_t* fmt, ...)
 
     return std::wstring(buf);
 }
+std::string ToNarrow(const std::wstring& ws)
+{
+	std::string s;
+	s.reserve(ws.size());
+	for (wchar_t wc : ws) {
+		if (wc <= 0x7F) {
+			s.push_back(static_cast<char>(wc));
+		} else {
+			Warn(Format(L"ToNarrow: non-ASCII char U+%04X ignored", wc));
+		}
+	}
+	return s;
+}

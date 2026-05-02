@@ -38,3 +38,5 @@ private:
 #define Warn(msg) ChmLogger::Warn(msg)
 #define Error(msg) ChmLogger::Error(msg)
 #define Format(form, ...) ChmLogger::Format(form, __VA_ARGS__)
+
+extern std::string ToNarrow(const std::wstring& ws);

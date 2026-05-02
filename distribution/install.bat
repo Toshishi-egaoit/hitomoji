@@ -5,11 +5,10 @@ cd /d %~dp0
 :: --- 管理者権限チェック ---
 openfiles >nul 2>&1
 if %errorlevel% neq 0 (
-    echo 管理者権限が必要です。昇格ダイアログを表示します...
-    powershell -Command "Start-Process '%~f0' -Verb RunAs"
+    echo 実行には管理者権限が必要です。
+    echo 管理者権限のあるコマンドプロンプトで再実行してください。
     exit /b
 )
-
 
 set CONFIG_DIR=%appdata%\Hitomoji
 
@@ -21,9 +20,9 @@ set SYSTEM_DIR32=%SystemRoot%\SysWOW64
 set TARGET_DIR32=%SYSTEM_DIR32%\hitomoji
 set TARGET_DLL32=%TARGET_DIR32%\Hitomoji.dll
 
-set FORCE=0
 
 REM オプション解析
+set FORCE=0
 if /i "%1"=="/f" set FORCE=1
 
 :: 2. フォルダがなければ作成
@@ -68,9 +67,9 @@ if exist "%CONFIG_DIR%\hitomoji.ini" (
 	)
 )
 copy /y "hitomoji.ini" "%CONFIG_DIR%"
+copy /y "layer2.sample.ini" "%CONFIG_DIR%"
 :skip
 
-copy /y "layer2.sample.ini" "%CONFIG_DIR%"
 echo "辞書ファイルのコピー"
 copy /y "hitomoji.dic" "%CONFIG_DIR%"
 

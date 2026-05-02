@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <fstream>
 #include "ChmEnvironment.h"
+#include "ChmConfig.h"
+#include "utils.h"
 
 
 // かな漢字変換の辞書を管理するクラス(Activate/Deactivateが生存期間）
@@ -178,16 +180,19 @@ private:
 
 class ChmL3Helper {
 public:
-	ChmL3Helper()
+	ChmL3Helper(ChmConfig* pConfig)
 	{
-		InitDefault();
+		InitDefault(pConfig);
 	}
 
 	// デフォルトの選択キー定義
-	void InitDefault()
+	void InitDefault(ChmConfig* pConfig)
 	{
-		std::string map = "dkfj ei sla; ruwoqpty c,vmx.z/bn 3847291056";
-		BuildTable(map);
+		std::wstring map = pConfig->GetString(L"UI", L"select_keymap");
+		if (map.empty()) {
+			map = L"dk fj sl gh ei ru a; wo qp ty c, vm x. z/ bn 38 47 29 10 56";
+		}
+		BuildTable(ToNarrow(map));
 	}
 
 	// ChmConfigで使うため（未実装)
@@ -244,10 +249,9 @@ private:
 		for (size_t i = 0; i < map.size(); ++i) {
 			_keyToIndex[(unsigned char)map[i]] = (int)i;
 		}
-#ifdef _DEBUG
-		OutputDebugString(L"[Hitomoji] L3Helper::BuildTable\n1234567890123456789012345678901234567890");
-		OutputDebugStringA(map.c_str());
-#endif
+		Info(Format(L"L3Helper::BuildTable >[%c]=%d / [%c]=%d",
+			map[0], _keyToIndex[(unsigned char)map[0]],
+			map[map.size() - 1], _keyToIndex[(unsigned char)map[map.size() - 1]]));
 	};
 
 	int _keyToIndex[256];

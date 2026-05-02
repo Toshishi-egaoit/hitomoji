@@ -99,7 +99,7 @@ void ChmEngine::_initLayer2() {
 
 void ChmEngine::_initLayer3() {
 	if (_pL3Helper == nullptr )
-		_pL3Helper = new ChmL3Helper ;
+		_pL3Helper = new ChmL3Helper(_pConfig) ;
 	if (_pL3KanjiDict == nullptr )
 		_pL3KanjiDict = new ChmL3KanjiDict ;
 }
@@ -254,11 +254,9 @@ BOOL ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			if (!_pending.empty() ) {
 				// エラーチェック：pendingに文字がある?
 				_pending += L"?";
-				_state = State::Inputing;
 			} else if ( _pL3KanjiSelect->Start(_converted) == FALSE ) {
 				// エラーチェック２：_convertedの読みを検索しても見つからない?
 				_pending = L"?ym";
-				_state = State::Inputing;
 			}
 			_converted = L"<" + _converted + L">";
 			// TODO:(未実装)候補リストの更新
@@ -275,6 +273,8 @@ BOOL ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			break;
 		case ChmFuncType::SelectCancel:         // 選択中のキャンセルは入力に戻す
 			_state = State::Inputing;
+			delete _pL3KanjiSelect;
+			_pL3KanjiSelect = nullptr;
 			break;
 
 		// --------
@@ -321,7 +321,7 @@ BOOL ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 				int index = _pL3Helper->KeyToIndex(keyEvent.GetChar());
 				if (index < 0) {
 					// indexが見つからない場合はエラー
-					_pending = L"?idx";
+					_pending = L"?map";
 				}
 				else {
 					uint32_t selected = _pL3KanjiSelect->SelectByIndex(index) ;

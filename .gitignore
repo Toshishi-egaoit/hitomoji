@@ -28,4 +28,5 @@ Release/
 /packages
 /SQLite
 /dbg_distribution/x86/regHitomoji.exe
-/distribution/Hitomoji-v0.2.5.2-bin.zip
+/distribution/*.zip
+/dbg_distribution/Hitomoji.log.old
