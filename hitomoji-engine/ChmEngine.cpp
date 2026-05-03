@@ -273,6 +273,8 @@ BOOL ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			break;
 		case ChmFuncType::SelectCancel:         // 選択中のキャンセルは入力に戻す
 			_state = State::Inputing;
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
 			delete _pL3KanjiSelect;
 			_pL3KanjiSelect = nullptr;
 			break;
