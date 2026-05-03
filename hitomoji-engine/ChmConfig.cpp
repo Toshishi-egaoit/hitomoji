@@ -289,8 +289,8 @@ std::wstring ChmConfig::DumpInfos() const
 // --- public helpers ---
 std::wstring ChmConfig::Trim(const std::wstring& s)
 {
-	// whitespace characters: space(0x20), tab(0x09), CR(0x0D), LF(0x0A)
-	const wchar_t* ws = L" \t\r\n";
+	// whitespace characters: space(0x20), tab(0x09), CR(0x0D), LF(0x0A), BOM(0xFEFF)
+	const wchar_t* ws = L" \t\r\n\xFEFF";
 	size_t start = s.find_first_not_of(ws);
 	if (start == std::wstring::npos) return L"";
 	size_t end = s.find_last_not_of(ws);
