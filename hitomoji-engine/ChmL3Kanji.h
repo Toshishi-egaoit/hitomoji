@@ -246,8 +246,10 @@ private:
 
 		_pageSize = (byte)map.size();
 
+		Debug(L"L3Helper::BuildTable");
 		for (size_t i = 0; i < map.size(); ++i) {
 			_keyToIndex[(unsigned char)map[i]] = (int)i;
+			Debug(Format(L"   > [%c]=%d" , map[i] , (int)i));
 		}
 		Info(Format(L"L3Helper::BuildTable >[%c]=%d / [%c]=%d",
 			map[0], _keyToIndex[(unsigned char)map[0]],
