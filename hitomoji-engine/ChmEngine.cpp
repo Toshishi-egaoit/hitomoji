@@ -179,6 +179,7 @@ BOOL ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 		return FALSE;
 	}
 
+	// UnFinish(確定取けし)
 	if (_type == ChmFuncType::UnFinish && CanUnFinish()) {
 		_pRawInputStore->restore();
 		ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
@@ -252,24 +253,24 @@ BOOL ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			_state = State::Selecting;
 			_pL3KanjiSelect = new ChmL3KanjiSelect(_pL3KanjiDict, _pL3Helper->GetPageSize());
 			if (!_pending.empty() ) {
-				// エラーチェック：pendingに文字がある?
-				_pending += L"?";
+				// TODO:促音と思われる場合「っ」に置換する処理が必要
+				Debug(Format(L"   > pending:%s", _pending.c_str()));
 			} else if ( _pL3KanjiSelect->Start(_converted) == FALSE ) {
 				// エラーチェック２：_convertedの読みを検索しても見つからない?
-				_pending = L"?ym";
+				Debug(Format(L"   > yomi not found:%s", _converted.c_str()));
 			}
-			_converted = L"<" + _converted + L">";
-			// TODO:(未実装)候補リストの更新
 			// TODO:(未実装)選択候補のスレッドへの通知
 
 			break;
 		case ChmFuncType::SelectNextPage:
 			_converted = _converted + L"+";
 			_pL3KanjiSelect->NextPage();
+			// TODO:(未実装)選択候補のスレッドへの通知
 			break;
 		case ChmFuncType::SelectPrevPage:
 			_converted = _converted + L"-";
 			_pL3KanjiSelect->PrevPage();
+			// TODO:(未実装)選択候補のスレッドへの通知
 			break;
 		case ChmFuncType::SelectCancel:         // 選択中のキャンセルは入力に戻す
 			_state = State::Inputing;
@@ -277,6 +278,7 @@ BOOL ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
 			delete _pL3KanjiSelect;
 			_pL3KanjiSelect = nullptr;
+			// TODO:(未実装)選択候補のスレッドへの通知
 			break;
 
 		// --------
@@ -316,20 +318,20 @@ BOOL ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			_PrepareUnFinish();
 			_state = State::None;
 			break;
-		case ChmFuncType::SelectInput:
+		case ChmFuncType::SelectInput: // 漢字の確定処理
 			// 選択処理の場合
 			if ( _state == State::Selecting) {
 				// キーからindexを求める
 				int index = _pL3Helper->KeyToIndex(keyEvent.GetChar());
 				if (index < 0) {
 					// indexが見つからない場合はエラー
-					_pending = L"?map";
+					Debug(L"   > invalid key");
 				}
 				else {
 					uint32_t selected = _pL3KanjiSelect->SelectByIndex(index) ;
 					if ( selected == 0) {
 						// その位置に選択肢がない場合はエラー
-						_pending = L"?ch";
+						Debug(L"   > invalid posision");
 					}
 					else {
 						// 選択成功の場合は確定して終了
@@ -350,9 +352,9 @@ BOOL ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 		case ChmFuncType::ReloadIni: {
 			bool bRet = _pConfig->LoadFile();
 			if (bRet) {
-				_converted = L"ok";
+				Debug(L"   > reload OK");
 			}else {
-				_converted = L"ng";
+				Debug(L"   > reload NG");
 			}
 			_pending = L"";
 			_state = State::Inputing;

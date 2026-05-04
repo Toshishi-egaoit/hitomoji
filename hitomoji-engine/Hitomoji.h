@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#define HM_VERSION L"0.4.3.1"
+#define HM_VERSION L"0.4.3.3"
 
 enum class ChmFuncType {
 	None = 0,

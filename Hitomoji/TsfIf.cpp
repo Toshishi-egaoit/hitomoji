@@ -214,15 +214,8 @@ STDMETHODIMP ChmTsfInterface::OnKeyUp(ITfContext* pic, WPARAM wp, LPARAM lp, BOO
 
 STDMETHODIMP ChmTsfInterface::OnPreservedKey(ITfContext* pic, REFGUID rguid, BOOL* pfEaten) {
 	if (IsEqualGUID(rguid, GUID_PreservedKey_OpenClose)) {
-		if ( _pEngine->IsON() && _pEngine->HasComposition() ) {
-			bool fEnd = true;
-			// OFFになる時にCompositionが残っている場合は、それを確定させる
-			ChmKeyEvent kEv(ChmFuncType::CompFinish);
-			if (_pEngine->UpdateComposition(kEv,fEnd)) {
-				_InvokeEditSession(pic, fEnd);
-				_pEngine->PostUpdateComposition();
-			}
-		}
+		// OFFになる時にCompositionが残っている場合は、それを確定させる
+		_CommitComposition(pic);
 
 		ToggleIME();
 		OutputDebugString(L"[Hitomoji]OnPreservedKey:processed");
@@ -307,6 +300,20 @@ HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
 	return hrSession;
 }
 
+HRESULT ChmTsfInterface::_CommitComposition(ITfContext* pic) {
+	Debug(Format(L"_CommitComposition: pic=%p", pic));
+	if (!pic) return S_FALSE;
+	if (!_pEngine->IsON() || !_pEngine->HasComposition()) return S_FALSE;
+
+	bool fEnd = true;
+	ChmKeyEvent kEv(ChmFuncType::CompFinish);
+	if (!_pEngine->UpdateComposition(kEv, fEnd)) return S_FALSE;
+
+	HRESULT hr = _InvokeEditSession(pic, TRUE);
+	_pEngine->PostUpdateComposition();
+	return hr;
+}
+
 // -----
 // ----- ITfDisplayAttributeProvider  のイベント処理 -----
 // -----
@@ -370,6 +377,10 @@ STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 
 STDMETHODIMP ChmTsfInterface::OnKillThreadFocus() {
 	OutputDebugString(L"OnKillThreadFocus()");
+	if (GetCompositionContext()) {
+		ClearComposition();
+		_pEngine->ResetStatus();
+	}
 	return S_OK;
 }
 
