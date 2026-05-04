@@ -8,6 +8,7 @@
 
 extern HINSTANCE g_hInst;
 class ChmLangBarItemButton; // forward declaration
+class ChmCandidateWindowThread; // forward declaration
 
 
 // --- GUID Definitions ---
@@ -143,6 +144,7 @@ private:
 	ITfContext* _pContextForComposition;
     ChmEngine* _pEngine; // ロジック担当
 	ChmLangBarItemButton* _pLangBarItem ;
+	ChmCandidateWindowThread* _pCandidateWindowThread;
 };
 
 #define OUTPUT_HR(funcName,hr) \
@@ -162,4 +164,3 @@ if ( hr != S_OK ) {\
 	OUTPUT_HR(funcName,hr)\
 	return hr;\
 };
-

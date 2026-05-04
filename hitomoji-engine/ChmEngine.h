@@ -43,7 +43,6 @@ public:
 	void ToggleIME() { _isON = !_isON; }
 
 	BOOL IsON() const { return _isON; }
-	BOOL IsSelecting() const { return _state == State::Selecting ; }
 	BOOL HasComposition() { return (_state == State::Selecting || _state == State::Inputing); }
 	BOOL CanUnFinish() const;
 	BOOL UseUndoEditSession() const { return _useUndoEditSession; }

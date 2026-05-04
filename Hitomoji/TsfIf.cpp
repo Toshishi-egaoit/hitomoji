@@ -15,6 +15,7 @@
 #include "ChmLangBar.h"
 #include "ChmConfig.h"
 #include "ChmEnvironment.h"
+#include "ChmCandidateWindow.h"
 
 // --- CTsfInterface クラスの実装 ---
 
@@ -26,13 +27,19 @@ ChmTsfInterface::ChmTsfInterface():
 	_pContextForComposition(nullptr),
 	_dwThreadFocusSinkCookie(TF_INVALID_COOKIE),
 	_dwTextEditSinkCookie(TF_INVALID_COOKIE),
-	_llMyEditSessionTick(0)
+	_llMyEditSessionTick(0),
+	_pCandidateWindowThread(nullptr)
 { 
 	_pEngine = new ChmEngine();
 	_pLangBarItem = nullptr;
 }
 
 ChmTsfInterface::~ChmTsfInterface() {
+	if (_pCandidateWindowThread) {
+		_pCandidateWindowThread->Stop();
+		delete _pCandidateWindowThread;
+		_pCandidateWindowThread = nullptr;
+	}
 	delete _pEngine;
 }
 
@@ -89,12 +96,25 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 	// ChmEngine のしょきか
 	_pEngine->Activate();
 
+	// 候補ウィンドウ表示スレッドの初期化
+	_pCandidateWindowThread = new ChmCandidateWindowThread();
+	if (!_pCandidateWindowThread || !_pCandidateWindowThread->Start(g_hInst)) {
+		ChmLogger::Warn(L"Candidate window thread start failed");
+		delete _pCandidateWindowThread;
+		_pCandidateWindowThread = nullptr;
+	}
+
 	return S_OK;
 }
 
 STDMETHODIMP ChmTsfInterface::Deactivate() {
 	ChmLogger::Info(L"Deactivate()");
 	ClearComposition();
+	if (_pCandidateWindowThread) {
+		_pCandidateWindowThread->Stop();
+		delete _pCandidateWindowThread;
+		_pCandidateWindowThread = nullptr;
+	}
 	if (_dwThreadFocusSinkCookie != TF_INVALID_COOKIE) {
 		ITfSource* pSource = nullptr;
 		if (SUCCEEDED(_pThreadMgr->QueryInterface(IID_ITfSource, (void**)&pSource))) {
@@ -198,6 +218,24 @@ STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, B
 		if (!_pEngine->UpdateComposition(kEv,fEnd)) return S_OK;
 		_InvokeEditSession(pic, fEnd);
 		_pEngine->PostUpdateComposition();
+
+		if (_pCandidateWindowThread) {
+			ChmFuncType type = kEv.GetType();
+			if (type == ChmFuncType::CompSelect) {
+				POINT pt{};
+				GetCursorPos(&pt);
+
+				ChmCandidatePage page{};
+				page.anchorRect.left = pt.x;
+				page.anchorRect.top = pt.y;
+				page.anchorRect.right = pt.x + 1;
+				page.anchorRect.bottom = pt.y + 1;
+				page.delayMs = 500;
+				_pCandidateWindowThread->ScheduleShow(page);
+			} else if (_pEngine->GetState() != ChmEngine::State::Selecting) {
+				_pCandidateWindowThread->Hide();
+			}
+		}
 	}
 	return S_OK;
 }
@@ -214,6 +252,10 @@ STDMETHODIMP ChmTsfInterface::OnKeyUp(ITfContext* pic, WPARAM wp, LPARAM lp, BOO
 
 STDMETHODIMP ChmTsfInterface::OnPreservedKey(ITfContext* pic, REFGUID rguid, BOOL* pfEaten) {
 	if (IsEqualGUID(rguid, GUID_PreservedKey_OpenClose)) {
+		if (_pCandidateWindowThread) {
+			_pCandidateWindowThread->Hide();
+		}
+
 		// OFFになる時にCompositionが残っている場合は、それを確定させる
 		_CommitComposition(pic);
 
@@ -366,6 +408,10 @@ STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 {
 	OutputDebugString(L"[Hitomoji] OnSetThreadFocus()");
 
+	if (_pCandidateWindowThread) {
+		_pCandidateWindowThread->Hide();
+	}
+
 	// フォーカス取得時は Composition 側のみを基準に整理
 	if (GetCompositionContext()) {
 		ClearComposition();
@@ -377,6 +423,9 @@ STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 
 STDMETHODIMP ChmTsfInterface::OnKillThreadFocus() {
 	OutputDebugString(L"OnKillThreadFocus()");
+	if (_pCandidateWindowThread) {
+		_pCandidateWindowThread->Hide();
+	}
 	if (GetCompositionContext()) {
 		ClearComposition();
 		_pEngine->ResetStatus();
