@@ -6,6 +6,7 @@
 #include <string>
 #include "utils.h"
 #include "hitomoji.h"
+#include "ChmCandidatePage.h"
 
 class ChmRawInputStore;
 class ChmConfig;
@@ -32,6 +33,7 @@ public:
 	void Deactivate();
 
 	// ChmConfigの処理ヘルパ
+	ChmConfig* GetConfig() const { return _pConfig; };
 	void InitConfig();
 	std::wstring GetConfigFile() ; 
 	std::wstring GetConfigPath() ; 
@@ -51,6 +53,7 @@ public:
 	BOOL IsDirectInput(ChmFuncType tp) { return (tp == ChmFuncType::CharInputSpace) ; }
 	State GetState() { return _state ;}
 	std::wstring GetCompositionStr() ;
+	BOOL GetCandidatePage(ChmCandidatePage& page) const;
 
 	BOOL UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition);
 	void PostUpdateComposition();

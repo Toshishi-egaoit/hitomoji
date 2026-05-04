@@ -78,6 +78,22 @@ public:
 	BOOL IsMyEditSession() { return (GetTickCount64() - _llMyEditSessionTick <= CHM_ONENDEDIT_TICK) ; }
 	ITfComposition* GetComposition() const { return _pComposition; }
 	ITfContext* GetCompositionContext() const { return _pContextForComposition; }
+	void SetCandidatePosition(const RECT& rc)
+	{
+		_candidateAnchorRect = rc;
+		_hasCandidatePosition = TRUE;
+	}
+	void ClearCandidatePosition()
+	{
+		SetRectEmpty(&_candidateAnchorRect);
+		_hasCandidatePosition = FALSE;
+	}
+	BOOL GetCandidatePosition(RECT& rc) const
+	{
+		if (!_hasCandidatePosition) return FALSE;
+		rc = _candidateAnchorRect;
+		return TRUE;
+	}
 	void SetComposition(ITfContext* pic, ITfComposition* pComp)
 	{
 		ClearComposition();
@@ -145,6 +161,8 @@ private:
     ChmEngine* _pEngine; // ロジック担当
 	ChmLangBarItemButton* _pLangBarItem ;
 	ChmCandidateWindowThread* _pCandidateWindowThread;
+	RECT _candidateAnchorRect;
+	BOOL _hasCandidatePosition;
 };
 
 #define OUTPUT_HR(funcName,hr) \

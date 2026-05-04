@@ -169,6 +169,22 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
 		LONG shifted = 0;
 		pRange->ShiftEnd(ec, cch, &shifted, nullptr);
 		_ApplyDisplayAttribute(ec, pRange);
+
+		ITfContextView* pContextView = nullptr;
+		HRESULT hrView = _pic->GetActiveView(&pContextView);
+		if (SUCCEEDED(hrView) && pContextView) {
+			RECT rc{};
+			BOOL clipped = FALSE;
+			HRESULT hrExt = pContextView->GetTextExt(ec, pRange, &rc, &clipped);
+			if (SUCCEEDED(hrExt)) {
+				_pTsfIf->SetCandidatePosition(rc);
+			} else {
+				_pTsfIf->ClearCandidatePosition();
+			}
+			pContextView->Release();
+		} else {
+			_pTsfIf->ClearCandidatePosition();
+		}
 	}
 
 	if (pRange) pRange->Release();

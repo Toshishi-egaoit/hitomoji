@@ -259,18 +259,12 @@ BOOL ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 				// エラーチェック２：_convertedの読みを検索しても見つからない?
 				Debug(Format(L"   > yomi not found:%s", _converted.c_str()));
 			}
-			// TODO:(未実装)選択候補のスレッドへの通知
-
 			break;
 		case ChmFuncType::SelectNextPage:
-			_converted = _converted + L"+";
 			_pL3KanjiSelect->NextPage();
-			// TODO:(未実装)選択候補のスレッドへの通知
 			break;
 		case ChmFuncType::SelectPrevPage:
-			_converted = _converted + L"-";
 			_pL3KanjiSelect->PrevPage();
-			// TODO:(未実装)選択候補のスレッドへの通知
 			break;
 		case ChmFuncType::SelectCancel:         // 選択中のキャンセルは入力に戻す
 			_state = State::Inputing;
@@ -414,4 +408,9 @@ std::wstring ChmEngine::GetCompositionStr(){
 
 	// 既に変換済みの文字列を連結して返却
 	return _converted + _pending;
+}
+
+BOOL ChmEngine::GetCandidatePage(ChmCandidatePage& page) const {
+	if (!_pL3KanjiSelect || !_pL3Helper) return FALSE;
+	return _pL3KanjiSelect->BuildCandidatePage(page, *_pL3Helper);
 }

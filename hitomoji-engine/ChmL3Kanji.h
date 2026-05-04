@@ -7,8 +7,10 @@
 #include <fstream>
 #include "ChmEnvironment.h"
 #include "ChmConfig.h"
+#include "ChmCandidatePage.h"
 #include "utils.h"
 
+class ChmL3Helper;
 
 // かな漢字変換の辞書を管理するクラス(Activate/Deactivateが生存期間）
 class ChmL3KanjiDict {
@@ -130,6 +132,7 @@ public:
 	const uint32_t* GetList() const { return _list; }
 	uint16_t GetCount() const { return _count; }
 	byte GetPage() const { return _page; }
+	BOOL BuildCandidatePage(ChmCandidatePage& page, const ChmL3Helper& helper) const;
 
 private:
 	// wstringから最大5文字までのchar16_t配列に変換
@@ -207,6 +210,12 @@ public:
 		return _keyToIndex[key];
 	}
 
+	int IndexToCell(size_t index) const
+	{
+		if (index >= CHM_CANDIDATE_MAX) return -1;
+		return _indexToCell[index];
+	}
+
 	size_t GetPageSize() const
 	{
 		return _pageSize;
@@ -238,24 +247,76 @@ private:
 	void BuildTable(const std::string& raw)
 	{
 		std::fill(std::begin(_keyToIndex), std::end(_keyToIndex), -1);
+		std::fill(std::begin(_keyToCell), std::end(_keyToCell), -1);
+		std::fill(std::begin(_indexToCell), std::end(_indexToCell), -1);
+
+		const char* rows[] = {
+			"1234567890",
+			"qwertyuiop",
+			"asdfghjkl;",
+			"zxcvbnm,./"
+		};
+		for (size_t row = 0; row < 4; ++row) {
+			for (size_t col = 0; col < 10; ++col) {
+				unsigned char key = static_cast<unsigned char>(rows[row][col]);
+				_keyToCell[key] = static_cast<int>(row * 10 + col);
+			}
+		}
 
 		std::string map;
 		for (char c : raw) {
 			if (!isspace((unsigned char)c)) map.push_back(c);
+		}
+		if (map.size() > CHM_CANDIDATE_MAX) {
+			map.resize(CHM_CANDIDATE_MAX);
 		}
 
 		_pageSize = (byte)map.size();
 
 		Debug(L"L3Helper::BuildTable");
 		for (size_t i = 0; i < map.size(); ++i) {
-			_keyToIndex[(unsigned char)map[i]] = (int)i;
-			Debug(Format(L"   > [%c]=%d" , map[i] , (int)i));
+			unsigned char key = (unsigned char)map[i];
+			_keyToIndex[key] = (int)i;
+			_indexToCell[i] = _keyToCell[key];
+			Debug(Format(L"   > [%c]=%d cell=%d" , map[i] , (int)i, _indexToCell[i]));
 		}
-		Info(Format(L"L3Helper::BuildTable >[%c]=%d / [%c]=%d",
-			map[0], _keyToIndex[(unsigned char)map[0]],
-			map[map.size() - 1], _keyToIndex[(unsigned char)map[map.size() - 1]]));
+		if (!map.empty()) {
+			Info(Format(L"L3Helper::BuildTable >[%c]=%d / [%c]=%d",
+				map[0], _keyToIndex[(unsigned char)map[0]],
+				map[map.size() - 1], _keyToIndex[(unsigned char)map[map.size() - 1]]));
+		}
 	};
 
 	int _keyToIndex[256];
+	int _keyToCell[256];
+	int _indexToCell[CHM_CANDIDATE_MAX];
 	byte _pageSize;
 };
+
+inline BOOL ChmL3KanjiSelect::BuildCandidatePage(ChmCandidatePage& page, const ChmL3Helper& helper) const
+{
+	RECT anchor = page.anchorRect;
+	DWORD delayMs = page.delayMs;
+	page = ChmCandidatePage{};
+	page.anchorRect = anchor;
+	page.delayMs = delayMs;
+	page.page = _page;
+	page.totalCount = _count;
+
+	if (!_list || _count == 0 || _pageSize == 0) return FALSE;
+
+	size_t start = static_cast<size_t>(_page) * _pageSize;
+	if (start >= _count) return FALSE;
+
+	size_t available = _count - start;
+	size_t pageCount = std::min<size_t>(_pageSize, available);
+	page.candidateCount = static_cast<UINT>(pageCount);
+
+	for (size_t i = 0; i < pageCount; ++i) {
+		int cell = helper.IndexToCell(i);
+		if (cell < 0 || cell >= static_cast<int>(CHM_CANDIDATE_MAX)) continue;
+		page.candidates[cell] = _list[start + i];
+	}
+
+	return TRUE;
+}

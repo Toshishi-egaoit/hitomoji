@@ -28,7 +28,9 @@ ChmTsfInterface::ChmTsfInterface():
 	_dwThreadFocusSinkCookie(TF_INVALID_COOKIE),
 	_dwTextEditSinkCookie(TF_INVALID_COOKIE),
 	_llMyEditSessionTick(0),
-	_pCandidateWindowThread(nullptr)
+	_pCandidateWindowThread(nullptr),
+	_candidateAnchorRect{},
+	_hasCandidatePosition(FALSE)
 { 
 	_pEngine = new ChmEngine();
 	_pLangBarItem = nullptr;
@@ -222,15 +224,23 @@ STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, B
 		if (_pCandidateWindowThread) {
 			ChmFuncType type = kEv.GetType();
 			if (type == ChmFuncType::CompSelect) {
-				POINT pt{};
-				GetCursorPos(&pt);
-
 				ChmCandidatePage page{};
-				page.anchorRect.left = pt.x;
-				page.anchorRect.top = pt.y;
-				page.anchorRect.right = pt.x + 1;
-				page.anchorRect.bottom = pt.y + 1;
-				page.delayMs = 500;
+				if (!GetCandidatePosition(page.anchorRect)) {
+					POINT pt{};
+					GetCursorPos(&pt);
+					page.anchorRect.left = pt.x;
+					page.anchorRect.top = pt.y;
+					page.anchorRect.right = pt.x + 1;
+					page.anchorRect.bottom = pt.y + 1;
+				}
+				page.delayMs = _pEngine->GetConfig()->GetLong(L"ui", L"candidate-delay",500);
+				if (!_pEngine->GetCandidatePage(page)) {
+					for (size_t i = 0; i < CHM_CANDIDATE_MAX; ++i) {
+						page.candidates[i] = 0x4E00 + static_cast<uint32_t>(i);
+					}
+					page.totalCount = CHM_CANDIDATE_MAX;
+					page.candidateCount = CHM_CANDIDATE_MAX;
+				}
 				_pCandidateWindowThread->ScheduleShow(page);
 			} else if (_pEngine->GetState() != ChmEngine::State::Selecting) {
 				_pCandidateWindowThread->Hide();

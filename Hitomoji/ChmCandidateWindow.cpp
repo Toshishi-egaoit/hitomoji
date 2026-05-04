@@ -7,8 +7,111 @@
 namespace {
 constexpr wchar_t CHM_CANDIDATE_WINDOW_CLASS[] = L"HitomojiCandidateWindow";
 constexpr UINT_PTR CHM_CANDIDATE_TIMER_ID = 1;
-constexpr int CHM_CANDIDATE_WIDTH = 240;
-constexpr int CHM_CANDIDATE_HEIGHT = 72;
+constexpr int CHM_CANDIDATE_COLS = 10;
+constexpr int CHM_CANDIDATE_ROWS = 4;
+constexpr int CHM_CANDIDATE_CELL_WIDTH = 34;
+constexpr int CHM_CANDIDATE_CELL_HEIGHT = 30;
+constexpr int CHM_CANDIDATE_PADDING = 10;
+constexpr int CHM_CANDIDATE_ROW_OFFSETS[CHM_CANDIDATE_ROWS] = { 0, 17, 25, 34 };
+constexpr int CHM_CANDIDATE_WIDTH = CHM_CANDIDATE_COLS * CHM_CANDIDATE_CELL_WIDTH + CHM_CANDIDATE_ROW_OFFSETS[3] + CHM_CANDIDATE_PADDING * 2;
+constexpr int CHM_CANDIDATE_HEIGHT = CHM_CANDIDATE_ROWS * CHM_CANDIDATE_CELL_HEIGHT + CHM_CANDIDATE_PADDING * 2;
+constexpr int CHM_CANDIDATE_HOME_F_INDEX = 23;
+constexpr int CHM_CANDIDATE_HOME_J_INDEX = 26;
+constexpr int CHM_CANDIDATE_MARKER_HEIGHT = 2;
+constexpr int CHM_CANDIDATE_HOME_MARKER_HEIGHT = 4;
+
+int Utf32ToUtf16(uint32_t cp, wchar_t out[3])
+{
+    out[0] = L'\0';
+    out[1] = L'\0';
+    out[2] = L'\0';
+
+    if (cp == 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) {
+        return 0;
+    }
+
+    if (cp <= 0xFFFF) {
+        out[0] = static_cast<wchar_t>(cp);
+        return 1;
+    }
+
+    cp -= 0x10000;
+    out[0] = static_cast<wchar_t>(0xD800 + (cp >> 10));
+    out[1] = static_cast<wchar_t>(0xDC00 + (cp & 0x3FF));
+    return 2;
+}
+
+void DrawCandidates(HDC hdc, const ChmCandidatePage* page)
+{
+    if (!page) return;
+
+    int fontHeight = -MulDiv(16, GetDeviceCaps(hdc, LOGPIXELSY), 72);
+    HFONT font = CreateFontW(
+        fontHeight,
+        0,
+        0,
+        0,
+        FW_NORMAL,
+        FALSE,
+        FALSE,
+        FALSE,
+        DEFAULT_CHARSET,
+        OUT_DEFAULT_PRECIS,
+        CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY,
+        DEFAULT_PITCH | FF_DONTCARE,
+        L"Yu Gothic UI");
+    HFONT oldFont = font ? static_cast<HFONT>(SelectObject(hdc, font)) : nullptr;
+    SetBkMode(hdc, TRANSPARENT);
+    SetTextColor(hdc, GetSysColor(COLOR_WINDOWTEXT));
+
+    HBRUSH markerBrush = CreateSolidBrush(RGB(192, 192, 192));
+    HBRUSH homeMarkerBrush = CreateSolidBrush(RGB(96, 96, 96));
+
+    for (int i = 0; i < static_cast<int>(CHM_CANDIDATE_MAX); ++i) {
+        int row = i / CHM_CANDIDATE_COLS;
+        int col = i % CHM_CANDIDATE_COLS;
+        RECT cell{
+            CHM_CANDIDATE_PADDING + CHM_CANDIDATE_ROW_OFFSETS[row] + col * CHM_CANDIDATE_CELL_WIDTH,
+            CHM_CANDIDATE_PADDING + row * CHM_CANDIDATE_CELL_HEIGHT,
+            CHM_CANDIDATE_PADDING + CHM_CANDIDATE_ROW_OFFSETS[row] + (col + 1) * CHM_CANDIDATE_CELL_WIDTH,
+            CHM_CANDIDATE_PADDING + (row + 1) * CHM_CANDIDATE_CELL_HEIGHT
+        };
+
+        bool isHome = (i == CHM_CANDIDATE_HOME_F_INDEX || i == CHM_CANDIDATE_HOME_J_INDEX);
+        int markerHeight = isHome ? CHM_CANDIDATE_HOME_MARKER_HEIGHT : CHM_CANDIDATE_MARKER_HEIGHT;
+        RECT marker{
+            cell.left + 5,
+            cell.bottom - 5,
+            cell.right - 5,
+            cell.bottom - 5 + markerHeight
+        };
+        FillRect(hdc, &marker, isHome ? homeMarkerBrush : markerBrush);
+
+        uint32_t cp = page->candidates[i];
+        if (cp == 0) continue;
+
+        wchar_t text[3];
+        if (Utf32ToUtf16(cp, text) == 0) continue;
+
+        SetTextColor(hdc, GetSysColor(COLOR_WINDOWTEXT));
+        DrawTextW(hdc, text, -1, &cell, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    }
+
+    if (homeMarkerBrush) {
+        DeleteObject(homeMarkerBrush);
+    }
+    if (markerBrush) {
+        DeleteObject(markerBrush);
+    }
+
+    if (oldFont) {
+        SelectObject(hdc, oldFont);
+    }
+    if (font) {
+        DeleteObject(font);
+    }
+}
 }
 
 ChmCandidateWindowThread::ChmCandidateWindowThread()
@@ -263,6 +366,9 @@ LRESULT CALLBACK ChmCandidateWindowThread::WndProc(HWND hwnd, UINT msg, WPARAM w
         GetClientRect(hwnd, &rc);
         FillRect(hdc, &rc, reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1));
         FrameRect(hdc, &rc, reinterpret_cast<HBRUSH>(COLOR_WINDOWFRAME + 1));
+        if (self) {
+            DrawCandidates(hdc, self->_pendingPage);
+        }
         EndPaint(hwnd, &ps);
         return 0;
     }
