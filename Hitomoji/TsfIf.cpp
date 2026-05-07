@@ -217,30 +217,34 @@ STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, B
 
 		bool fEnd = false;
 		ChmKeyEvent kEv(wp, lp,_pEngine->GetState());
-		if (!_pEngine->UpdateComposition(kEv,fEnd)) return S_OK;
+		ChmFuncType type = kEv.GetType();
+		ChmCandidatePage page{};
+		BOOL hasCandidatePage = FALSE;
+
+		if (ChmEngine::IsLayer3Function(type)) {
+			if (!GetCandidatePosition(page.anchorRect)) {
+				POINT pt{};
+				GetCursorPos(&pt);
+				page.anchorRect.left = pt.x;
+				page.anchorRect.top = pt.y;
+				page.anchorRect.right = pt.x + 1;
+				page.anchorRect.bottom = pt.y + 1;
+			}
+			page.delayMs = _pEngine->GetConfig()->GetLong(L"ui", L"candidate-delay",500);
+			if (!_pEngine->UpdateLayer3(kEv, fEnd, &page)) return S_OK;
+			hasCandidatePage = page.candidateCount > 0;
+		} else if (ChmEngine::IsLayer2Function(type)) {
+			if (!_pEngine->UpdateLayer2(kEv, fEnd)) return S_OK;
+		} else {
+			if (!_pEngine->UpdateOther(kEv, fEnd)) return S_OK;
+		}
+
 		_InvokeEditSession(pic, fEnd);
 		_pEngine->PostUpdateComposition();
+		_HandleEngineError(pic);
 
 		if (_pCandidateWindowThread) {
-			ChmFuncType type = kEv.GetType();
-			if (type == ChmFuncType::CompSelect) {
-				ChmCandidatePage page{};
-				if (!GetCandidatePosition(page.anchorRect)) {
-					POINT pt{};
-					GetCursorPos(&pt);
-					page.anchorRect.left = pt.x;
-					page.anchorRect.top = pt.y;
-					page.anchorRect.right = pt.x + 1;
-					page.anchorRect.bottom = pt.y + 1;
-				}
-				page.delayMs = _pEngine->GetConfig()->GetLong(L"ui", L"candidate-delay",500);
-				if (!_pEngine->GetCandidatePage(page)) {
-					for (size_t i = 0; i < CHM_CANDIDATE_MAX; ++i) {
-						page.candidates[i] = 0x4E00 + static_cast<uint32_t>(i);
-					}
-					page.totalCount = CHM_CANDIDATE_MAX;
-					page.candidateCount = CHM_CANDIDATE_MAX;
-				}
+			if (hasCandidatePage && _pEngine->GetState() == ChmEngine::State::Selecting) {
 				_pCandidateWindowThread->ScheduleShow(page);
 			} else if (_pEngine->GetState() != ChmEngine::State::Selecting) {
 				_pCandidateWindowThread->Hide();
@@ -248,6 +252,23 @@ STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, B
 		}
 	}
 	return S_OK;
+}
+
+void ChmTsfInterface::_HandleEngineError(ITfContext* pic)
+{
+	if (!_pEngine->ConsumeErrorRequest()) return;
+
+	if (_pEngine->GetConfig()->GetBool(L"ui", L"error-beep", TRUE)) {
+		MessageBeep(MB_OK);
+	} else {
+		_TriggerVisualBell(pic);
+	}
+}
+
+void ChmTsfInterface::_TriggerVisualBell(ITfContext* /*pic*/)
+{
+	// TODO: VisualBellとしてCompositionの表示属性を短時間だけ反転させる。
+	//       期間は ui.visual-bell-ms（既定300ms）で制御する想定。
 }
 
 STDMETHODIMP ChmTsfInterface::OnTestKeyUp(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten) {

@@ -140,6 +140,8 @@ private:
     void _UninitPreservedKey();
 	HRESULT _InvokeEditSession(ITfContext* pic, BOOL fEnd) ;
 	HRESULT _CommitComposition(ITfContext* pic);
+	void _HandleEngineError(ITfContext* pic);
+	void _TriggerVisualBell(ITfContext* pic);
 
 	// ITfDisplayAttributeProvider
     HRESULT _InitDisplayAttributeInfo();

@@ -49,6 +49,7 @@ public:
 	BOOL CanUnFinish() const;
 	BOOL UseUndoEditSession() const { return _useUndoEditSession; }
 	LONG GetUndoDeleteLength() const { return _undoDeleteLength; }
+	BOOL ConsumeErrorRequest();
 	void InvalidateUnFinishByKey(WPARAM wp);
 	BOOL IsDirectInput(ChmFuncType tp) { return (tp == ChmFuncType::CharInputSpace) ; }
 	State GetState() { return _state ;}
@@ -56,8 +57,14 @@ public:
 	BOOL GetCandidatePage(ChmCandidatePage& page) const;
 
 	BOOL UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition);
+	BOOL UpdateLayer2(const ChmKeyEvent& keyEvent, bool& pEndComposition);
+	BOOL UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition, ChmCandidatePage* pCandidatePage);
+	BOOL UpdateOther(const ChmKeyEvent& keyEvent, bool& pEndComposition);
 	void PostUpdateComposition();
 	void ResetStatus() ;
+
+	static BOOL IsLayer2Function(ChmFuncType type);
+	static BOOL IsLayer3Function(ChmFuncType type);
 
 private:
 	// Activate/Deactivateでの初期処理
@@ -87,4 +94,5 @@ private:
 	std::wstring _pending; // かなに変換できていない部分（残り）
 	BOOL _useUndoEditSession;
 	LONG _undoDeleteLength;
+	BOOL _hasErrorRequest;
 };

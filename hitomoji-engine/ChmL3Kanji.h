@@ -109,12 +109,14 @@ public:
 
 	void NextPage()
 	{
+		if (!_list || _count == 0 || _pageSize == 0) return;
 		byte maxPage = (_count + _pageSize - 1) / _pageSize;
 		if (_page + 1 < maxPage) _page++;
 	}
 
 	void PrevPage()
 	{
+		if (!_list || _count == 0 || _pageSize == 0) return;
 		byte maxPage = (_count + _pageSize - 1) / _pageSize;
 		if (_page == 0 ) _page = maxPage - 1;
 		else if (_page > 0) _page--;

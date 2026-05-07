@@ -11,7 +11,7 @@
 
 ChmEngine::ChmEngine()
 	: _isON(FALSE), _state(State::None), _converted(L""), _pending(L""),
-	  _useUndoEditSession(FALSE), _undoDeleteLength(0)
+	  _useUndoEditSession(FALSE), _undoDeleteLength(0), _hasErrorRequest(FALSE)
 {
 	_pRawInputStore = new ChmRawInputStore();
 	_pConfig = nullptr;
@@ -166,11 +166,206 @@ void ChmEngine::_ClearUnFinish() {
 }
 
 void ChmEngine::SetError(void) {
-	// TODO:Beep音を出す。（confiファイルでON/OFFできるようにする）
-	_pending += L"?";
+	_hasErrorRequest = TRUE;
+}
+
+BOOL ChmEngine::ConsumeErrorRequest() {
+	BOOL requested = _hasErrorRequest;
+	_hasErrorRequest = FALSE;
+	return requested;
 }
 
 BOOL ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition){
+	ChmFuncType _type = keyEvent.GetType();
+
+	if (IsLayer2Function(_type)) {
+		return UpdateLayer2(keyEvent, pEndComposition);
+	}
+	if (IsLayer3Function(_type)) {
+		return UpdateLayer3(keyEvent, pEndComposition, nullptr);
+	}
+	return UpdateOther(keyEvent, pEndComposition);
+}
+
+BOOL ChmEngine::IsLayer2Function(ChmFuncType type) {
+	switch (type) {
+		case ChmFuncType::CharInputSpace:
+		case ChmFuncType::CharInput:
+		case ChmFuncType::Backspace:
+		case ChmFuncType::Cancel:
+			return TRUE;
+		default:
+			return FALSE;
+	}
+}
+
+BOOL ChmEngine::IsLayer3Function(ChmFuncType type) {
+	switch (type) {
+		case ChmFuncType::CompSelect:
+		case ChmFuncType::SelectInput:
+		case ChmFuncType::SelectNextPage:
+		case ChmFuncType::SelectPrevPage:
+		case ChmFuncType::SelectCancel:
+			return TRUE;
+		default:
+			return FALSE;
+	}
+}
+
+BOOL ChmEngine::UpdateLayer2(const ChmKeyEvent& keyEvent, bool& pEndComposition){
+	ChmFuncType _type = keyEvent.GetType();
+	_useUndoEditSession = FALSE;
+
+	if (_type == ChmFuncType::None) {
+		pEndComposition = FALSE;
+		return FALSE;
+	}
+
+	if (_state == State::None) {
+		_ClearUnFinish();
+	}
+
+	switch (_type) {
+		case ChmFuncType::CharInputSpace: // 1文字目のスペース入力
+			// TODO: configで全角空白か半角かを選べるようにする
+			_converted = L" ";
+			_pending = L"";
+			_state = State::None;
+			break;
+		case ChmFuncType::CharInput:
+			_state = State::Inputing;
+			_pRawInputStore->push(keyEvent.GetChar());
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
+			break;
+		case ChmFuncType::Backspace: {
+			if (!HasComposition()) break;
+			size_t len = _pRawInputStore->get().size();
+			size_t del = ChmRomajiConverter::GetLastRawUnitLength();
+
+			if (!_pConfig->GetBool(L"ui",L"backspace-unit-symbol")) {
+				del = 1;
+			}
+
+			if (del > len) del = len;
+
+			_pRawInputStore->pop(del);
+			OutputDebugStringWithInt(L"[Hitomoji] Backspace %d chars",(ULONG)del);
+
+			if (_pRawInputStore->get().empty()) {
+				_converted = L"";
+				_pending = L"";
+				_ClearUnFinish();
+				_state = State::None;
+			} else {
+				ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+					_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
+			}
+			break;
+		}
+		case ChmFuncType::Cancel:
+			_converted = L"";
+			_pending = L"";
+			_ClearUnFinish();
+			_state = State::None;
+			break;
+		default:
+			return FALSE;
+	}
+	pEndComposition = !HasComposition();
+
+	return TRUE;
+}
+
+BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition, ChmCandidatePage* pCandidatePage){
+	ChmFuncType _type = keyEvent.GetType();
+	_useUndoEditSession = FALSE;
+
+	if (_type == ChmFuncType::None) {
+		pEndComposition = FALSE;
+		return FALSE;
+	}
+
+	switch (_type) {
+		case ChmFuncType::CompSelect:
+			delete _pL3KanjiSelect;
+			_pL3KanjiSelect = nullptr;
+			_pL3KanjiSelect = new ChmL3KanjiSelect(_pL3KanjiDict, static_cast<byte>(_pL3Helper->GetPageSize()));
+			if (!_pending.empty() ) {
+				// TODO:促音と思われる場合「っ」に置換する処理が必要
+				Debug(Format(L"   > pending:%s", _pending.c_str()));
+				SetError();
+				delete _pL3KanjiSelect;
+				_pL3KanjiSelect = nullptr;
+				_state = State::Inputing;
+			} else if ( _pL3KanjiSelect->Start(_converted) == FALSE ) {
+				Debug(Format(L"   > yomi not found:%s", _converted.c_str()));
+				SetError();
+				delete _pL3KanjiSelect;
+				_pL3KanjiSelect = nullptr;
+				_state = State::Inputing;
+			} else {
+				_state = State::Selecting;
+			}
+			break;
+		case ChmFuncType::SelectNextPage:
+			if (_pL3KanjiSelect) {
+				_pL3KanjiSelect->NextPage();
+			} else {
+				SetError();
+			}
+			break;
+		case ChmFuncType::SelectPrevPage:
+			if (_pL3KanjiSelect) {
+				_pL3KanjiSelect->PrevPage();
+			} else {
+				SetError();
+			}
+			break;
+		case ChmFuncType::SelectCancel:
+			_state = State::Inputing;
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
+			delete _pL3KanjiSelect;
+			_pL3KanjiSelect = nullptr;
+			break;
+		case ChmFuncType::SelectInput:
+			if ( _state == State::Selecting && _pL3KanjiSelect) {
+				int index = _pL3Helper->KeyToIndex(keyEvent.GetChar());
+				if (index < 0) {
+					Debug(L"   > invalid key");
+					SetError();
+				}
+				else {
+					uint32_t selected = _pL3KanjiSelect->SelectByIndex(index) ;
+					if ( selected == 0) {
+						Debug(L"   > invalid posision");
+						SetError();
+					}
+					else {
+						_converted = ChmL3Helper::Utf32ToWString(selected);
+						_pending = L"";
+						_PrepareUnFinish();
+						_state = State::None;
+						delete _pL3KanjiSelect ;
+						_pL3KanjiSelect = nullptr;
+					}
+				}
+			}
+			break ;
+		default:
+			return FALSE;
+	}
+
+	if (pCandidatePage) {
+		GetCandidatePage(*pCandidatePage);
+	}
+	pEndComposition = !HasComposition();
+
+	return TRUE;
+}
+
+BOOL ChmEngine::UpdateOther(const ChmKeyEvent& keyEvent, bool& pEndComposition){
 	ChmFuncType _type = keyEvent.GetType();
 	_useUndoEditSession = FALSE;
 
@@ -194,103 +389,21 @@ BOOL ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 		_ClearUnFinish();
 	}
 
-	// 確定キー
 	switch (_type) {
-		// --------
-		// 文字入力
-		case ChmFuncType::CharInputSpace: // 1文字目のスペース入力
-			// TODO: configで全角空白か半角かを選べるようにする
-			_converted = L" ";
-			_pending = L"";
-			_state = State::None;
-			break;
-		case ChmFuncType::CharInput:
-			// 通常の文字入力
-			_state = State::Inputing;
-			_pRawInputStore->push(keyEvent.GetChar());
-			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
-				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
-			break;
-		case ChmFuncType::Backspace: {
-			if (!HasComposition()) break;
-			size_t len = _pRawInputStore->get().size();
-			size_t del = ChmRomajiConverter::GetLastRawUnitLength();
-
-			// Backspace の単位設定を考慮（Char / Unit）
-			if (!_pConfig->GetBool(L"ui",L"backspace-unit-symbol")) {
-				del = 1;
-			}
-
-			// 念のためのガード：過剰な削除要求は全消去
-			if (del > len) del = len;
-
-			_pRawInputStore->pop(del);
-			OutputDebugStringWithInt(L"[Hitomoji] Backspace %d chars",(ULONG)del);
-
-			// 削除の結果文字がなくなったらCompositionを削除
-			if (_pRawInputStore->get().empty()) {
-				_converted = L"";
-				_pending = L"";
-				_ClearUnFinish();
-				_state = State::None;
-			} else {
-				ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
-					_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
-			}
-			break;
-		}
-		case ChmFuncType::Cancel:         // ESCキャンセル
-			_converted = L"";
-			_pending = L"";
-			_ClearUnFinish();
-			_state = State::None;
-			break;
-
-		// --------
-		// 漢字変換に関する処理
-		case ChmFuncType::CompSelect:
-			// かな漢字変換の選択開始
-			_state = State::Selecting;
-			_pL3KanjiSelect = new ChmL3KanjiSelect(_pL3KanjiDict, _pL3Helper->GetPageSize());
-			if (!_pending.empty() ) {
-				// TODO:促音と思われる場合「っ」に置換する処理が必要
-				Debug(Format(L"   > pending:%s", _pending.c_str()));
-			} else if ( _pL3KanjiSelect->Start(_converted) == FALSE ) {
-				// エラーチェック２：_convertedの読みを検索しても見つからない?
-				Debug(Format(L"   > yomi not found:%s", _converted.c_str()));
-			}
-			break;
-		case ChmFuncType::SelectNextPage:
-			_pL3KanjiSelect->NextPage();
-			break;
-		case ChmFuncType::SelectPrevPage:
-			_pL3KanjiSelect->PrevPage();
-			break;
-		case ChmFuncType::SelectCancel:         // 選択中のキャンセルは入力に戻す
-			_state = State::Inputing;
-			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
-				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
-			delete _pL3KanjiSelect;
-			_pL3KanjiSelect = nullptr;
-			// TODO:(未実装)選択候補のスレッドへの通知
-			break;
-
-		// --------
-		// 各種の確定キーの処理
-		case ChmFuncType::CompFinishHiragana: // ひらがな変換
+		case ChmFuncType::CompFinishHiragana:
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
 			_PrepareUnFinish();
 			_state = State::None;
 			break ;
-		case ChmFuncType::CompFinishKatakana: // カタカナ変換
+		case ChmFuncType::CompFinishKatakana:
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
 			_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
 			_converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
 			_PrepareUnFinish();
 			_state = State::None;
 			break ;
-		case ChmFuncType::CompFinish:     // 見たまま変換
+		case ChmFuncType::CompFinish:
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
 			if (keyEvent.IsNavigationFinish()) {
@@ -300,49 +413,18 @@ BOOL ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			}
 			_state = State::None;
 			break;
-		case ChmFuncType::CompFinishKey:    // ASCII確定
+		case ChmFuncType::CompFinishKey:
 			_converted = _pRawInputStore->get();
 			_pending = L"";
 			_PrepareUnFinish();
 			_state = State::None;
 			break;
-		case ChmFuncType::CompFinishKeyWide: // 全角ASCII確定
+		case ChmFuncType::CompFinishKeyWide:
 			_converted = AsciiToWide(_pRawInputStore->get());
 			_pending = L"";
 			_PrepareUnFinish();
 			_state = State::None;
 			break;
-		case ChmFuncType::SelectInput: // 漢字の確定処理
-			// 選択処理の場合
-			if ( _state == State::Selecting) {
-				// キーからindexを求める
-				int index = _pL3Helper->KeyToIndex(keyEvent.GetChar());
-				if (index < 0) {
-					// indexが見つからない場合はエラー
-					Debug(L"   > invalid key");
-				}
-				else {
-					uint32_t selected = _pL3KanjiSelect->SelectByIndex(index) ;
-					if ( selected == 0) {
-						// その位置に選択肢がない場合はエラー
-						Debug(L"   > invalid posision");
-					}
-					else {
-						// 選択成功の場合は確定して終了
-						_converted = ChmL3Helper::Utf32ToWString(selected);
-						_pending = L"";
-						_PrepareUnFinish();
-						_state = State::None;
-						// 選択オブジェクトはもう不要なので破棄
-						delete _pL3KanjiSelect ;
-						_pL3KanjiSelect = nullptr;
-					}
-				}
-			}
-			break ;
-
-		// --------
-		// その他の機能キー
 		case ChmFuncType::ReloadIni: {
 			bool bRet = _pConfig->LoadFile();
 			if (bRet) {
@@ -359,10 +441,8 @@ BOOL ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposi
 			_pending = L"";
 			_state = State::Inputing;
 			break;
-
 		default:
-			// その他のキーは何もしない
-			break;
+			return FALSE;
 	}
 	pEndComposition = !HasComposition();
 
@@ -382,6 +462,8 @@ void ChmEngine::ResetStatus() {
 	_pRawInputStore->clear();
 	_converted = L"";
 	_pending = L"";
+	delete _pL3KanjiSelect;
+	_pL3KanjiSelect = nullptr;
 	return;
 }
 
