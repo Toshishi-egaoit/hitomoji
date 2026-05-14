@@ -287,19 +287,26 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 	}
 
 	switch (_type) {
-		case ChmFuncType::CompSelect:
+		case ChmFuncType::CompSelect: {
+			std::wstring selectStr = _converted;
 			delete _pL3KanjiSelect;
 			_pL3KanjiSelect = nullptr;
 			_pL3KanjiSelect = new ChmL3KanjiSelect(_pL3KanjiDict, static_cast<byte>(_pL3Helper->GetPageSize()));
+			// 促音となりうるパターン(k,s,t,p)がpendingにある場合は「っ」を補う
+			if (_pending == L"k" || _pending == L"s" || _pending == L"t" || _pending == L"p") {
+				selectStr = selectStr + L"っ" ;
+				_pending = L"";
+			}
+			// TODO:先頭に記号がある場合はそれを先に確定させる
+
 			if (!_pending.empty() ) {
-				// TODO:促音と思われる場合「っ」に置換する処理が必要
 				Debug(Format(L"   > pending:%s", _pending.c_str()));
 				SetError();
 				delete _pL3KanjiSelect;
 				_pL3KanjiSelect = nullptr;
 				_state = State::Inputing;
-			} else if ( _pL3KanjiSelect->Start(_converted) == FALSE ) {
-				Debug(Format(L"   > yomi not found:%s", _converted.c_str()));
+			} else if ( _pL3KanjiSelect->Start(selectStr) == FALSE ) {
+				Debug(Format(L"   > yomi not found:%s", selectStr.c_str()));
 				SetError();
 				delete _pL3KanjiSelect;
 				_pL3KanjiSelect = nullptr;
@@ -308,6 +315,7 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 				_state = State::Selecting;
 			}
 			break;
+		}
 		case ChmFuncType::SelectNextPage:
 			if (_pL3KanjiSelect) {
 				_pL3KanjiSelect->NextPage();
