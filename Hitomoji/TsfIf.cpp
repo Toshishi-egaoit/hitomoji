@@ -7,6 +7,7 @@
 #include <cctype>
 #include <initguid.h> // GUIDの実体定義用
 #include <objbase.h>
+#include <inputscope.h>
 #include <shellapi.h>
 #include "TsfIf.h"
 #include "CEditSession.h"
@@ -26,8 +27,13 @@ ChmTsfInterface::ChmTsfInterface():
 	_pComposition(nullptr),
 	_pContextForComposition(nullptr),
 	_dwThreadFocusSinkCookie(TF_INVALID_COOKIE),
+	_dwThreadMgrEventSinkCookie(TF_INVALID_COOKIE),
+	_dwKeyboardOpenCloseSinkCookie(TF_INVALID_COOKIE),
+	_dwKeyboardDisabledSinkCookie(TF_INVALID_COOKIE),
+	_dwEmptyContextSinkCookie(TF_INVALID_COOKIE),
 	_dwTextEditSinkCookie(TF_INVALID_COOKIE),
 	_llMyEditSessionTick(0),
+	_isSettingOpenClose(FALSE),
 	_pCandidateWindowThread(nullptr),
 	_candidateAnchorRect{},
 	_hasCandidatePosition(FALSE)
@@ -59,6 +65,10 @@ STDMETHODIMP ChmTsfInterface::QueryInterface(REFIID riid, void** ppvObj) {
 		*ppvObj = (ITfDisplayAttributeProvider*)this;
 	} else if (IsEqualIID(riid, IID_ITfThreadFocusSink)) {
 		*ppvObj = (ITfThreadFocusSink*)this;
+	} else if (IsEqualIID(riid, IID_ITfThreadMgrEventSink)) {
+		*ppvObj = (ITfThreadMgrEventSink*)this;
+	} else if (IsEqualIID(riid, IID_ITfCompartmentEventSink)) {
+		*ppvObj = (ITfCompartmentEventSink*)this;
 	}
 	if (*ppvObj) { AddRef(); return S_OK; }
 	return E_NOINTERFACE;
@@ -82,6 +92,8 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 	if (FAILED(_InitKeyEventSink())) return E_FAIL;
 	if (FAILED(_InitPreservedKey())) return E_FAIL;
 	if (FAILED(_InitDisplayAttributeInfo())) return E_FAIL;
+	if (FAILED(_InitThreadMgrEventSink())) return E_FAIL;
+	if (FAILED(_InitKeyboardOpenCloseSink())) return E_FAIL;
 
 	// ChmLangBarItemButtonの初期化
 	_pLangBarItem = new ChmLangBarItemButton(GUID_HmLangBar, this);
@@ -125,6 +137,8 @@ STDMETHODIMP ChmTsfInterface::Deactivate() {
 		}
 		_dwThreadFocusSinkCookie = TF_INVALID_COOKIE;
 	}
+	_UninitKeyboardOpenCloseSink();
+	_UninitThreadMgrEventSink();
 	_pEngine->Deactivate();
 
 	// ChmLangBarItemButtonの後始末
@@ -189,10 +203,12 @@ HRESULT ChmTsfInterface::GetFirstCompositionView(
 
 STDMETHODIMP ChmTsfInterface::OnSetFocus(BOOL fFocus)
 {
-	return S_OK;
 	if (fFocus == TRUE) { // フォーカス取得時
-		ClearComposition();
-		_pEngine->ResetStatus();
+		ITfContext* pContext = nullptr;
+		if (SUCCEEDED(_GetFocusedContext(&pContext)) && pContext) {
+			_ApplyAppInputMode(pContext);
+			pContext->Release();
+		}
 	}
 	return S_OK;
 }
@@ -448,6 +464,11 @@ STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 		ClearComposition();
 		_pEngine->ResetStatus();
 	}
+	ITfContext* pContext = nullptr;
+	if (SUCCEEDED(_GetFocusedContext(&pContext)) && pContext) {
+		_ApplyAppInputMode(pContext);
+		pContext->Release();
+	}
 	return S_OK;
 }
 
@@ -460,6 +481,72 @@ STDMETHODIMP ChmTsfInterface::OnKillThreadFocus() {
 	if (GetCompositionContext()) {
 		ClearComposition();
 		_pEngine->ResetStatus();
+	}
+	return S_OK;
+}
+
+// -----
+// ----- ITfThreadMgrEventSink のイベント処理 -----
+// -----
+
+STDMETHODIMP ChmTsfInterface::OnInitDocumentMgr(ITfDocumentMgr* /*pdim*/)
+{
+	return S_OK;
+}
+
+STDMETHODIMP ChmTsfInterface::OnUninitDocumentMgr(ITfDocumentMgr* /*pdim*/)
+{
+	return S_OK;
+}
+
+STDMETHODIMP ChmTsfInterface::OnSetFocus(ITfDocumentMgr* pdimFocus, ITfDocumentMgr* /*pdimPrevFocus*/)
+{
+	OutputDebugString(L"[Hitomoji] ITfThreadMgrEventSink::OnSetFocus()");
+
+	if (_pCandidateWindowThread) {
+		_pCandidateWindowThread->Hide();
+	}
+	if (GetCompositionContext()) {
+		ClearComposition();
+		_pEngine->ResetStatus();
+	}
+
+	ITfContext* pContext = nullptr;
+	if (SUCCEEDED(_GetTopContext(pdimFocus, &pContext)) && pContext) {
+		_ApplyAppInputMode(pContext);
+		pContext->Release();
+	}
+	return S_OK;
+}
+
+STDMETHODIMP ChmTsfInterface::OnPushContext(ITfContext* pic)
+{
+	_ApplyAppInputMode(pic);
+	return S_OK;
+}
+
+STDMETHODIMP ChmTsfInterface::OnPopContext(ITfContext* /*pic*/)
+{
+	return S_OK;
+}
+
+// -----
+// ----- ITfCompartmentEventSink のイベント処理 -----
+// -----
+
+STDMETHODIMP ChmTsfInterface::OnChange(REFGUID rguid)
+{
+	if (!IsEqualGUID(rguid, GUID_COMPARTMENT_KEYBOARD_OPENCLOSE) &&
+		!IsEqualGUID(rguid, GUID_COMPARTMENT_KEYBOARD_DISABLED) &&
+		!IsEqualGUID(rguid, GUID_COMPARTMENT_EMPTYCONTEXT)) {
+		return S_OK;
+	}
+	if (_isSettingOpenClose) return S_OK;
+
+	ITfContext* pContext = nullptr;
+	if (SUCCEEDED(_GetFocusedContext(&pContext))) {
+		_ApplyAppInputMode(pContext);
+		if (pContext) pContext->Release();
 	}
 	return S_OK;
 }
@@ -492,19 +579,53 @@ STDMETHODIMP ChmTsfInterface::OnEndEdit(
 BOOL ChmTsfInterface::ToggleIME() 
 {
 	if (!_pEngine) return FALSE;
-
-	// ロジック上のIME状態を切り替え
-	_pEngine->ToggleIME();
-	BOOL newState = _pEngine->IsON();
-
-	// OSに状態通知
-	_SetImeOpenClose(newState);
-
-	// LangBarの状態update
-	if (_pLangBarItem) {
-		_pLangBarItem->SetImeState(newState);
+	if (_GetCompartmentBool(GUID_COMPARTMENT_KEYBOARD_DISABLED, FALSE) ||
+		_GetCompartmentBool(GUID_COMPARTMENT_EMPTYCONTEXT, FALSE)) {
+		_SetImeOpenState(FALSE, nullptr, FALSE);
+		return FALSE;
 	}
+
+	ITfContext* pContext = nullptr;
+	if (SUCCEEDED(_GetFocusedContext(&pContext)) && pContext) {
+		if (_IsPasswordContext(pContext)) {
+			pContext->Release();
+			_SetImeOpenState(FALSE, nullptr, TRUE);
+			return FALSE;
+		}
+		pContext->Release();
+	}
+	_SetImeOpenState(!_pEngine->IsON(), nullptr, TRUE);
 	return TRUE;
+}
+
+void ChmTsfInterface::_SetImeOpenState(BOOL fOpen, ITfContext* pic, BOOL fNotifyOs)
+{
+	if (!_pEngine) return;
+
+	if (!fOpen) {
+		if (_pCandidateWindowThread) {
+			_pCandidateWindowThread->Hide();
+		}
+
+		if (pic && GetCompositionContext()) {
+			_CommitComposition(pic);
+		} else if (GetCompositionContext()) {
+			ClearComposition();
+			_pEngine->ResetStatus();
+		} else {
+			_pEngine->ResetStatus();
+		}
+	}
+
+	_pEngine->SetIME(fOpen);
+
+	if (fNotifyOs) {
+		_SetImeOpenClose(fOpen);
+	}
+
+	if (_pLangBarItem) {
+		_pLangBarItem->SetImeState(fOpen);
+	}
 }
 
 // IME ON/OFF を OS に通知する
@@ -523,10 +644,207 @@ void ChmTsfInterface::_SetImeOpenClose(BOOL fOpen)
 		VariantInit(&var);
 		var.vt = VT_I4;
 		var.lVal = fOpen ? 1 : 0;   // 1=IME ON, 0=IME OFF
+		_isSettingOpenClose = TRUE;
 		pComp->SetValue(0, &var);
+		_isSettingOpenClose = FALSE;
 		pComp->Release();
 	}
 	pCompMgr->Release();
+}
+
+HRESULT ChmTsfInterface::_InitThreadMgrEventSink()
+{
+	if (!_pThreadMgr) return E_FAIL;
+
+	ITfSource* pSource = nullptr;
+	HRESULT hr = _pThreadMgr->QueryInterface(IID_ITfSource, (void**)&pSource);
+	if (FAILED(hr)) return hr;
+
+	hr = pSource->AdviseSink(
+		IID_ITfThreadMgrEventSink,
+		static_cast<ITfThreadMgrEventSink*>(this),
+		&_dwThreadMgrEventSinkCookie
+	);
+	pSource->Release();
+	return hr;
+}
+
+void ChmTsfInterface::_UninitThreadMgrEventSink()
+{
+	if (!_pThreadMgr || _dwThreadMgrEventSinkCookie == TF_INVALID_COOKIE) return;
+
+	ITfSource* pSource = nullptr;
+	if (SUCCEEDED(_pThreadMgr->QueryInterface(IID_ITfSource, (void**)&pSource))) {
+		pSource->UnadviseSink(_dwThreadMgrEventSinkCookie);
+		pSource->Release();
+	}
+	_dwThreadMgrEventSinkCookie = TF_INVALID_COOKIE;
+}
+
+HRESULT ChmTsfInterface::_InitKeyboardOpenCloseSink()
+{
+	HRESULT hr = _InitCompartmentSink(GUID_COMPARTMENT_KEYBOARD_OPENCLOSE, &_dwKeyboardOpenCloseSinkCookie);
+	if (FAILED(hr)) return hr;
+
+	hr = _InitCompartmentSink(GUID_COMPARTMENT_KEYBOARD_DISABLED, &_dwKeyboardDisabledSinkCookie);
+	if (FAILED(hr)) return hr;
+
+	return _InitCompartmentSink(GUID_COMPARTMENT_EMPTYCONTEXT, &_dwEmptyContextSinkCookie);
+}
+
+void ChmTsfInterface::_UninitKeyboardOpenCloseSink()
+{
+	_UninitCompartmentSink(GUID_COMPARTMENT_EMPTYCONTEXT, &_dwEmptyContextSinkCookie);
+	_UninitCompartmentSink(GUID_COMPARTMENT_KEYBOARD_DISABLED, &_dwKeyboardDisabledSinkCookie);
+	_UninitCompartmentSink(GUID_COMPARTMENT_KEYBOARD_OPENCLOSE, &_dwKeyboardOpenCloseSinkCookie);
+}
+
+HRESULT ChmTsfInterface::_InitCompartmentSink(REFGUID rguid, DWORD* pdwCookie)
+{
+	if (!_pThreadMgr || !pdwCookie) return E_FAIL;
+	if (*pdwCookie != TF_INVALID_COOKIE) return S_OK;
+
+	ITfCompartmentMgr* pCompMgr = nullptr;
+	HRESULT hr = _pThreadMgr->QueryInterface(IID_ITfCompartmentMgr, (void**)&pCompMgr);
+	if (FAILED(hr)) return hr;
+
+	ITfCompartment* pComp = nullptr;
+	hr = pCompMgr->GetCompartment(rguid, &pComp);
+	pCompMgr->Release();
+	if (FAILED(hr)) return hr;
+
+	ITfSource* pSource = nullptr;
+	hr = pComp->QueryInterface(IID_ITfSource, (void**)&pSource);
+	if (SUCCEEDED(hr)) {
+		hr = pSource->AdviseSink(
+			IID_ITfCompartmentEventSink,
+			static_cast<ITfCompartmentEventSink*>(this),
+			pdwCookie
+		);
+		pSource->Release();
+	}
+	pComp->Release();
+	return hr;
+}
+
+void ChmTsfInterface::_UninitCompartmentSink(REFGUID rguid, DWORD* pdwCookie)
+{
+	if (!_pThreadMgr || !pdwCookie || *pdwCookie == TF_INVALID_COOKIE) return;
+
+	ITfCompartmentMgr* pCompMgr = nullptr;
+	if (SUCCEEDED(_pThreadMgr->QueryInterface(IID_ITfCompartmentMgr, (void**)&pCompMgr))) {
+		ITfCompartment* pComp = nullptr;
+		if (SUCCEEDED(pCompMgr->GetCompartment(rguid, &pComp))) {
+			ITfSource* pSource = nullptr;
+			if (SUCCEEDED(pComp->QueryInterface(IID_ITfSource, (void**)&pSource))) {
+				pSource->UnadviseSink(*pdwCookie);
+				pSource->Release();
+			}
+			pComp->Release();
+		}
+		pCompMgr->Release();
+	}
+	*pdwCookie = TF_INVALID_COOKIE;
+}
+
+void ChmTsfInterface::_SyncImeOpenCloseFromCompartment(ITfContext* pic)
+{
+	_SetImeOpenState(_GetCompartmentBool(GUID_COMPARTMENT_KEYBOARD_OPENCLOSE, FALSE), pic, FALSE);
+}
+
+void ChmTsfInterface::_ApplyAppInputMode(ITfContext* pic)
+{
+	if (_GetCompartmentBool(GUID_COMPARTMENT_KEYBOARD_DISABLED, FALSE) ||
+		_GetCompartmentBool(GUID_COMPARTMENT_EMPTYCONTEXT, FALSE)) {
+		ChmLogger::Info(L"Keyboard disabled/empty context detected; Hitomoji IME forced OFF");
+		_SetImeOpenState(FALSE, nullptr, FALSE);
+		return;
+	}
+
+	if (_IsPasswordContext(pic)) {
+		ChmLogger::Info(L"Password input scope detected; Hitomoji IME forced OFF");
+		_SetImeOpenState(FALSE, nullptr, TRUE);
+		return;
+	}
+
+	_SyncImeOpenCloseFromCompartment(pic);
+}
+
+BOOL ChmTsfInterface::_GetCompartmentBool(REFGUID rguid, BOOL defaultValue)
+{
+	if (!_pThreadMgr) return defaultValue;
+
+	ITfCompartmentMgr* pCompMgr = nullptr;
+	if (FAILED(_pThreadMgr->QueryInterface(IID_ITfCompartmentMgr, (void**)&pCompMgr))) {
+		return defaultValue;
+	}
+
+	BOOL value = defaultValue;
+	ITfCompartment* pComp = nullptr;
+	if (SUCCEEDED(pCompMgr->GetCompartment(rguid, &pComp))) {
+		VARIANT var;
+		VariantInit(&var);
+		if (SUCCEEDED(pComp->GetValue(&var))) {
+			if (var.vt == VT_I4) {
+				value = (var.lVal != 0);
+			} else if (var.vt == VT_BOOL) {
+				value = (var.boolVal != VARIANT_FALSE);
+			}
+			VariantClear(&var);
+		}
+		pComp->Release();
+	}
+	pCompMgr->Release();
+	return value;
+}
+
+HRESULT ChmTsfInterface::_GetFocusedContext(ITfContext** ppContext)
+{
+	if (!ppContext) return E_INVALIDARG;
+	*ppContext = nullptr;
+	if (!_pThreadMgr) return E_FAIL;
+
+	ITfDocumentMgr* pDocMgr = nullptr;
+	HRESULT hr = _pThreadMgr->GetFocus(&pDocMgr);
+	if (FAILED(hr) || !pDocMgr) return hr;
+
+	hr = _GetTopContext(pDocMgr, ppContext);
+	pDocMgr->Release();
+	return hr;
+}
+
+HRESULT ChmTsfInterface::_GetTopContext(ITfDocumentMgr* pDocMgr, ITfContext** ppContext)
+{
+	if (!ppContext) return E_INVALIDARG;
+	*ppContext = nullptr;
+	if (!pDocMgr) return E_INVALIDARG;
+
+	return pDocMgr->GetTop(ppContext);
+}
+
+BOOL ChmTsfInterface::_IsPasswordContext(ITfContext* pic)
+{
+	if (!pic) return FALSE;
+
+	ITfInputScope* pInputScope = nullptr;
+	if (FAILED(pic->QueryInterface(IID_ITfInputScope, (void**)&pInputScope)) || !pInputScope) {
+		return FALSE;
+	}
+
+	InputScope* pScopes = nullptr;
+	UINT count = 0;
+	BOOL fPassword = FALSE;
+	if (SUCCEEDED(pInputScope->GetInputScopes(&pScopes, &count)) && pScopes) {
+		for (UINT i = 0; i < count; ++i) {
+			if (pScopes[i] == IS_PASSWORD) {
+				fPassword = TRUE;
+				break;
+			}
+		}
+		CoTaskMemFree(pScopes);
+	}
+	pInputScope->Release();
+	return fPassword;
 }
 
 HRESULT ChmTsfInterface::_InitTextEditSink(ITfContext* pic)

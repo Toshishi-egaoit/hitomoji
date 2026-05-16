@@ -43,6 +43,7 @@ public:
 	
 	// IMEのON/OFF
 	void ToggleIME() { _isON = !_isON; }
+	void SetIME(BOOL fOpen) { _isON = fOpen; }
 
 	BOOL IsON() const { return _isON; }
 	BOOL HasComposition() { return (_state == State::Selecting || _state == State::Inputing); }

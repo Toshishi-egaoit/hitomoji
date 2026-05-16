@@ -34,6 +34,8 @@ class ChmTsfInterface : public ITfTextInputProcessor,
 		public ITfKeyEventSink ,
 		public ITfDisplayAttributeProvider,
 		public ITfThreadFocusSink,
+		public ITfThreadMgrEventSink,
+		public ITfCompartmentEventSink,
 		public ITfTextEditSink{
 public:
     ChmTsfInterface();
@@ -63,6 +65,16 @@ public:
 	// ITfThreadFocusSink
 	STDMETHODIMP OnSetThreadFocus() ;
 	STDMETHODIMP OnKillThreadFocus();
+
+	// ITfThreadMgrEventSink
+	STDMETHODIMP OnInitDocumentMgr(ITfDocumentMgr* pdim);
+	STDMETHODIMP OnUninitDocumentMgr(ITfDocumentMgr* pdim);
+	STDMETHODIMP OnSetFocus(ITfDocumentMgr* pdimFocus, ITfDocumentMgr* pdimPrevFocus);
+	STDMETHODIMP OnPushContext(ITfContext* pic);
+	STDMETHODIMP OnPopContext(ITfContext* pic);
+
+	// ITfCompartmentEventSink
+	STDMETHODIMP OnChange(REFGUID rguid);
 
 	// ITfTextEditSink
 	STDMETHODIMP OnEndEdit(ITfContext* pic, TfEditCookie ecReadOnly, ITfEditRecord* pEditRecord) ;
@@ -131,7 +143,20 @@ public:
 	);
 
 private:
+	void _SetImeOpenState(BOOL fOpen, ITfContext* pic, BOOL fNotifyOs);
 	void _SetImeOpenClose(BOOL fOpen);
+	HRESULT _InitThreadMgrEventSink();
+	void _UninitThreadMgrEventSink();
+	HRESULT _InitKeyboardOpenCloseSink();
+	void _UninitKeyboardOpenCloseSink();
+	HRESULT _InitCompartmentSink(REFGUID rguid, DWORD* pdwCookie);
+	void _UninitCompartmentSink(REFGUID rguid, DWORD* pdwCookie);
+	void _SyncImeOpenCloseFromCompartment(ITfContext* pic);
+	void _ApplyAppInputMode(ITfContext* pic);
+	BOOL _GetCompartmentBool(REFGUID rguid, BOOL defaultValue);
+	HRESULT _GetFocusedContext(ITfContext** ppContext);
+	HRESULT _GetTopContext(ITfDocumentMgr* pDocMgr, ITfContext** ppContext);
+	BOOL _IsPasswordContext(ITfContext* pic);
 
     // ITfKeyEventSink
     HRESULT _InitKeyEventSink();
@@ -156,8 +181,13 @@ private:
     LONG _cRef;
 
     DWORD _dwThreadFocusSinkCookie; 
+    DWORD _dwThreadMgrEventSinkCookie;
+    DWORD _dwKeyboardOpenCloseSinkCookie;
+    DWORD _dwKeyboardDisabledSinkCookie;
+    DWORD _dwEmptyContextSinkCookie;
     DWORD _dwTextEditSinkCookie; 
 	LONGLONG _llMyEditSessionTick;
+	BOOL _isSettingOpenClose;
     ITfComposition* _pComposition;
 	ITfContext* _pContextForComposition;
     ChmEngine* _pEngine; // ロジック担当
