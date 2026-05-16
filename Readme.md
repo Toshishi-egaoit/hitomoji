@@ -15,15 +15,16 @@ https://github.com/toshishi-egaoit/hitomoji
 なお、ひともじはオープンソースであり、GPLv3ライセンスで配布している。
 
 
-# 残存バグ
+## 残存バグ
 
-- OnSetFocus / OnSetThreadFocus でのCompositionの初期化処理を改善
 - OnEndEditの処理がうまく動いてない原因を調査
 - アイコンが消失(HIDDEN)となる原因の調査
+- chatGPTのキャンバスで未確定文字が確定文字となる場合がある
+- dbgViewで、異様な性能劣化がおきる。
 
-# ロードマップ（2026.5.2版）
+# ロードマップ（2026.5.16版）
 
-現状、v0.4.3.2までを実装済み。
+現状、v0.5.2までを実装済み。
 
 ## hitomoji v0.1系統
 
