@@ -157,6 +157,8 @@ private:
 	HRESULT _GetFocusedContext(ITfContext** ppContext);
 	HRESULT _GetTopContext(ITfDocumentMgr* pDocMgr, ITfContext** ppContext);
 	BOOL _IsPasswordContext(ITfContext* pic);
+	BOOL _IsSameContext(ITfContext* pLeft, ITfContext* pRight);
+	void _ResetCompositionOnFocusChange(ITfContext* pNewContext, LPCWSTR source);
 
     // ITfKeyEventSink
     HRESULT _InitKeyEventSink();

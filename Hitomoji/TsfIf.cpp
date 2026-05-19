@@ -459,13 +459,11 @@ STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 		_pCandidateWindowThread->Hide();
 	}
 
-	// フォーカス取得時は Composition 側のみを基準に整理
-	if (GetCompositionContext()) {
-		ClearComposition();
-		_pEngine->ResetStatus();
-	}
 	ITfContext* pContext = nullptr;
-	if (SUCCEEDED(_GetFocusedContext(&pContext)) && pContext) {
+	if (SUCCEEDED(_GetFocusedContext(&pContext))) {
+		_ResetCompositionOnFocusChange(pContext, L"OnSetThreadFocus");
+	}
+	if (pContext) {
 		_ApplyAppInputMode(pContext);
 		pContext->Release();
 	}
@@ -506,17 +504,46 @@ STDMETHODIMP ChmTsfInterface::OnSetFocus(ITfDocumentMgr* pdimFocus, ITfDocumentM
 	if (_pCandidateWindowThread) {
 		_pCandidateWindowThread->Hide();
 	}
-	if (GetCompositionContext()) {
-		ClearComposition();
-		_pEngine->ResetStatus();
-	}
-
 	ITfContext* pContext = nullptr;
-	if (SUCCEEDED(_GetTopContext(pdimFocus, &pContext)) && pContext) {
+	if (SUCCEEDED(_GetTopContext(pdimFocus, &pContext))) {
+		_ResetCompositionOnFocusChange(pContext, L"OnSetFocus");
+	}
+	if (pContext) {
 		_ApplyAppInputMode(pContext);
 		pContext->Release();
 	}
 	return S_OK;
+}
+
+BOOL ChmTsfInterface::_IsSameContext(ITfContext* pLeft, ITfContext* pRight)
+{
+	if (!pLeft || !pRight) return FALSE;
+	if (pLeft == pRight) return TRUE;
+
+	IUnknown* pUnkLeft = nullptr;
+	IUnknown* pUnkRight = nullptr;
+	HRESULT hrLeft = pLeft->QueryInterface(IID_IUnknown, (void**)&pUnkLeft);
+	HRESULT hrRight = pRight->QueryInterface(IID_IUnknown, (void**)&pUnkRight);
+	BOOL isSame = SUCCEEDED(hrLeft) && SUCCEEDED(hrRight) && pUnkLeft == pUnkRight;
+
+	if (pUnkLeft) pUnkLeft->Release();
+	if (pUnkRight) pUnkRight->Release();
+	return isSame;
+}
+
+void ChmTsfInterface::_ResetCompositionOnFocusChange(ITfContext* pNewContext, LPCWSTR source)
+{
+	ITfContext* pCompositionContext = GetCompositionContext();
+	if (!pCompositionContext) return;
+
+	if (_IsSameContext(pCompositionContext, pNewContext)) {
+		Debug(Format(L"%s: keep composition on same context", source ? source : L"focus"));
+		return;
+	}
+
+	Debug(Format(L"%s: context changed -> clear composition", source ? source : L"focus"));
+	ClearComposition();
+	_pEngine->ResetStatus();
 }
 
 STDMETHODIMP ChmTsfInterface::OnPushContext(ITfContext* pic)

@@ -274,6 +274,7 @@ https://github.com/toshishi-egaoit/hitomoji
 
 - vimなどで、モード変更の通知によりIMEの状態変更する機能の実装
 - ブラウザでのパスワード入力などでのIMEのON/OFF制御に対応
+- 一部アプリで、想定外のOnSetFocusが呼ばれていた。その際のエラーハンドリングの実装
 
 ### v0.5.4
 
