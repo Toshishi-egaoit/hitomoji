@@ -20,11 +20,11 @@ https://github.com/toshishi-egaoit/hitomoji
 - OnEndEditの処理がうまく動いてない原因を調査
 - アイコンが消失(HIDDEN)となる原因の調査
 - chatGPTのキャンバスで未確定文字が確定文字となる場合がある
-- dbgViewで、異様な性能劣化がおきる。
+- Excelでデータ制約がリストの場合、選択肢が正しく表示されない
 
-# ロードマップ（2026.5.16版）
+# ロードマップ（2026.5.24版）
 
-現状、v0.5.2までを実装済み。
+現状、v0.5.3までを実装済み。
 
 ## hitomoji v0.1系統
 
@@ -275,6 +275,7 @@ https://github.com/toshishi-egaoit/hitomoji
 - vimなどで、モード変更の通知によりIMEの状態変更する機能の実装
 - ブラウザでのパスワード入力などでのIMEのON/OFF制御に対応
 - 一部アプリで、想定外のOnSetFocusが呼ばれていた。その際のエラーハンドリングの実装
+- DbgViewでの性能劣化対応
 
 ### v0.5.4
 
@@ -288,7 +289,7 @@ https://github.com/toshishi-egaoit/hitomoji
 目的：カスタマイズ項目の強化、付加機能の強化、ソースコードの整理
 
 - 全角スペースの入力
-- 入力時の記号類の全角化(configでON/OFFに加えて、切り換え機能キーも作る)
+- 入力時の記号類の全角化(configでON/OFFに加えて、切り換え機能キー(WideLock)も作る)
 - Layer2での約物の追加
 - 機能キーのconfig対応追加
 - 複数の読みを指定する方式（風の：指定相当の機能）
