@@ -197,6 +197,7 @@ private:
 	ChmCandidateWindowThread* _pCandidateWindowThread;
 	RECT _candidateAnchorRect;
 	BOOL _hasCandidatePosition;
+	BOOL _isDisabledForProcess;
 };
 
 #define OUTPUT_HR(funcName,hr) \

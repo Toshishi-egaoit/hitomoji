@@ -18,6 +18,26 @@
 #include "ChmEnvironment.h"
 #include "ChmCandidateWindow.h"
 
+namespace {
+BOOL IsDbgViewProcess()
+{
+	WCHAR path[MAX_PATH] = {};
+	DWORD len = GetModuleFileNameW(nullptr, path, ARRAYSIZE(path));
+	if (len == 0 || len >= ARRAYSIZE(path)) return FALSE;
+
+	LPCWSTR fileName = path;
+	for (LPCWSTR p = path; *p; ++p) {
+		if (*p == L'\\' || *p == L'/') {
+			fileName = p + 1;
+		}
+	}
+
+	return lstrcmpiW(fileName, L"Dbgview.exe") == 0 ||
+		lstrcmpiW(fileName, L"Dbgview64.exe") == 0 ||
+		lstrcmpiW(fileName, L"Dbgview64a.exe") == 0;
+}
+}
+
 // --- CTsfInterface クラスの実装 ---
 
 ChmTsfInterface::ChmTsfInterface():
@@ -36,7 +56,8 @@ ChmTsfInterface::ChmTsfInterface():
 	_isSettingOpenClose(FALSE),
 	_pCandidateWindowThread(nullptr),
 	_candidateAnchorRect{},
-	_hasCandidatePosition(FALSE)
+	_hasCandidatePosition(FALSE),
+	_isDisabledForProcess(FALSE)
 { 
 	_pEngine = new ChmEngine();
 	_pLangBarItem = nullptr;
@@ -84,6 +105,11 @@ STDMETHODIMP_(ULONG) ChmTsfInterface::Release() {
 // -----
 
 STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
+	if (IsDbgViewProcess()) {
+		_isDisabledForProcess = TRUE;
+		return S_OK;
+	}
+
 	ChmLogger::Info(L"Activate() : Hitomoji " HM_VERSION L"(" __DATE__ L")" );
 	_pThreadMgr = ptm;
 	_pThreadMgr->AddRef();
@@ -122,6 +148,11 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 }
 
 STDMETHODIMP ChmTsfInterface::Deactivate() {
+	if (_isDisabledForProcess) {
+		_isDisabledForProcess = FALSE;
+		return S_OK;
+	}
+
 	ChmLogger::Info(L"Deactivate()");
 	ClearComposition();
 	if (_pCandidateWindowThread) {
@@ -142,9 +173,11 @@ STDMETHODIMP ChmTsfInterface::Deactivate() {
 	_pEngine->Deactivate();
 
 	// ChmLangBarItemButtonの後始末
-	_pLangBarItem->RemoveFromLangBar(_pThreadMgr);
-	_pLangBarItem->Release();
-	_pLangBarItem = nullptr;
+	if (_pLangBarItem) {
+		_pLangBarItem->RemoveFromLangBar(_pThreadMgr);
+		_pLangBarItem->Release();
+		_pLangBarItem = nullptr;
+	}
 
 	_UninitKeyEventSink();
 	_UninitPreservedKey();
