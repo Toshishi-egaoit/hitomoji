@@ -114,13 +114,16 @@ void DrawCandidates(HDC hdc, const ChmCandidatePage* page)
 }
 }
 
-ChmCandidateWindowThread::ChmCandidateWindowThread()
+ChmCandidateWindowThread::ChmCandidateWindowThread(ChmCandidatePositionProvider positionProvider, void* positionContext)
     : _hInst(nullptr),
       _hThread(nullptr),
       _hReadyEvent(nullptr),
       _threadId(0),
       _hwnd(nullptr),
       _pendingPage(nullptr),
+      _pendingDelayMs(0),
+      _positionProvider(positionProvider),
+      _positionContext(positionContext),
       _state(State::Hidden)
 {
 }
@@ -174,12 +177,12 @@ void ChmCandidateWindowThread::Stop()
     _hInst = nullptr;
 }
 
-BOOL ChmCandidateWindowThread::ScheduleShow(const ChmCandidatePage& page)
+BOOL ChmCandidateWindowThread::ScheduleShow(const ChmCandidatePage& page, DWORD delayMs)
 {
     if (!_hThread || _threadId == 0) return FALSE;
 
     ChmCandidatePage* payload = new ChmCandidatePage(page);
-    if (!PostThreadMessageW(_threadId, WM_HM_CAND_SCHEDULE_SHOW, 0, reinterpret_cast<LPARAM>(payload))) {
+    if (!PostThreadMessageW(_threadId, WM_HM_CAND_SCHEDULE_SHOW, delayMs, reinterpret_cast<LPARAM>(payload))) {
         delete payload;
         return FALSE;
     }
@@ -211,7 +214,7 @@ DWORD ChmCandidateWindowThread::_Run()
     while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
         switch (msg.message) {
         case WM_HM_CAND_SCHEDULE_SHOW:
-            _OnScheduleShow(reinterpret_cast<ChmCandidatePage*>(msg.lParam));
+            _OnScheduleShow(reinterpret_cast<ChmCandidatePage*>(msg.lParam), static_cast<DWORD>(msg.wParam));
             break;
         case WM_HM_CAND_HIDE:
             _OnHide();
@@ -270,7 +273,7 @@ BOOL ChmCandidateWindowThread::_CreateWindow()
     return TRUE;
 }
 
-void ChmCandidateWindowThread::_OnScheduleShow(ChmCandidatePage* page)
+void ChmCandidateWindowThread::_OnScheduleShow(ChmCandidatePage* page, DWORD delayMs)
 {
     if (!page || !_hwnd) {
         delete page;
@@ -280,13 +283,14 @@ void ChmCandidateWindowThread::_OnScheduleShow(ChmCandidatePage* page)
     KillTimer(_hwnd, CHM_CANDIDATE_TIMER_ID);
     _DiscardPendingPage();
     _pendingPage = page;
+    _pendingDelayMs = delayMs;
 
-    if (_pendingPage->delayMs == 0) {
+    if (_pendingDelayMs == 0) {
         _ShowPendingPage();
         return;
     }
 
-    SetTimer(_hwnd, CHM_CANDIDATE_TIMER_ID, _pendingPage->delayMs, nullptr);
+    SetTimer(_hwnd, CHM_CANDIDATE_TIMER_ID, _pendingDelayMs, nullptr);
     _state = State::WaitingToShow;
 }
 
@@ -306,9 +310,14 @@ void ChmCandidateWindowThread::_ShowPendingPage()
 
     KillTimer(_hwnd, CHM_CANDIDATE_TIMER_ID);
 
-    RECT rc = _pendingPage->anchorRect;
-    int x = rc.left;
-    int y = rc.bottom;
+    POINT pt{};
+    if (!_positionProvider || !_positionProvider(_positionContext, pt)) {
+        GetCursorPos(&pt);
+    }
+
+    RECT rc{ pt.x, pt.y, pt.x + 1, pt.y + 1 };
+    int x = pt.x;
+    int y = pt.y;
 
     HMONITOR monitor = MonitorFromRect(&rc, MONITOR_DEFAULTTONEAREST);
     MONITORINFO mi{};

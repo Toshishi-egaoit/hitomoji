@@ -90,21 +90,30 @@ public:
 	BOOL IsMyEditSession() { return (GetTickCount64() - _llMyEditSessionTick <= CHM_ONENDEDIT_TICK) ; }
 	ITfComposition* GetComposition() const { return _pComposition; }
 	ITfContext* GetCompositionContext() const { return _pContextForComposition; }
-	void SetCandidatePosition(const RECT& rc)
+	void SetCandidateWindowPosition(const RECT& rc)
 	{
-		_candidateAnchorRect = rc;
-		_hasCandidatePosition = TRUE;
+		EnterCriticalSection(&_candidateWindowPositionLock);
+		_candidateWindowPosition.x = rc.left;
+		_candidateWindowPosition.y = rc.bottom;
+		_hasCandidateWindowPosition = TRUE;
+		LeaveCriticalSection(&_candidateWindowPositionLock);
 	}
-	void ClearCandidatePosition()
+	void ClearCandidateWindowPosition()
 	{
-		SetRectEmpty(&_candidateAnchorRect);
-		_hasCandidatePosition = FALSE;
+		EnterCriticalSection(&_candidateWindowPositionLock);
+		_candidateWindowPosition = POINT{};
+		_hasCandidateWindowPosition = FALSE;
+		LeaveCriticalSection(&_candidateWindowPositionLock);
 	}
-	BOOL GetCandidatePosition(RECT& rc) const
+	BOOL GetCandidateWindowPosition(POINT& pt)
 	{
-		if (!_hasCandidatePosition) return FALSE;
-		rc = _candidateAnchorRect;
-		return TRUE;
+		EnterCriticalSection(&_candidateWindowPositionLock);
+		BOOL hasPosition = _hasCandidateWindowPosition;
+		if (hasPosition) {
+			pt = _candidateWindowPosition;
+		}
+		LeaveCriticalSection(&_candidateWindowPositionLock);
+		return hasPosition;
 	}
 	void SetComposition(ITfContext* pic, ITfComposition* pComp)
 	{
@@ -169,6 +178,7 @@ private:
 	HRESULT _CommitComposition(ITfContext* pic);
 	void _HandleEngineError(ITfContext* pic);
 	void _TriggerVisualBell(ITfContext* pic);
+	static BOOL _GetCandidateWindowPositionCallback(void* context, POINT& pt);
 
 	// ITfDisplayAttributeProvider
     HRESULT _InitDisplayAttributeInfo();
@@ -192,11 +202,12 @@ private:
 	BOOL _isSettingOpenClose;
     ITfComposition* _pComposition;
 	ITfContext* _pContextForComposition;
-    ChmEngine* _pEngine; // ロジック担当
+	ChmEngine* _pEngine; // ロジック担当
 	ChmLangBarItemButton* _pLangBarItem ;
 	ChmCandidateWindowThread* _pCandidateWindowThread;
-	RECT _candidateAnchorRect;
-	BOOL _hasCandidatePosition;
+	CRITICAL_SECTION _candidateWindowPositionLock;
+	POINT _candidateWindowPosition;
+	BOOL _hasCandidateWindowPosition;
 	BOOL _isDisabledForProcess;
 };
 

@@ -297,11 +297,7 @@ private:
 
 inline BOOL ChmL3KanjiSelect::BuildCandidatePage(ChmCandidatePage& page, const ChmL3Helper& helper) const
 {
-	RECT anchor = page.anchorRect;
-	DWORD delayMs = page.delayMs;
 	page = ChmCandidatePage{};
-	page.anchorRect = anchor;
-	page.delayMs = delayMs;
 	page.page = _page;
 	page.totalCount = _count;
 

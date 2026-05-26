@@ -55,10 +55,11 @@ ChmTsfInterface::ChmTsfInterface():
 	_llMyEditSessionTick(0),
 	_isSettingOpenClose(FALSE),
 	_pCandidateWindowThread(nullptr),
-	_candidateAnchorRect{},
-	_hasCandidatePosition(FALSE),
+	_candidateWindowPosition{},
+	_hasCandidateWindowPosition(FALSE),
 	_isDisabledForProcess(FALSE)
 { 
+	InitializeCriticalSection(&_candidateWindowPositionLock);
 	_pEngine = new ChmEngine();
 	_pLangBarItem = nullptr;
 }
@@ -70,6 +71,7 @@ ChmTsfInterface::~ChmTsfInterface() {
 		_pCandidateWindowThread = nullptr;
 	}
 	delete _pEngine;
+	DeleteCriticalSection(&_candidateWindowPositionLock);
 }
 
 // IUnknown Implementation
@@ -137,7 +139,7 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 	_pEngine->Activate();
 
 	// 候補ウィンドウ表示スレッドの初期化
-	_pCandidateWindowThread = new ChmCandidateWindowThread();
+	_pCandidateWindowThread = new ChmCandidateWindowThread(_GetCandidateWindowPositionCallback, this);
 	if (!_pCandidateWindowThread || !_pCandidateWindowThread->Start(g_hInst)) {
 		ChmLogger::Warn(L"Candidate window thread start failed");
 		delete _pCandidateWindowThread;
@@ -271,15 +273,6 @@ STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, B
 		BOOL hasCandidatePage = FALSE;
 
 		if (ChmEngine::IsLayer3Function(type)) {
-			if (!GetCandidatePosition(page.anchorRect)) {
-				POINT pt{};
-				GetCursorPos(&pt);
-				page.anchorRect.left = pt.x;
-				page.anchorRect.top = pt.y;
-				page.anchorRect.right = pt.x + 1;
-				page.anchorRect.bottom = pt.y + 1;
-			}
-			page.delayMs = _pEngine->GetConfig()->GetLong(L"ui", L"candidate-delay",500);
 			if (!_pEngine->UpdateLayer3(kEv, fEnd, &page)) return S_OK;
 			hasCandidatePage = page.candidateCount > 0;
 		} else if (ChmEngine::IsLayer2Function(type)) {
@@ -294,7 +287,8 @@ STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, B
 
 		if (_pCandidateWindowThread) {
 			if (hasCandidatePage && _pEngine->GetState() == ChmEngine::State::Selecting) {
-				_pCandidateWindowThread->ScheduleShow(page);
+				DWORD delayMs = _pEngine->GetConfig()->GetLong(L"ui", L"candidate-delay", 500);
+				_pCandidateWindowThread->ScheduleShow(page, delayMs);
 			} else if (_pEngine->GetState() != ChmEngine::State::Selecting) {
 				_pCandidateWindowThread->Hide();
 			}
@@ -420,6 +414,12 @@ HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
 	OUTPUT_HR_ON_ERROR("_InvokeEditSession/RequestEditSession", hrSession);
 	pES->Release();
 	return hrSession;
+}
+
+BOOL ChmTsfInterface::_GetCandidateWindowPositionCallback(void* context, POINT& pt)
+{
+	if (!context) return FALSE;
+	return static_cast<ChmTsfInterface*>(context)->GetCandidateWindowPosition(pt);
 }
 
 HRESULT ChmTsfInterface::_CommitComposition(ITfContext* pic) {

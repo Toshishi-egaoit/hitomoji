@@ -177,13 +177,13 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
 			BOOL clipped = FALSE;
 			HRESULT hrExt = pContextView->GetTextExt(ec, pRange, &rc, &clipped);
 			if (SUCCEEDED(hrExt)) {
-				_pTsfIf->SetCandidatePosition(rc);
+				_pTsfIf->SetCandidateWindowPosition(rc);
 			} else {
-				_pTsfIf->ClearCandidatePosition();
+				_pTsfIf->ClearCandidateWindowPosition();
 			}
 			pContextView->Release();
 		} else {
-			_pTsfIf->ClearCandidatePosition();
+			_pTsfIf->ClearCandidateWindowPosition();
 		}
 	}
 
