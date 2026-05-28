@@ -31,6 +31,7 @@ BOOL IsDbgViewProcess()
 			fileName = p + 1;
 		}
 	}
+	ChmLogger::Info(Format(L"process name: %s", fileName));
 
 	return lstrcmpiW(fileName, L"Dbgview.exe") == 0 ||
 		lstrcmpiW(fileName, L"Dbgview64.exe") == 0 ||
