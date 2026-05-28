@@ -18,6 +18,26 @@
 #include "ChmEnvironment.h"
 #include "ChmCandidateWindow.h"
 
+namespace {
+BOOL IsDbgViewProcess()
+{
+	WCHAR path[MAX_PATH] = {};
+	DWORD len = GetModuleFileNameW(nullptr, path, ARRAYSIZE(path));
+	if (len == 0 || len >= ARRAYSIZE(path)) return FALSE;
+
+	LPCWSTR fileName = path;
+	for (LPCWSTR p = path; *p; ++p) {
+		if (*p == L'\\' || *p == L'/') {
+			fileName = p + 1;
+		}
+	}
+
+	return lstrcmpiW(fileName, L"Dbgview.exe") == 0 ||
+		lstrcmpiW(fileName, L"Dbgview64.exe") == 0 ||
+		lstrcmpiW(fileName, L"Dbgview64a.exe") == 0;
+}
+}
+
 // --- CTsfInterface クラスの実装 ---
 
 ChmTsfInterface::ChmTsfInterface():
@@ -35,9 +55,11 @@ ChmTsfInterface::ChmTsfInterface():
 	_llMyEditSessionTick(0),
 	_isSettingOpenClose(FALSE),
 	_pCandidateWindowThread(nullptr),
-	_candidateAnchorRect{},
-	_hasCandidatePosition(FALSE)
+	_candidateWindowPosition{},
+	_hasCandidateWindowPosition(FALSE),
+	_isDisabledForProcess(FALSE)
 { 
+	InitializeCriticalSection(&_candidateWindowPositionLock);
 	_pEngine = new ChmEngine();
 	_pLangBarItem = nullptr;
 }
@@ -49,6 +71,7 @@ ChmTsfInterface::~ChmTsfInterface() {
 		_pCandidateWindowThread = nullptr;
 	}
 	delete _pEngine;
+	DeleteCriticalSection(&_candidateWindowPositionLock);
 }
 
 // IUnknown Implementation
@@ -84,6 +107,11 @@ STDMETHODIMP_(ULONG) ChmTsfInterface::Release() {
 // -----
 
 STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
+	if (IsDbgViewProcess()) {
+		_isDisabledForProcess = TRUE;
+		return S_OK;
+	}
+
 	ChmLogger::Info(L"Activate() : Hitomoji " HM_VERSION L"(" __DATE__ L")" );
 	_pThreadMgr = ptm;
 	_pThreadMgr->AddRef();
@@ -111,7 +139,7 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 	_pEngine->Activate();
 
 	// 候補ウィンドウ表示スレッドの初期化
-	_pCandidateWindowThread = new ChmCandidateWindowThread();
+	_pCandidateWindowThread = new ChmCandidateWindowThread(_GetCandidateWindowPositionCallback, this);
 	if (!_pCandidateWindowThread || !_pCandidateWindowThread->Start(g_hInst)) {
 		ChmLogger::Warn(L"Candidate window thread start failed");
 		delete _pCandidateWindowThread;
@@ -122,6 +150,11 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 }
 
 STDMETHODIMP ChmTsfInterface::Deactivate() {
+	if (_isDisabledForProcess) {
+		_isDisabledForProcess = FALSE;
+		return S_OK;
+	}
+
 	ChmLogger::Info(L"Deactivate()");
 	ClearComposition();
 	if (_pCandidateWindowThread) {
@@ -142,9 +175,11 @@ STDMETHODIMP ChmTsfInterface::Deactivate() {
 	_pEngine->Deactivate();
 
 	// ChmLangBarItemButtonの後始末
-	_pLangBarItem->RemoveFromLangBar(_pThreadMgr);
-	_pLangBarItem->Release();
-	_pLangBarItem = nullptr;
+	if (_pLangBarItem) {
+		_pLangBarItem->RemoveFromLangBar(_pThreadMgr);
+		_pLangBarItem->Release();
+		_pLangBarItem = nullptr;
+	}
 
 	_UninitKeyEventSink();
 	_UninitPreservedKey();
@@ -238,15 +273,6 @@ STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, B
 		BOOL hasCandidatePage = FALSE;
 
 		if (ChmEngine::IsLayer3Function(type)) {
-			if (!GetCandidatePosition(page.anchorRect)) {
-				POINT pt{};
-				GetCursorPos(&pt);
-				page.anchorRect.left = pt.x;
-				page.anchorRect.top = pt.y;
-				page.anchorRect.right = pt.x + 1;
-				page.anchorRect.bottom = pt.y + 1;
-			}
-			page.delayMs = _pEngine->GetConfig()->GetLong(L"ui", L"candidate-delay",500);
 			if (!_pEngine->UpdateLayer3(kEv, fEnd, &page)) return S_OK;
 			hasCandidatePage = page.candidateCount > 0;
 		} else if (ChmEngine::IsLayer2Function(type)) {
@@ -261,7 +287,8 @@ STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, B
 
 		if (_pCandidateWindowThread) {
 			if (hasCandidatePage && _pEngine->GetState() == ChmEngine::State::Selecting) {
-				_pCandidateWindowThread->ScheduleShow(page);
+				DWORD delayMs = _pEngine->GetConfig()->GetLong(L"ui", L"candidate-delay", 500);
+				_pCandidateWindowThread->ScheduleShow(page, delayMs);
 			} else if (_pEngine->GetState() != ChmEngine::State::Selecting) {
 				_pCandidateWindowThread->Hide();
 			}
@@ -389,6 +416,12 @@ HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
 	return hrSession;
 }
 
+BOOL ChmTsfInterface::_GetCandidateWindowPositionCallback(void* context, POINT& pt)
+{
+	if (!context) return FALSE;
+	return static_cast<ChmTsfInterface*>(context)->GetCandidateWindowPosition(pt);
+}
+
 HRESULT ChmTsfInterface::_CommitComposition(ITfContext* pic) {
 	Debug(Format(L"_CommitComposition: pic=%p", pic));
 	if (!pic) return S_FALSE;
@@ -459,13 +492,11 @@ STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 		_pCandidateWindowThread->Hide();
 	}
 
-	// フォーカス取得時は Composition 側のみを基準に整理
-	if (GetCompositionContext()) {
-		ClearComposition();
-		_pEngine->ResetStatus();
-	}
 	ITfContext* pContext = nullptr;
-	if (SUCCEEDED(_GetFocusedContext(&pContext)) && pContext) {
+	if (SUCCEEDED(_GetFocusedContext(&pContext))) {
+		_ResetCompositionOnFocusChange(pContext, L"OnSetThreadFocus");
+	}
+	if (pContext) {
 		_ApplyAppInputMode(pContext);
 		pContext->Release();
 	}
@@ -506,17 +537,46 @@ STDMETHODIMP ChmTsfInterface::OnSetFocus(ITfDocumentMgr* pdimFocus, ITfDocumentM
 	if (_pCandidateWindowThread) {
 		_pCandidateWindowThread->Hide();
 	}
-	if (GetCompositionContext()) {
-		ClearComposition();
-		_pEngine->ResetStatus();
-	}
-
 	ITfContext* pContext = nullptr;
-	if (SUCCEEDED(_GetTopContext(pdimFocus, &pContext)) && pContext) {
+	if (SUCCEEDED(_GetTopContext(pdimFocus, &pContext))) {
+		_ResetCompositionOnFocusChange(pContext, L"OnSetFocus");
+	}
+	if (pContext) {
 		_ApplyAppInputMode(pContext);
 		pContext->Release();
 	}
 	return S_OK;
+}
+
+BOOL ChmTsfInterface::_IsSameContext(ITfContext* pLeft, ITfContext* pRight)
+{
+	if (!pLeft || !pRight) return FALSE;
+	if (pLeft == pRight) return TRUE;
+
+	IUnknown* pUnkLeft = nullptr;
+	IUnknown* pUnkRight = nullptr;
+	HRESULT hrLeft = pLeft->QueryInterface(IID_IUnknown, (void**)&pUnkLeft);
+	HRESULT hrRight = pRight->QueryInterface(IID_IUnknown, (void**)&pUnkRight);
+	BOOL isSame = SUCCEEDED(hrLeft) && SUCCEEDED(hrRight) && pUnkLeft == pUnkRight;
+
+	if (pUnkLeft) pUnkLeft->Release();
+	if (pUnkRight) pUnkRight->Release();
+	return isSame;
+}
+
+void ChmTsfInterface::_ResetCompositionOnFocusChange(ITfContext* pNewContext, LPCWSTR source)
+{
+	ITfContext* pCompositionContext = GetCompositionContext();
+	if (!pCompositionContext) return;
+
+	if (_IsSameContext(pCompositionContext, pNewContext)) {
+		Debug(Format(L"%s: keep composition on same context", source ? source : L"focus"));
+		return;
+	}
+
+	Debug(Format(L"%s: context changed -> clear composition", source ? source : L"focus"));
+	ClearComposition();
+	_pEngine->ResetStatus();
 }
 
 STDMETHODIMP ChmTsfInterface::OnPushContext(ITfContext* pic)
