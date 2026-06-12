@@ -77,6 +77,129 @@ TEST_F(FunctionKeyTestBase, InitAndClear)
     EXPECT_EQ(ChmFuncType::None, ev2.GetType());
 }
 
+TEST_F(FunctionKeyTestBase, DefaultFunctionKeysByState)
+{
+    ChmKeyEvent::InitFunctionKey();
+
+    ChmKeyEvent spaceNone(VK_SPACE, 0, ChmEngine::State::None);
+    EXPECT_EQ(ChmFuncType::CharInputSpace, spaceNone.GetType());
+
+    ChmKeyEvent enter(VK_RETURN, 0);
+    EXPECT_EQ(ChmFuncType::CompFinish, enter.GetType());
+
+    SetKeyState(true, false, false);
+    ChmKeyEvent shiftEnter(VK_RETURN, 0);
+    EXPECT_EQ(ChmFuncType::CompFinishKatakana, shiftEnter.GetType());
+
+    SetKeyState(false, false, true);
+    ChmKeyEvent altEnter(VK_RETURN, 0);
+    EXPECT_EQ(ChmFuncType::CompFinishHiragana, altEnter.GetType());
+
+    SetKeyState(false, false, false);
+    ChmKeyEvent tab(VK_TAB, 0);
+    EXPECT_EQ(ChmFuncType::CompFinishKey, tab.GetType());
+
+    SetKeyState(true, false, false);
+    ChmKeyEvent shiftTab(VK_TAB, 0);
+    EXPECT_EQ(ChmFuncType::CompFinishKeyWide, shiftTab.GetType());
+
+    SetKeyState(false, false, false);
+    ChmKeyEvent spaceInputing(VK_SPACE, 0);
+    EXPECT_EQ(ChmFuncType::CompSelect, spaceInputing.GetType());
+
+    ChmKeyEvent backspace(VK_BACK, 0);
+    EXPECT_EQ(ChmFuncType::Backspace, backspace.GetType());
+
+    ChmKeyEvent escape(VK_ESCAPE, 0);
+    EXPECT_EQ(ChmFuncType::Cancel, escape.GetType());
+
+    ChmKeyEvent spaceSelecting(VK_SPACE, 0, ChmEngine::State::Selecting);
+    EXPECT_EQ(ChmFuncType::SelectNextPage, spaceSelecting.GetType());
+
+    ChmKeyEvent backspaceSelecting(VK_BACK, 0, ChmEngine::State::Selecting);
+    EXPECT_EQ(ChmFuncType::SelectPrevPage, backspaceSelecting.GetType());
+
+    ChmKeyEvent escapeSelecting(VK_ESCAPE, 0, ChmEngine::State::Selecting);
+    EXPECT_EQ(ChmFuncType::SelectCancel, escapeSelecting.GetType());
+
+    SetKeyState(false, true, false);
+    ChmKeyEvent ctrlZ('Z', 0, ChmEngine::State::None);
+    EXPECT_EQ(ChmFuncType::UnFinish, ctrlZ.GetType());
+    EXPECT_TRUE(ctrlZ.IsUnFinishKey());
+
+    ChmKeyEvent ctrlHSelecting('H', 0, ChmEngine::State::Selecting);
+    EXPECT_EQ(ChmFuncType::Backspace, ctrlHSelecting.GetType());
+
+    ChmKeyEvent ctrlISelecting('I', 0, ChmEngine::State::Selecting);
+    EXPECT_EQ(ChmFuncType::CompFinishKey, ctrlISelecting.GetType());
+
+    SetKeyState(true, true, false);
+    ChmKeyEvent shiftCtrlISelecting('I', 0, ChmEngine::State::Selecting);
+    EXPECT_EQ(ChmFuncType::CompFinishKeyWide, shiftCtrlISelecting.GetType());
+
+    SetKeyState(false, true, false);
+    ChmKeyEvent ctrlMSelecting('M', 0, ChmEngine::State::Selecting);
+    EXPECT_EQ(ChmFuncType::CompFinish, ctrlMSelecting.GetType());
+}
+
+TEST_F(FunctionKeyTestBase, CharacterInputTranslation)
+{
+    ChmKeyEvent::ClearFunctionKey();
+
+    ChmKeyEvent lowerA('A', 0);
+    EXPECT_EQ(ChmFuncType::CharInput, lowerA.GetType());
+    EXPECT_EQ('a', lowerA.GetChar());
+
+    SetKeyState(true, false, false);
+    ChmKeyEvent upperAByShift('A', 0);
+    EXPECT_EQ(ChmFuncType::CharInput, upperAByShift.GetType());
+    EXPECT_EQ('A', upperAByShift.GetChar());
+
+    SetKeyState(false, false, false, true);
+    ChmKeyEvent upperAByCaps('A', 0);
+    EXPECT_EQ(ChmFuncType::CharInput, upperAByCaps.GetType());
+    EXPECT_EQ('A', upperAByCaps.GetChar());
+
+    SetKeyState(true, false, false, true);
+    ChmKeyEvent lowerAByShiftCaps('A', 0);
+    EXPECT_EQ(ChmFuncType::CharInput, lowerAByShiftCaps.GetType());
+    EXPECT_EQ('a', lowerAByShiftCaps.GetChar());
+
+    SetKeyState(true, false, false);
+    ChmKeyEvent shiftedDigit('1', 0);
+    EXPECT_EQ(ChmFuncType::CharInput, shiftedDigit.GetType());
+    EXPECT_EQ('!', shiftedDigit.GetChar());
+
+    SetKeyState(false, true, false);
+    ChmKeyEvent ctrlA('A', 0);
+    EXPECT_EQ(ChmFuncType::None, ctrlA.GetType());
+}
+
+TEST_F(FunctionKeyTestBase, SelectingCharacterInput)
+{
+    ChmKeyEvent::ClearFunctionKey();
+
+    ChmKeyEvent ev('A', 0, ChmEngine::State::Selecting);
+    EXPECT_EQ(ChmFuncType::SelectInput, ev.GetType());
+    EXPECT_EQ('a', ev.GetChar());
+}
+
+TEST_F(FunctionKeyTestBase, NavigationKeyFinishesComposition)
+{
+    ChmKeyEvent::ClearFunctionKey();
+
+    ChmKeyEvent left(VK_LEFT, 0);
+    EXPECT_EQ(ChmFuncType::CompFinish, left.GetType());
+    EXPECT_TRUE(left.IsNavigationFinish());
+
+    ChmKeyEvent pageDown(VK_NEXT, 0);
+    EXPECT_EQ(ChmFuncType::CompFinish, pageDown.GetType());
+    EXPECT_TRUE(pageDown.IsNavigationFinish());
+
+    ChmKeyEvent enter(VK_RETURN, 0);
+    EXPECT_FALSE(enter.IsNavigationFinish());
+}
+
 // ---------------------------------------------
 // Parse 正常系
 // ---------------------------------------------
@@ -274,12 +397,19 @@ TEST_F(FunctionKeyTestBase, AllActionNamesCovered)
 
     const wchar_t* actions[] = {
         L"finish",
+        L"finish-hiragana",
         L"finish-katakana",
         L"finish-raw",
         L"finish-raw-wide",
         L"backspace",
         L"cancel",
-        L"cancel-finish"
+        L"cancel-finish",
+        L"select-start",
+        L"next-page",
+        L"prev-page",
+        L"cancel-select",
+        L"select-kanji",
+        L"space-char"
 #ifdef _DEBUG
         ,L"version-info",
         L"reload-ini"
