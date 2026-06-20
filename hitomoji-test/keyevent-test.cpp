@@ -1,35 +1,7 @@
-﻿#include "gtest/gtest.h"
+#include "gtest/gtest.h"
 #include "ChmConfig.h"
 #include "ChmKeyEvent.h"
-
-// =====================================================
-// テスト用 KeyStateProvider
-// =====================================================
-
-static bool g_shift = false;
-static bool g_ctrl  = false;
-static bool g_alt   = false;
-static bool g_caps  = false;
-
-static SHORT __stdcall TestKeyStateProvider(int vkey)
-{
-    switch (vkey)
-    {
-    case VK_SHIFT:   return g_shift ? 0x8000 : 0;
-    case VK_CONTROL: return g_ctrl  ? 0x8000 : 0;
-    case VK_MENU:    return g_alt   ? 0x8000 : 0;
-    case VK_CAPITAL: return g_caps  ? 0x0001 : 0;
-    default:         return 0;
-    }
-}
-
-static void SetKeyState(bool shift, bool ctrl, bool alt, bool caps = false)
-{
-    g_shift = shift;
-    g_ctrl  = ctrl;
-    g_alt   = alt;
-    g_caps  = caps;
-}
+#include "TestKeyEventHelper.h"
 
 // =====================================================
 // gtest フィクスチャ
@@ -41,13 +13,12 @@ class FunctionKeyTestBase : public ::testing::Test
 protected:
     void SetUp() override
     {
-        ChmKeyEvent::SetKeyStateProvider(TestKeyStateProvider);
-        SetKeyState(false, false, false, false);
+        TestKeyEventHelper::Install();
     }
 
     void TearDown() override
     {
-        ChmKeyEvent::SetKeyStateProvider(::GetKeyState);
+        TestKeyEventHelper::Restore();
     }
 };
 
@@ -87,23 +58,23 @@ TEST_F(FunctionKeyTestBase, DefaultFunctionKeysByState)
     ChmKeyEvent enter(VK_RETURN, 0);
     EXPECT_EQ(ChmFuncType::CompFinish, enter.GetType());
 
-    SetKeyState(true, false, false);
+    TestKeyEventHelper::SetState(true, false, false);
     ChmKeyEvent shiftEnter(VK_RETURN, 0);
     EXPECT_EQ(ChmFuncType::CompFinishKatakana, shiftEnter.GetType());
 
-    SetKeyState(false, false, true);
+    TestKeyEventHelper::SetState(false, false, true);
     ChmKeyEvent altEnter(VK_RETURN, 0);
     EXPECT_EQ(ChmFuncType::CompFinishHiragana, altEnter.GetType());
 
-    SetKeyState(false, false, false);
+    TestKeyEventHelper::SetState(false, false, false);
     ChmKeyEvent tab(VK_TAB, 0);
     EXPECT_EQ(ChmFuncType::CompFinishKey, tab.GetType());
 
-    SetKeyState(true, false, false);
+    TestKeyEventHelper::SetState(true, false, false);
     ChmKeyEvent shiftTab(VK_TAB, 0);
     EXPECT_EQ(ChmFuncType::CompFinishKeyWide, shiftTab.GetType());
 
-    SetKeyState(false, false, false);
+    TestKeyEventHelper::SetState(false, false, false);
     ChmKeyEvent spaceInputing(VK_SPACE, 0);
     EXPECT_EQ(ChmFuncType::CompSelect, spaceInputing.GetType());
 
@@ -122,7 +93,7 @@ TEST_F(FunctionKeyTestBase, DefaultFunctionKeysByState)
     ChmKeyEvent escapeSelecting(VK_ESCAPE, 0, ChmEngine::State::Selecting);
     EXPECT_EQ(ChmFuncType::SelectCancel, escapeSelecting.GetType());
 
-    SetKeyState(false, true, false);
+    TestKeyEventHelper::SetState(false, true, false);
     ChmKeyEvent ctrlZ('Z', 0, ChmEngine::State::None);
     EXPECT_EQ(ChmFuncType::UnFinish, ctrlZ.GetType());
     EXPECT_TRUE(ctrlZ.IsUnFinishKey());
@@ -133,11 +104,11 @@ TEST_F(FunctionKeyTestBase, DefaultFunctionKeysByState)
     ChmKeyEvent ctrlISelecting('I', 0, ChmEngine::State::Selecting);
     EXPECT_EQ(ChmFuncType::CompFinishKey, ctrlISelecting.GetType());
 
-    SetKeyState(true, true, false);
+    TestKeyEventHelper::SetState(true, true, false);
     ChmKeyEvent shiftCtrlISelecting('I', 0, ChmEngine::State::Selecting);
     EXPECT_EQ(ChmFuncType::CompFinishKeyWide, shiftCtrlISelecting.GetType());
 
-    SetKeyState(false, true, false);
+    TestKeyEventHelper::SetState(false, true, false);
     ChmKeyEvent ctrlMSelecting('M', 0, ChmEngine::State::Selecting);
     EXPECT_EQ(ChmFuncType::CompFinish, ctrlMSelecting.GetType());
 }
@@ -150,27 +121,27 @@ TEST_F(FunctionKeyTestBase, CharacterInputTranslation)
     EXPECT_EQ(ChmFuncType::CharInput, lowerA.GetType());
     EXPECT_EQ('a', lowerA.GetChar());
 
-    SetKeyState(true, false, false);
+    TestKeyEventHelper::SetState(true, false, false);
     ChmKeyEvent upperAByShift('A', 0);
     EXPECT_EQ(ChmFuncType::CharInput, upperAByShift.GetType());
     EXPECT_EQ('A', upperAByShift.GetChar());
 
-    SetKeyState(false, false, false, true);
+    TestKeyEventHelper::SetState(false, false, false, true);
     ChmKeyEvent upperAByCaps('A', 0);
     EXPECT_EQ(ChmFuncType::CharInput, upperAByCaps.GetType());
     EXPECT_EQ('A', upperAByCaps.GetChar());
 
-    SetKeyState(true, false, false, true);
+    TestKeyEventHelper::SetState(true, false, false, true);
     ChmKeyEvent lowerAByShiftCaps('A', 0);
     EXPECT_EQ(ChmFuncType::CharInput, lowerAByShiftCaps.GetType());
     EXPECT_EQ('a', lowerAByShiftCaps.GetChar());
 
-    SetKeyState(true, false, false);
+    TestKeyEventHelper::SetState(true, false, false);
     ChmKeyEvent shiftedDigit('1', 0);
     EXPECT_EQ(ChmFuncType::CharInput, shiftedDigit.GetType());
     EXPECT_EQ('!', shiftedDigit.GetChar());
 
-    SetKeyState(false, true, false);
+    TestKeyEventHelper::SetState(false, true, false);
     ChmKeyEvent ctrlA('A', 0);
     EXPECT_EQ(ChmFuncType::None, ctrlA.GetType());
 }
@@ -218,7 +189,7 @@ TEST_F(FunctionKeyTestBase, ParseAndApply)
     EXPECT_TRUE(error.level == ChmConfig::ParseLevel::None);
 
                   // CTRLのみON
-    SetKeyState(false, true, false);
+    TestKeyEventHelper::SetState(false, true, false);
 
     // 実際にキーイベントを生成して確認
     ChmKeyEvent ev('Z', 0);
@@ -265,7 +236,7 @@ TEST_F(FunctionKeyTestBase, ShiftWithSpecialKey)
     EXPECT_TRUE(error.level == ChmConfig::ParseLevel::None);
 
     // SHIFTのみON
-    SetKeyState(true, false, false);
+    TestKeyEventHelper::SetState(true, false, false);
 
     ChmKeyEvent ev(VK_RETURN, 0);
     EXPECT_EQ(ChmFuncType::CompFinishKey, ev.GetType());
@@ -451,7 +422,7 @@ TEST_F(FunctionKeyTestBase, DuplicateDefinitionWarning)
     EXPECT_NE(std::wstring::npos, error.message.find(L"duplicate"));
   
     // 後勝ちで cancel が有効になることを確認
-    SetKeyState(false, true, false);
+    TestKeyEventHelper::SetState(false, true, false);
     ChmKeyEvent ev('Z', 0);
     EXPECT_EQ(ChmFuncType::Cancel, ev.GetType());
 }
