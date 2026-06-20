@@ -7,6 +7,7 @@
 #include <locale>
 #include <codecvt>
 #include "ChmConfig.h"
+#include "ChmConfigUtils.h"
 #include "ChmRomajiConverter.h"
 #include "ChmKeyEvent.h"
 #include "ChmEnvironment.h"
@@ -25,8 +26,9 @@ void ChmConfig::InitConfig()
 {
 	m_config.clear();
 	m_errors.clear();
-	// function-key テーブルを初期化
-	ChmKeyEvent::InitFunctionKey();
+	m_infos.clear();
+	// function-key テーブルを読み込み用の一時状態へ初期化
+	m_functionKeyMap.InitDefault();
 	// key-table テーブルを初期化
 	ChmKeytableParser::ClearOverrideTable();
 
@@ -147,7 +149,7 @@ BOOL ChmConfig::_LoadStreamInternal(std::wistream& is,
 			}
 			else if (currentSection == L"function-key")
 			{
-				bRet = ChmKeyEvent::ParseFunctionKey(key, value, errorMsg);
+				bRet = _parseFunctionKey(key, value, errorMsg);
 			}
 			else
 			{
@@ -206,6 +208,10 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 	InitConfig();
 
 	BOOL bRet = _LoadStreamInternal(ifs, path, /*isMain*/ TRUE, L"");
+	if (bRet)
+	{
+		ChmKeyEvent::SetFunctionKeyMap(m_functionKeyMap);
+	}
 
 	OutputDebugStringWithInt(L"   > LoadFile end. m_errors.size(): %d\n", (ULONG)m_errors.size());
 	OutputDebugStringWithInt(L"   >               m_infos.size(): %d\n", (ULONG)m_infos.size());
@@ -289,30 +295,23 @@ std::wstring ChmConfig::DumpInfos() const
 // --- public helpers ---
 std::wstring ChmConfig::Trim(const std::wstring& s)
 {
-	// whitespace characters: space(0x20), tab(0x09), CR(0x0D), LF(0x0A), BOM(0xFEFF)
-	const wchar_t* ws = L" \t\r\n\xFEFF";
-	size_t start = s.find_first_not_of(ws);
-	if (start == std::wstring::npos) return L"";
-	size_t end = s.find_last_not_of(ws);
-	std::wstring out = s.substr(start, end - start + 1);
-	return out;
+    return ChmStringUtil::Trim(s);
 }
 
-//  大文字の小文字化　＋　'_'の'-'化
 std::wstring ChmConfig::Canonize(const std::wstring& s)
 {
-	std::wstring result = s;
-	std::transform(result.begin(), result.end(),
-				   result.begin(),
-				   [](wchar_t c)
-				   {
-				       if (c == L'_') return L'-';   // unify '_' to '-'
-				       return (wchar_t)towlower(c);
-				   });
-	return result;
+    return ChmStringUtil::Canonize(s);
 }
 
+void ChmConfig::SetError(ParseResult& r, const std::wstring& msg)
+{
+    ChmConfigParse::SetError(r, msg);
+}
 
+void ChmConfig::SetInfo(ParseResult& r, const std::wstring& msg)
+{
+    ChmConfigParse::SetInfo(r, msg);
+}
 // --- private helpers ---
 
 std::wstring ChmConfig::_Dump() const
@@ -485,6 +484,22 @@ BOOL ChmConfig::_divideRawTrim(const std::wstring& rawTrim,
 	return TRUE;
 }
 
+BOOL ChmConfig::_parseFunctionKey(const std::wstring& key,
+                                  const std::wstring& value,
+                                  ParseResult& errorMsg)
+{
+    ParseResult result;
+    BOOL ret = m_functionKeyMap.ParseFunctionKey(key, value, result);
+    if (result.level == ParseLevel::Error)
+    {
+        SetError(errorMsg, result.message);
+    }
+    else if (result.level == ParseLevel::Info)
+    {
+        SetInfo(errorMsg, result.message);
+    }
+    return ret;
+}
 BOOL ChmConfig::_parseValue(const std::wstring& keyTrim,
 		const std::wstring& valueTrim,
 		const std::wstring& currentSection,

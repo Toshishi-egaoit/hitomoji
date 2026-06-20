@@ -1,10 +1,9 @@
-﻿#include "gtest/gtest.h"
+#include "gtest/gtest.h"
 #include "ChmConfig.h"
 #include "ChmRomajiConverter.h"
+#include "TestConfigHelper.h"
 #include <algorithm>
-#include <fstream>
 #include <string>
-#include <vector>
 
 namespace {
 
@@ -18,56 +17,6 @@ static std::wstring ConvertWithPendingForConfigTest(const std::wstring& input,
     return converted + L":" + pending;
 }
 
-class TempConfigDir {
-public:
-    TempConfigDir()
-    {
-        wchar_t tempPath[MAX_PATH];
-        GetTempPathW(MAX_PATH, tempPath);
-
-        wchar_t uniqueName[MAX_PATH];
-        GetTempFileNameW(tempPath, L"hmj", 0, uniqueName);
-        DeleteFileW(uniqueName);
-
-        _baseDir = uniqueName;
-        _baseDir += L"\\";
-        CreateDirectoryW(_baseDir.c_str(), nullptr);
-    }
-
-    ~TempConfigDir()
-    {
-        for (const auto& file : _files) {
-            DeleteFileW(file.c_str());
-        }
-        RemoveDirectoryW(_baseDir.c_str());
-    }
-
-    const std::wstring& BaseDir() const
-    {
-        return _baseDir;
-    }
-
-    void WriteFile(const std::wstring& fileName, const std::wstring& content)
-    {
-        std::wstring path = _baseDir + fileName;
-        int size = WideCharToMultiByte(CP_UTF8, 0,
-            content.c_str(), static_cast<int>(content.size()),
-            nullptr, 0, nullptr, nullptr);
-        std::string utf8(size, '\0');
-        WideCharToMultiByte(CP_UTF8, 0,
-            content.c_str(), static_cast<int>(content.size()),
-            utf8.data(), size, nullptr, nullptr);
-
-        std::ofstream file(path, std::ios::binary);
-        file.write(utf8.data(), utf8.size());
-        file.close();
-        _files.push_back(path);
-    }
-
-private:
-    std::wstring _baseDir;
-    std::vector<std::wstring> _files;
-};
 
 static std::wstring ValidConfigText()
 {
@@ -339,6 +288,25 @@ TEST(ConfigTest, KeyTableLoadedFromConfigAffectsRomajiConverter)
     EXPECT_EQ(L"ゐ:", ConvertWithPendingForConfigTest(L"wwi"));
     EXPECT_EQ(L"→:", ConvertWithPendingForConfigTest(L"->"));
     EXPECT_EQ(L"《:", ConvertWithPendingForConfigTest(L"<<"));
+}
+
+TEST(ConfigTest, IncludedKeyTableOverridesEarlierDefinition)
+{
+    TempConfigDir dir;
+    dir.WriteFile(L"sub.ini",
+        L"/k=ゝ\n");
+    dir.WriteFile(L"main.ini",
+        L"[key-table]\n"
+        L"/k=々\n"
+        L"@include sub.ini\n");
+
+    ChmConfig config;
+    config.SetBasePath(dir.BaseDir());
+
+    EXPECT_TRUE(config.LoadFile(L"main.ini"));
+    EXPECT_FALSE(config.HasErrors());
+
+    EXPECT_EQ(L"ゝ:", ConvertWithPendingForConfigTest(L"/k"));
 }
 
 TEST(ConfigTest, LoadFileClearsPreviousKeyTableOverrides)

@@ -4,7 +4,10 @@
 #include <string>
 #include <unordered_map>
 #include <variant>
+#include <vector>
 #include <windows.h>
+#include "ChmConfigUtils.h"
+#include "ChmFunctionKeyMap.h"
 
 class ChmConfig
 {
@@ -18,17 +21,8 @@ public:
 		size_t lineNo;
 		std::wstring message;
 	};
-
-	enum class ParseLevel {
-		None,
-		Info,
-		Error
-	};
-
-	struct ParseResult {
-		ParseLevel level = ParseLevel::None;
-		std::wstring message;
-	};
+	using ParseLevel = ChmConfigParse::Level;
+	using ParseResult = ChmConfigParse::Result;
 
 	// 内部表現は long / string に正規化
 	using ConfigValue = std::variant<bool, long, std::wstring>;
@@ -59,20 +53,13 @@ public:
 	std::wstring DumpInfos() const;
 	BOOL HasErrors() const { return !m_errors.empty(); }
 	BOOL HasInfos() const { return !m_infos.empty(); }
+	const ChmFunctionKeyMap& GetFunctionKeyMap() const { return m_functionKeyMap; }
 
 	// 公開ヘルパー
 	static std::wstring Trim(const std::wstring& s);
 	static std::wstring Canonize(const std::wstring& s);
-	static void SetError(ParseResult& r, const std::wstring& msg)
-	{
-		r.level = ParseLevel::Error;
-		r.message = msg;
-	}
-	static void SetInfo(ParseResult& r, const std::wstring& msg)
-	{
-		r.level = ParseLevel::Info;
-		r.message = msg;
-	}
+	static void SetError(ParseResult& r, const std::wstring& msg);
+	static void SetInfo(ParseResult& r, const std::wstring& msg);
 	
 private:
 	BOOL _LoadStreamInternal(std::wistream& is,
@@ -85,7 +72,10 @@ private:
 	BOOL _divideRawTrim(const std::wstring& rawTrim,
 		std::wstring& key,
 		std::wstring& value,
-	 	ParseResult& errorMsg);
+		ParseResult& errorMsg);
+	BOOL _parseFunctionKey(const std::wstring& key,
+		const std::wstring& value,
+		ParseResult& errorMsg);
 	BOOL _parseValue(const std::wstring& keyTrim,
 		const std::wstring& valueTrim,
 		const std::wstring& currentSection,
@@ -106,4 +96,5 @@ private:
 	ConfigMap m_config;
 	ErrorMap  m_errors;
 	InfoMap  m_infos;
+	ChmFunctionKeyMap m_functionKeyMap;
 };
