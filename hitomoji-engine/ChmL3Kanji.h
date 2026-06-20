@@ -117,9 +117,7 @@ public:
 	void PrevPage()
 	{
 		if (!_list || _count == 0 || _pageSize == 0) return;
-		byte maxPage = (_count + _pageSize - 1) / _pageSize;
-		if (_page == 0 ) _page = maxPage - 1;
-		else if (_page > 0) _page--;
+		if (_page > 0) _page--;
 	}
 
 	uint32_t SelectByIndex(byte index)
@@ -195,7 +193,7 @@ public:
 	{
 		std::wstring map = pConfig->GetString(L"UI", L"select_keymap");
 		if (map.empty()) {
-			map = L"dk fj sl gh ei ru a; wo qp ty c, vm x. z/ bn 38 47 29 10 56";
+			map = L"dk fj sl gh ei ru a; wo qp ty c, vm x. z/ bn 38 47";
 		}
 		BuildTable(ToNarrow(map));
 	}
