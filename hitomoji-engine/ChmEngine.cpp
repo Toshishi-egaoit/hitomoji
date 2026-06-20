@@ -127,6 +127,9 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
 	// 入力中の UnFinish はアプリ側Undoに流さず、IME側で握りつぶす
 	if (HasComposition() && ev.IsUnFinishKey()) return TRUE;
 
+	// 選択中は未定義キーも候補選択の異常入力としてIMEが食う
+	if (_state == State::Selecting && ev.GetType() == ChmFuncType::None) return TRUE;
+
 	// Compositonが存在する状態の特殊キーはIMEが食う
 	if (HasComposition() && ev.GetType() != ChmFuncType::None) return TRUE;
 
@@ -206,6 +209,9 @@ BOOL ChmEngine::ConsumeErrorRequest() {
 BOOL ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition){
 	ChmFuncType _type = keyEvent.GetType();
 
+	if (_state == State::Selecting && !IsLayer3Function(_type)) {
+		return UpdateLayer3(keyEvent, pEndComposition, nullptr);
+	}
 	if (IsLayer2Function(_type)) {
 		return UpdateLayer2(keyEvent, pEndComposition);
 	}
@@ -310,6 +316,11 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 	_useUndoEditSession = FALSE;
 
 	if (_type == ChmFuncType::None) {
+		if (_state == State::Selecting) {
+			SetError();
+			pEndComposition = FALSE;
+			return TRUE;
+		}
 		pEndComposition = FALSE;
 		return FALSE;
 	}
@@ -421,6 +432,10 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 			}
 			break ;
 		default:
+			if (_state == State::Selecting) {
+				SetError();
+				break;
+			}
 			return FALSE;
 	}
 
