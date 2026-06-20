@@ -26,7 +26,6 @@ ChmEngine::~ChmEngine() {
 
 void ChmEngine::Activate() {
 	Debug(L"ChmEngine::Activate");
-	_initEnv();
 	InitConfig();
 	_initLayer2();
 	_initLayer3();
@@ -88,9 +87,6 @@ std::wstring ChmEngine::GetConfigFile() {
 	return _pConfig->GetConfigFile();
 }
 
-void ChmEngine::_initEnv() {
-	g_environment.Init();
-}
 
 void ChmEngine::_initLayer2() {
 	// TODO: いまはnullかんすう

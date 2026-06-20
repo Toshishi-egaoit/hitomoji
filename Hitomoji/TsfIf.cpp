@@ -113,6 +113,7 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 		return S_OK;
 	}
 
+	g_environment.Init();
 	ChmLogger::Info(L"Activate() : Hitomoji " HM_VERSION L"(" __DATE__ L")" );
 	_pThreadMgr = ptm;
 	_pThreadMgr->AddRef();
