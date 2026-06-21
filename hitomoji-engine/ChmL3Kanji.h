@@ -111,13 +111,14 @@ public:
 	{
 		if (!_list || _count == 0 || _pageSize == 0) return;
 		byte maxPage = (_count + _pageSize - 1) / _pageSize;
-		if (_page + 1 < maxPage) _page++;
+		_page = (_page + 1 < maxPage) ? _page + 1 : 0;
 	}
 
 	void PrevPage()
 	{
 		if (!_list || _count == 0 || _pageSize == 0) return;
-		if (_page > 0) _page--;
+		byte maxPage = (_count + _pageSize - 1) / _pageSize;
+		_page = (_page > 0) ? _page - 1 : maxPage - 1;
 	}
 
 	uint32_t SelectByIndex(byte index)
