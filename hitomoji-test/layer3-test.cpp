@@ -366,6 +366,32 @@ TEST_F(Layer3Test, ConvertKeyIgnoresMultipleDifferentLeadingSymbolsWhenSearching
     engine.Deactivate();
 }
 
+TEST_F(Layer3Test, ConvertKeyIgnoresLeadingNonHiraganaWhenSearchingYomi)
+{
+    WriteMainConfig(
+        L"[ui]\n"
+        L"select_keymap=dk fj sl gh ei ru a; wo qp ty c, vm x. z/ bn 38 47 29 10 56\n"
+        L"[key-table]\n"
+        L"qq=字\n");
+
+    ChmEngine engine;
+    engine.Activate();
+
+    InputKeys(engine, "QQAI", L"字あい");
+
+    ChmCandidatePage page;
+    StartSelection(engine, page);
+    EXPECT_EQ(L"字あい", engine.GetCompositionStr());
+
+    EXPECT_EQ(0u, page.page);
+    EXPECT_EQ(26u, page.totalCount);
+    EXPECT_EQ(26u, page.candidateCount);
+
+    SelectCandidate(engine, 'D', L"字会");
+
+    engine.Deactivate();
+}
+
 TEST_F(Layer3Test, ConvertKeyKeepsInputingAndRequestsErrorWhenPendingRemains)
 {
     ChmEngine engine;

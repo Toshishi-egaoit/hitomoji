@@ -83,8 +83,10 @@ public:
 	};
 
 	// 変換開始
-	BOOL Start(const std::wstring& DictYomi)
+	BOOL Start(const std::wstring& composition)
 	{
+		_leadingChars.clear();
+		std::wstring DictYomi = _makeDictYomi(composition);
 		char16_t key[6];
 		_makeYomiKey(DictYomi, key);
 		
@@ -105,6 +107,7 @@ public:
 		_list = nullptr;
 		_count = 0;
 		_page = 0;
+		_leadingChars.clear();
 	}
 
 	void NextPage()
@@ -133,9 +136,30 @@ public:
 	const uint32_t* GetList() const { return _list; }
 	uint16_t GetCount() const { return _count; }
 	byte GetPage() const { return _page; }
+	const std::wstring& GetLeadingChars() const { return _leadingChars; }
 	BOOL BuildCandidatePage(ChmCandidatePage& page, const ChmL3Helper& helper) const;
 
 private:
+	static BOOL _isYomiChar(wchar_t ch)
+	{
+		return ch >= 0x3040 && ch <= 0x309F; // Hiragana
+	}
+
+	std::wstring _makeDictYomi(const std::wstring& composition)
+	{
+		size_t start = 0;
+		while (start < composition.length() && !_isYomiChar(composition[start])) {
+			++start;
+		}
+
+		if (start == 0 || start == composition.length()) {
+			return composition;
+		}
+
+		_leadingChars = composition.substr(0, start);
+		return composition.substr(start);
+	}
+
 	// wstringから最大5文字までのchar16_t配列に変換
 	void _makeYomiKey(const std::wstring& src, char16_t out[6])
 	{
@@ -175,6 +199,7 @@ private:
 	uint16_t _count;
 	byte _page;
 	byte _pageSize;
+	std::wstring _leadingChars;
 };
 
 

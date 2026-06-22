@@ -75,8 +75,6 @@ private:
 	// ASCII -> 全角 変換（v0.1.3 簡易実装）
 	static std::wstring AsciiToWide(const std::wstring& src);
 	static LONG CountUndoDeleteLength(const std::wstring& src);
-	static BOOL IsLayer3LeadingSymbol(wchar_t ch);
-	static size_t CountLayer3LeadingSymbols(const std::wstring& src);
 
 	void SetError(void) ;
 	void _PrepareUnFinish();
@@ -94,7 +92,6 @@ private:
 
 	std::wstring _converted; // かな変換できた部分
 	std::wstring _pending; // かなに変換できていない部分（残り）
-	std::wstring _l3LeadingSymbols; // かな漢字変換の読みから外した先頭記号
 	BOOL _useUndoEditSession;
 	LONG _undoDeleteLength;
 	BOOL _hasErrorRequest;
