@@ -159,6 +159,8 @@ LONG ChmEngine::CountUndoDeleteLength(const std::wstring& src) {
 }
 
 BOOL ChmEngine::IsLayer3LeadingSymbol(wchar_t ch) {
+	if (ch == L':' || ch == L'*') return FALSE;
+
 	if (ch >= L'0' && ch <= L'9') return FALSE;
 	if (ch >= L'A' && ch <= L'Z') return FALSE;
 	if (ch >= L'a' && ch <= L'z') return FALSE;

@@ -101,6 +101,19 @@ protected:
         EXPECT_EQ(composition, engine.GetCompositionStr());
     }
 
+    void InputKey(ChmEngine& engine, WPARAM key, const wchar_t* composition,
+                  bool shift = false)
+    {
+        bool endComposition = true;
+        ChmKeyEvent keyEvent = MakeKey(key, engine.GetState(), shift);
+
+        EXPECT_EQ(ChmFuncType::CharInput, keyEvent.GetType());
+        EXPECT_TRUE(engine.UpdateComposition(keyEvent, endComposition));
+        EXPECT_FALSE(endComposition);
+        EXPECT_EQ(ChmEngine::State::Inputing, engine.GetState());
+        EXPECT_EQ(composition, engine.GetCompositionStr());
+    }
+
     void StartSelection(ChmEngine& engine, ChmCandidatePage& page)
     {
         bool endComposition = true;
@@ -192,6 +205,38 @@ TEST_F(Layer3Test, ConvertKeyStartsKanjiSelectionAndBuildsCandidatePageForKou)
     EXPECT_EQ(0u, page.page);
     EXPECT_EQ(123u, page.totalCount);
     EXPECT_EQ(40u, page.candidateCount);
+
+    engine.Deactivate();
+}
+
+TEST_F(Layer3Test, ConvertKeyFiltersKanjiSelectionByAdditionalYomiOperator)
+{
+    ChmEngine engine;
+    engine.Activate();
+
+    InputKeys(engine, "KOU", L"\x3053\x3046");
+    InputKey(engine, VK_OEM_1, L"\x3053\x3046:", true);
+	InputKeys(engine, "KI", L"\x3053\x3046:\x304D");
+
+	ChmCandidatePage page;
+    StartSelection(engine, page);
+    EXPECT_EQ(L"\x3053\x3046:\x304D", engine.GetCompositionStr());
+
+    EXPECT_GT(page.totalCount, 20u);
+    EXPECT_EQ(40u, page.candidateCount);
+
+    bool hasKouKi = false;
+    bool hasFilteredSlot = false;
+    for (uint32_t candidate : page.candidates) {
+        if (candidate == 0x52B9u) {
+            hasKouKi = true;
+        }
+        else if (candidate == 0) {
+            hasFilteredSlot = true;
+        }
+    }
+    EXPECT_TRUE(hasKouKi);
+    EXPECT_TRUE(hasFilteredSlot);
 
     engine.Deactivate();
 }
