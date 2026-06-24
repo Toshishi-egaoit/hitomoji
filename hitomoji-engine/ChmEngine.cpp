@@ -263,11 +263,16 @@ BOOL ChmEngine::UpdateLayer2(const ChmKeyEvent& keyEvent, bool& pEndComposition)
 
 	switch (_type) {
 		case ChmFuncType::CharInputSpace: // 1文字目のスペース入力
-			// TODO: configで全角空白か半角かを選べるようにする
-			_converted = L" ";
+		{
+			BOOL useWideSpace = _pConfig->GetBool(L"ui", L"wide-space", TRUE);
+			if (keyEvent.IsShift()) {
+				useWideSpace = !useWideSpace;
+			}
+			_converted = useWideSpace ? L"\x3000" : L" ";
 			_pending = L"";
 			_state = State::None;
 			break;
+		}
 		case ChmFuncType::CharInput:
 			_state = State::Inputing;
 			_pRawInputStore->push(keyEvent.GetChar());

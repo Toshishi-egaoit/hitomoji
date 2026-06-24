@@ -19,6 +19,7 @@ struct FuncKeyDef {
 const FuncKeyDef g_functionKeyTable[] = {
     // WPARAM      SHIFT  CTRL   ALT    State                        Type
     { VK_SPACE,    false, false, false, ChmEngine::State::None,      ChmFuncType::CharInputSpace },
+    { VK_SPACE,    true,  false, false, ChmEngine::State::None,      ChmFuncType::CharInputSpace },
     { VK_RETURN,   false, false, false, ChmEngine::State::Inputing,  ChmFuncType::CompFinish     },
     { VK_RETURN,   false, false, true,  ChmEngine::State::Inputing,  ChmFuncType::CompFinishHiragana },
     { VK_RETURN,   true,  false, false, ChmEngine::State::Inputing,  ChmFuncType::CompFinishKatakana },

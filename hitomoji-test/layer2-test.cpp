@@ -177,6 +177,72 @@ TEST_F(Layer2Test, CharInputStartsComposition)
     engine.Deactivate();
 }
 
+TEST_F(Layer2Test, SpaceCharUsesWideSpaceConfigAndShiftInvertsIt)
+{
+    {
+        ChmEngine engine;
+        engine.Activate();
+
+        bool endComposition = false;
+        ChmKeyEvent spaceKey = MakeKey(VK_SPACE, engine.GetState());
+
+        EXPECT_EQ(ChmFuncType::CharInputSpace, spaceKey.GetType());
+        EXPECT_TRUE(engine.UpdateComposition(spaceKey, endComposition));
+        EXPECT_TRUE(endComposition);
+        EXPECT_EQ(ChmEngine::State::None, engine.GetState());
+        EXPECT_FALSE(engine.HasComposition());
+        EXPECT_EQ(L"\x3000", engine.GetCompositionStr());
+
+        engine.Deactivate();
+    }
+    {
+        ChmEngine engine;
+        engine.Activate();
+
+        bool endComposition = false;
+        ChmKeyEvent shiftSpaceKey = MakeKey(VK_SPACE, engine.GetState(), true);
+
+        EXPECT_EQ(ChmFuncType::CharInputSpace, shiftSpaceKey.GetType());
+        EXPECT_TRUE(engine.UpdateComposition(shiftSpaceKey, endComposition));
+        EXPECT_TRUE(endComposition);
+        EXPECT_EQ(L" ", engine.GetCompositionStr());
+
+        engine.Deactivate();
+    }
+    {
+        WriteMainConfig(
+            L"[ui]\n"
+            L"wide-space=false\n");
+
+        ChmEngine engine;
+        engine.Activate();
+
+        bool endComposition = false;
+        ChmKeyEvent spaceKey = MakeKey(VK_SPACE, engine.GetState());
+
+        EXPECT_EQ(ChmFuncType::CharInputSpace, spaceKey.GetType());
+        EXPECT_TRUE(engine.UpdateComposition(spaceKey, endComposition));
+        EXPECT_TRUE(endComposition);
+        EXPECT_EQ(L" ", engine.GetCompositionStr());
+
+        engine.Deactivate();
+    }
+    {
+        ChmEngine engine;
+        engine.Activate();
+
+        bool endComposition = false;
+        ChmKeyEvent shiftSpaceKey = MakeKey(VK_SPACE, engine.GetState(), true);
+
+        EXPECT_EQ(ChmFuncType::CharInputSpace, shiftSpaceKey.GetType());
+        EXPECT_TRUE(engine.UpdateComposition(shiftSpaceKey, endComposition));
+        EXPECT_TRUE(endComposition);
+        EXPECT_EQ(L"\x3000", engine.GetCompositionStr());
+
+        engine.Deactivate();
+    }
+}
+
 TEST_F(Layer2Test, RomajiInputUpdatesCompositionStepByStep)
 {
     ChmEngine engine;
