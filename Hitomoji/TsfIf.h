@@ -163,6 +163,7 @@ private:
 	void _SyncImeOpenCloseFromCompartment(ITfContext* pic);
 	void _ApplyAppInputMode(ITfContext* pic);
 	BOOL _GetCompartmentBool(REFGUID rguid, BOOL defaultValue);
+	void _DumpCompartments(LPCWSTR source, ITfDocumentMgr* pDocMgr, ITfContext* pic);
 	HRESULT _GetFocusedContext(ITfContext** ppContext);
 	HRESULT _GetTopContext(ITfDocumentMgr* pDocMgr, ITfContext** ppContext);
 	BOOL _IsPasswordContext(ITfContext* pic);
@@ -228,3 +229,4 @@ if ( hr != S_OK ) {\
 	OUTPUT_HR(funcName,hr)\
 	return hr;\
 };
+

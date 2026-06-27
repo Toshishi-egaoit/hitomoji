@@ -37,6 +37,97 @@ BOOL IsDbgViewProcess()
 		lstrcmpiW(fileName, L"Dbgview64.exe") == 0 ||
 		lstrcmpiW(fileName, L"Dbgview64a.exe") == 0;
 }
+std::wstring GuidToString(REFGUID rguid)
+{
+    WCHAR buf[64] = {};
+    StringFromGUID2(rguid, buf, ARRAYSIZE(buf));
+    return buf;
+}
+
+LPCWSTR KnownCompartmentName(REFGUID rguid)
+{
+    if (IsEqualGUID(rguid, GUID_COMPARTMENT_KEYBOARD_OPENCLOSE)) return L"GUID_COMPARTMENT_KEYBOARD_OPENCLOSE";
+    if (IsEqualGUID(rguid, GUID_COMPARTMENT_KEYBOARD_DISABLED)) return L"GUID_COMPARTMENT_KEYBOARD_DISABLED";
+    if (IsEqualGUID(rguid, GUID_COMPARTMENT_EMPTYCONTEXT)) return L"GUID_COMPARTMENT_EMPTYCONTEXT";
+    return L"(unknown)";
+}
+
+std::wstring VariantToString(const VARIANT& var)
+{
+    switch (var.vt) {
+    case VT_EMPTY:
+        return L"VT_EMPTY";
+    case VT_NULL:
+        return L"VT_NULL";
+    case VT_I4:
+        return Format(L"VT_I4:%ld", var.lVal);
+    case VT_UI4:
+        return Format(L"VT_UI4:%lu", var.ulVal);
+    case VT_BOOL:
+        return Format(L"VT_BOOL:%s", var.boolVal == VARIANT_FALSE ? L"FALSE" : L"TRUE");
+    case VT_BSTR:
+        return Format(L"VT_BSTR:%s", var.bstrVal ? var.bstrVal : L"(null)");
+    case VT_UNKNOWN:
+        return Format(L"VT_UNKNOWN:%p", var.punkVal);
+    case VT_DISPATCH:
+        return Format(L"VT_DISPATCH:%p", var.pdispVal);
+    default:
+        return Format(L"vt=%u", var.vt);
+    }
+}
+
+void DumpCompartmentsForObject(LPCWSTR source, LPCWSTR scope, IUnknown* pObject)
+{
+    if (!pObject) {
+        OutputDebugStringW(Format(
+            L"[Hitomoji][investigate] Compartments %s/%s object=null",
+            source ? source : L"(null)", scope ? scope : L"(null)").c_str());
+        return;
+    }
+
+    ITfCompartmentMgr* pCompMgr = nullptr;
+    HRESULT hrMgr = pObject->QueryInterface(IID_ITfCompartmentMgr, (void**)&pCompMgr);
+    OutputDebugStringW(Format(
+        L"[Hitomoji][investigate] Compartments %s/%s QI(ITfCompartmentMgr) hr=0x%08X mgr=%p",
+        source ? source : L"(null)", scope ? scope : L"(null)", hrMgr, pCompMgr).c_str());
+    if (FAILED(hrMgr) || !pCompMgr) return;
+
+    IEnumGUID* pEnum = nullptr;
+    HRESULT hrEnum = pCompMgr->EnumCompartments(&pEnum);
+    OutputDebugStringW(Format(
+        L"[Hitomoji][investigate] Compartments %s/%s EnumCompartments hr=0x%08X enum=%p",
+        source ? source : L"(null)", scope ? scope : L"(null)", hrEnum, pEnum).c_str());
+    if (SUCCEEDED(hrEnum) && pEnum) {
+        GUID guid = {};
+        ULONG fetched = 0;
+        UINT count = 0;
+        while (pEnum->Next(1, &guid, &fetched) == S_OK && fetched == 1) {
+            ITfCompartment* pComp = nullptr;
+            HRESULT hrComp = pCompMgr->GetCompartment(guid, &pComp);
+            VARIANT var;
+            VariantInit(&var);
+            HRESULT hrValue = pComp ? pComp->GetValue(&var) : E_POINTER;
+            OutputDebugStringW(Format(
+                L"[Hitomoji][investigate] Compartments %s/%s [%u] %s %s GetCompartment=0x%08X GetValue=0x%08X value=%s",
+                source ? source : L"(null)",
+                scope ? scope : L"(null)",
+                count,
+                KnownCompartmentName(guid),
+                GuidToString(guid).c_str(),
+                hrComp,
+                hrValue,
+                SUCCEEDED(hrValue) ? VariantToString(var).c_str() : L"(unavailable)").c_str());
+            VariantClear(&var);
+            if (pComp) pComp->Release();
+            ++count;
+        }
+        OutputDebugStringW(Format(
+            L"[Hitomoji][investigate] Compartments %s/%s count=%u",
+            source ? source : L"(null)", scope ? scope : L"(null)", count).c_str());
+        pEnum->Release();
+    }
+    pCompMgr->Release();
+}
 }
 
 // --- CTsfInterface クラスの実装 ---
@@ -240,6 +331,7 @@ HRESULT ChmTsfInterface::GetFirstCompositionView(
 
 STDMETHODIMP ChmTsfInterface::OnSetFocus(BOOL fFocus)
 {
+	OutputDebugStringW(Format(L"[Hitomoji][investigate] ITfKeyEventSink::OnSetFocus foreground=%d", fFocus).c_str());
 	if (fFocus == TRUE) { // フォーカス取得時
 		ITfContext* pContext = nullptr;
 		if (SUCCEEDED(_GetFocusedContext(&pContext)) && pContext) {
@@ -489,15 +581,21 @@ void ChmTsfInterface::_UninitDisplayAttributeInfo() {
 STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 {
 	OutputDebugString(L"[Hitomoji] OnSetThreadFocus()");
+	OutputDebugStringW(L"[Hitomoji][investigate] OnSetThreadFocus entry");
 
 	if (_pCandidateWindowThread) {
 		_pCandidateWindowThread->Hide();
 	}
 
 	ITfContext* pContext = nullptr;
-	if (SUCCEEDED(_GetFocusedContext(&pContext))) {
+	HRESULT hrContext = _GetFocusedContext(&pContext);
+	OutputDebugStringW(Format(
+		L"[Hitomoji][investigate] OnSetThreadFocus _GetFocusedContext hr=0x%08X pContext=%p",
+		hrContext, pContext).c_str());
+	if (SUCCEEDED(hrContext)) {
 		_ResetCompositionOnFocusChange(pContext, L"OnSetThreadFocus");
 	}
+	_DumpCompartments(L"OnSetThreadFocus", nullptr, pContext);
 	if (pContext) {
 		_ApplyAppInputMode(pContext);
 		pContext->Release();
@@ -535,14 +633,22 @@ STDMETHODIMP ChmTsfInterface::OnUninitDocumentMgr(ITfDocumentMgr* /*pdim*/)
 STDMETHODIMP ChmTsfInterface::OnSetFocus(ITfDocumentMgr* pdimFocus, ITfDocumentMgr* /*pdimPrevFocus*/)
 {
 	OutputDebugString(L"[Hitomoji] ITfThreadMgrEventSink::OnSetFocus()");
+	OutputDebugStringW(Format(
+		L"[Hitomoji][investigate] ThreadMgr OnSetFocus pdimFocus=%p",
+		pdimFocus).c_str());
 
 	if (_pCandidateWindowThread) {
 		_pCandidateWindowThread->Hide();
 	}
 	ITfContext* pContext = nullptr;
-	if (SUCCEEDED(_GetTopContext(pdimFocus, &pContext))) {
+	HRESULT hrContext = _GetTopContext(pdimFocus, &pContext);
+	OutputDebugStringW(Format(
+		L"[Hitomoji][investigate] ThreadMgr OnSetFocus _GetTopContext hr=0x%08X pContext=%p",
+		hrContext, pContext).c_str());
+	if (SUCCEEDED(hrContext)) {
 		_ResetCompositionOnFocusChange(pContext, L"OnSetFocus");
 	}
+	_DumpCompartments(L"OnSetFocus", pdimFocus, pContext);
 	if (pContext) {
 		_ApplyAppInputMode(pContext);
 		pContext->Release();
@@ -583,6 +689,8 @@ void ChmTsfInterface::_ResetCompositionOnFocusChange(ITfContext* pNewContext, LP
 
 STDMETHODIMP ChmTsfInterface::OnPushContext(ITfContext* pic)
 {
+	OutputDebugStringW(Format(L"[Hitomoji][investigate] OnPushContext pic=%p", pic).c_str());
+	_DumpCompartments(L"OnPushContext", nullptr, pic);
 	_ApplyAppInputMode(pic);
 	return S_OK;
 }
@@ -598,6 +706,7 @@ STDMETHODIMP ChmTsfInterface::OnPopContext(ITfContext* /*pic*/)
 
 STDMETHODIMP ChmTsfInterface::OnChange(REFGUID rguid)
 {
+	OutputDebugStringWithGuid(L"[Hitomoji][investigate] Compartment OnChange guid=%s", rguid);
 	if (!IsEqualGUID(rguid, GUID_COMPARTMENT_KEYBOARD_OPENCLOSE) &&
 		!IsEqualGUID(rguid, GUID_COMPARTMENT_KEYBOARD_DISABLED) &&
 		!IsEqualGUID(rguid, GUID_COMPARTMENT_EMPTYCONTEXT)) {
@@ -607,6 +716,7 @@ STDMETHODIMP ChmTsfInterface::OnChange(REFGUID rguid)
 
 	ITfContext* pContext = nullptr;
 	if (SUCCEEDED(_GetFocusedContext(&pContext))) {
+		_DumpCompartments(L"OnChange", nullptr, pContext);
 		_ApplyAppInputMode(pContext);
 		if (pContext) pContext->Release();
 	}
@@ -816,19 +926,27 @@ void ChmTsfInterface::_SyncImeOpenCloseFromCompartment(ITfContext* pic)
 
 void ChmTsfInterface::_ApplyAppInputMode(ITfContext* pic)
 {
-	if (_GetCompartmentBool(GUID_COMPARTMENT_KEYBOARD_DISABLED, FALSE) ||
-		_GetCompartmentBool(GUID_COMPARTMENT_EMPTYCONTEXT, FALSE)) {
+	BOOL keyboardDisabled = _GetCompartmentBool(GUID_COMPARTMENT_KEYBOARD_DISABLED, FALSE);
+	BOOL emptyContext = _GetCompartmentBool(GUID_COMPARTMENT_EMPTYCONTEXT, FALSE);
+	OutputDebugStringW(Format(
+		L"[Hitomoji][investigate] _ApplyAppInputMode pic=%p keyboardDisabled=%d emptyContext=%d",
+		pic, keyboardDisabled, emptyContext).c_str());
+
+	if (keyboardDisabled || emptyContext) {
+		OutputDebugStringW(L"[Hitomoji][investigate] _ApplyAppInputMode -> OFF by compartment");
 		ChmLogger::Info(L"Keyboard disabled/empty context detected; Hitomoji IME forced OFF");
 		_SetImeOpenState(FALSE, nullptr, FALSE);
 		return;
 	}
 
 	if (_IsPasswordContext(pic)) {
+		OutputDebugStringW(L"[Hitomoji][investigate] _ApplyAppInputMode -> OFF by password scope");
 		ChmLogger::Info(L"Password input scope detected; Hitomoji IME forced OFF");
 		_SetImeOpenState(FALSE, nullptr, TRUE);
 		return;
 	}
 
+	OutputDebugStringW(L"[Hitomoji][investigate] _ApplyAppInputMode -> sync open/close compartment");
 	_SyncImeOpenCloseFromCompartment(pic);
 }
 
@@ -860,6 +978,31 @@ BOOL ChmTsfInterface::_GetCompartmentBool(REFGUID rguid, BOOL defaultValue)
 	return value;
 }
 
+void ChmTsfInterface::_DumpCompartments(LPCWSTR source, ITfDocumentMgr* pDocMgr, ITfContext* pic)
+{
+    OutputDebugStringW(Format(
+        L"[Hitomoji][investigate] Compartments begin source=%s threadMgr=%p docMgr=%p context=%p",
+        source ? source : L"(null)", _pThreadMgr, pDocMgr, pic).c_str());
+
+    DumpCompartmentsForObject(source, L"thread", _pThreadMgr);
+
+    ITfDocumentMgr* pFocusedDocMgr = nullptr;
+    if (!pDocMgr && _pThreadMgr) {
+        HRESULT hrFocus = _pThreadMgr->GetFocus(&pFocusedDocMgr);
+        OutputDebugStringW(Format(
+            L"[Hitomoji][investigate] Compartments %s/focused-doc GetFocus hr=0x%08X docMgr=%p",
+            source ? source : L"(null)", hrFocus, pFocusedDocMgr).c_str());
+        pDocMgr = pFocusedDocMgr;
+    }
+
+    DumpCompartmentsForObject(source, L"document", pDocMgr);
+    DumpCompartmentsForObject(source, L"context", pic);
+
+    if (pFocusedDocMgr) pFocusedDocMgr->Release();
+    OutputDebugStringW(Format(
+        L"[Hitomoji][investigate] Compartments end source=%s",
+        source ? source : L"(null)").c_str());
+}
 HRESULT ChmTsfInterface::_GetFocusedContext(ITfContext** ppContext)
 {
 	if (!ppContext) return E_INVALIDARG;
@@ -886,18 +1029,42 @@ HRESULT ChmTsfInterface::_GetTopContext(ITfDocumentMgr* pDocMgr, ITfContext** pp
 
 BOOL ChmTsfInterface::_IsPasswordContext(ITfContext* pic)
 {
-	if (!pic) return FALSE;
+	if (!pic) {
+		OutputDebugStringW(L"[Hitomoji][investigate] _IsPasswordContext pic=null -> FALSE");
+		return FALSE;
+	}
+
+	ITfProperty* pInputScopeProp = nullptr;
+	HRESULT hrProp = pic->GetProperty(GUID_PROP_INPUTSCOPE, &pInputScopeProp);
+	OutputDebugStringW(Format(
+		L"[Hitomoji][investigate] _IsPasswordContext GetProperty(GUID_PROP_INPUTSCOPE) hr=0x%08X prop=%p",
+		hrProp, pInputScopeProp).c_str());
+	if (pInputScopeProp) {
+		pInputScopeProp->Release();
+	}
 
 	ITfInputScope* pInputScope = nullptr;
-	if (FAILED(pic->QueryInterface(IID_ITfInputScope, (void**)&pInputScope)) || !pInputScope) {
+	HRESULT hrQI = pic->QueryInterface(IID_ITfInputScope, (void**)&pInputScope);
+	if (FAILED(hrQI) || !pInputScope) {
+		OutputDebugStringW(Format(
+			L"[Hitomoji][investigate] _IsPasswordContext QueryInterface(ITfInputScope) failed hr=0x%08X pic=%p",
+			hrQI, pic).c_str());
 		return FALSE;
 	}
 
 	InputScope* pScopes = nullptr;
 	UINT count = 0;
 	BOOL fPassword = FALSE;
-	if (SUCCEEDED(pInputScope->GetInputScopes(&pScopes, &count)) && pScopes) {
+	HRESULT hrScopes = pInputScope->GetInputScopes(&pScopes, &count);
+	OutputDebugStringW(Format(
+		L"[Hitomoji][investigate] _IsPasswordContext GetInputScopes hr=0x%08X count=%u scopes=%p",
+		hrScopes, count, pScopes).c_str());
+
+	if (SUCCEEDED(hrScopes) && pScopes) {
 		for (UINT i = 0; i < count; ++i) {
+			OutputDebugStringW(Format(
+				L"[Hitomoji][investigate] _IsPasswordContext scope[%u]=%d",
+				i, pScopes[i]).c_str());
 			if (pScopes[i] == IS_PASSWORD) {
 				fPassword = TRUE;
 				break;
@@ -906,6 +1073,7 @@ BOOL ChmTsfInterface::_IsPasswordContext(ITfContext* pic)
 		CoTaskMemFree(pScopes);
 	}
 	pInputScope->Release();
+	OutputDebugStringW(Format(L"[Hitomoji][investigate] _IsPasswordContext -> %d", fPassword).c_str());
 	return fPassword;
 }
 
@@ -976,3 +1144,4 @@ void ChmTsfInterface::OpenFolder()
 	);
 	return;
 }
+
