@@ -9,6 +9,15 @@
 #include "ChmL3Kanji.h"
 #include "Hitomoji.h"
 
+namespace {
+
+bool IsSokuonPendingChar(wchar_t ch)
+{
+	return ch == L'k' || ch == L's' || ch == L't' || ch == L'p';
+}
+
+} // namespace
+
 ChmEngine::ChmEngine()
 	: _isON(FALSE), _state(State::None), _converted(L""), _pending(L""),
 	  _l3LeadingSymbols(L""), _useUndoEditSession(FALSE), _undoDeleteLength(0), _hasErrorRequest(FALSE)
@@ -26,7 +35,6 @@ ChmEngine::~ChmEngine() {
 
 void ChmEngine::Activate() {
 	Debug(L"ChmEngine::Activate");
-	_initEnv();
 	InitConfig();
 	_initLayer2();
 	_initLayer3();
@@ -88,9 +96,6 @@ std::wstring ChmEngine::GetConfigFile() {
 	return _pConfig->GetConfigFile();
 }
 
-void ChmEngine::_initEnv() {
-	g_environment.Init();
-}
 
 void ChmEngine::_initLayer2() {
 	// TODO: いまはnullかんすう
@@ -122,6 +127,9 @@ BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
 	// 入力中の UnFinish はアプリ側Undoに流さず、IME側で握りつぶす
 	if (HasComposition() && ev.IsUnFinishKey()) return TRUE;
 
+	// 選択中は未定義キーも候補選択の異常入力としてIMEが食う
+	if (_state == State::Selecting && ev.GetType() == ChmFuncType::None) return TRUE;
+
 	// Compositonが存在する状態の特殊キーはIMEが食う
 	if (HasComposition() && ev.GetType() != ChmFuncType::None) return TRUE;
 
@@ -151,6 +159,8 @@ LONG ChmEngine::CountUndoDeleteLength(const std::wstring& src) {
 }
 
 BOOL ChmEngine::IsLayer3LeadingSymbol(wchar_t ch) {
+	if (ch == L':' || ch == L'*') return FALSE;
+
 	if (ch >= L'0' && ch <= L'9') return FALSE;
 	if (ch >= L'A' && ch <= L'Z') return FALSE;
 	if (ch >= L'a' && ch <= L'z') return FALSE;
@@ -158,6 +168,7 @@ BOOL ChmEngine::IsLayer3LeadingSymbol(wchar_t ch) {
 	if (ch >= 0x3400 && ch <= 0x9FFF) return FALSE; // CJK Unified Ideographs
 
 	if (ch >= 0x21 && ch <= 0x7E) return TRUE;
+	if (ch >= 0x2190 && ch <= 0x21FF) return TRUE; // Arrows
 	if (ch >= 0x3000 && ch <= 0x303F) return TRUE; // Japanese punctuation
 	if (ch >= 0xFF01 && ch <= 0xFF65) return TRUE; // Fullwidth ASCII / halfwidth kana punctuation
 
@@ -200,6 +211,9 @@ BOOL ChmEngine::ConsumeErrorRequest() {
 BOOL ChmEngine::UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition){
 	ChmFuncType _type = keyEvent.GetType();
 
+	if (_state == State::Selecting && !IsLayer3Function(_type)) {
+		return UpdateLayer3(keyEvent, pEndComposition, nullptr);
+	}
 	if (IsLayer2Function(_type)) {
 		return UpdateLayer2(keyEvent, pEndComposition);
 	}
@@ -249,11 +263,16 @@ BOOL ChmEngine::UpdateLayer2(const ChmKeyEvent& keyEvent, bool& pEndComposition)
 
 	switch (_type) {
 		case ChmFuncType::CharInputSpace: // 1文字目のスペース入力
-			// TODO: configで全角空白か半角かを選べるようにする
-			_converted = L" ";
+		{
+			BOOL useWideSpace = _pConfig->GetBool(L"ui", L"wide-space", TRUE);
+			if (keyEvent.IsShift()) {
+				useWideSpace = !useWideSpace;
+			}
+			_converted = useWideSpace ? L"\x3000" : L" ";
 			_pending = L"";
 			_state = State::None;
 			break;
+		}
 		case ChmFuncType::CharInput:
 			_state = State::Inputing;
 			_pRawInputStore->push(keyEvent.GetChar());
@@ -304,6 +323,11 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 	_useUndoEditSession = FALSE;
 
 	if (_type == ChmFuncType::None) {
+		if (_state == State::Selecting) {
+			SetError();
+			pEndComposition = FALSE;
+			return TRUE;
+		}
 		pEndComposition = FALSE;
 		return FALSE;
 	}
@@ -315,7 +339,7 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 			_l3LeadingSymbols.clear();
 			_pL3KanjiSelect = new ChmL3KanjiSelect(_pL3KanjiDict, static_cast<byte>(_pL3Helper->GetPageSize()));
 			// 促音となりうるパターン(k,s,t,p)がpendingにある場合は「っ」を補う
-			if (_pending == L"k" || _pending == L"s" || _pending == L"t" || _pending == L"p") {
+			if (_pending.length() == 1 && IsSokuonPendingChar(_pending[0])) {
 				_converted += L"っ" ;
 				_pending = L"";
 			}
@@ -354,7 +378,29 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 			break;
 		case ChmFuncType::SelectPrevPage:
 			if (_pL3KanjiSelect) {
-				_pL3KanjiSelect->PrevPage();
+				const std::wstring& rawInput = _pRawInputStore->get();
+				if (_state == State::Selecting
+					&& !_converted.empty()
+					&& _converted.back() == L'っ'
+					&& !rawInput.empty()
+					&& IsSokuonPendingChar(rawInput.back())) {
+					_pRawInputStore->pop(1);
+					if (_pRawInputStore->get().empty()) {
+						_converted = L"";
+						_pending = L"";
+						_ClearUnFinish();
+						_state = State::None;
+					} else {
+						ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+							_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
+						_state = State::Inputing;
+					}
+					delete _pL3KanjiSelect;
+					_pL3KanjiSelect = nullptr;
+					_l3LeadingSymbols.clear();
+				} else {
+					_pL3KanjiSelect->PrevPage();
+				}
 			} else {
 				SetError();
 			}
@@ -393,6 +439,10 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 			}
 			break ;
 		default:
+			if (_state == State::Selecting) {
+				SetError();
+				break;
+			}
 			return FALSE;
 	}
 

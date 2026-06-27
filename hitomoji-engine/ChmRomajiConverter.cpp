@@ -1,4 +1,5 @@
 ﻿#include "ChmRomajiConverter.h"
+#include "ChmConfigUtils.h"
 #include <cwctype>
 
 size_t ChmRomajiConverter::_lastRawUnitLength = 0;
@@ -189,10 +190,10 @@ BOOL ChmKeytableParser::ParseLine(const std::wstring& line,
                                   ChmConfig::ParseResult& errorMsg)
 {
     // 前後Trim
-    std::wstring trimmed = Trim(line);
+    std::wstring trimmed = ChmStringUtil::Trim(line);
 
-    left  = Trim(left);
-    right = Trim(right);
+    left  = ChmStringUtil::Trim(left);
+    right = ChmStringUtil::Trim(right);
 
 	if (left.length() > MAX_KEY_LENGTH) {
 		ChmConfig::SetError(errorMsg, L"left side too large");
@@ -214,15 +215,3 @@ BOOL ChmKeytableParser::ParseLine(const std::wstring& line,
 
     return TRUE;
 }
-
-std::wstring ChmKeytableParser::Trim(const std::wstring& s)
-{
-    size_t start = 0;
-    while (start < s.size() && iswspace(s[start])) start++;
-
-    size_t end = s.size();
-    while (end > start && iswspace(s[end - 1])) end--;
-
-    return s.substr(start, end - start);
-}
-

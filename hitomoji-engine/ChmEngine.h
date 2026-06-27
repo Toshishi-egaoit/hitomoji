@@ -69,7 +69,6 @@ public:
 
 private:
 	// Activate/Deactivateでの初期処理
-	void _initEnv();
 	void _initLayer3();
 	void _initLayer2();
 

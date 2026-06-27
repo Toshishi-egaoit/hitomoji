@@ -31,6 +31,7 @@ BOOL IsDbgViewProcess()
 			fileName = p + 1;
 		}
 	}
+	ChmLogger::Info(Format(L"process name: %s", fileName));
 
 	return lstrcmpiW(fileName, L"Dbgview.exe") == 0 ||
 		lstrcmpiW(fileName, L"Dbgview64.exe") == 0 ||
@@ -112,6 +113,7 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 		return S_OK;
 	}
 
+	g_environment.Init();
 	ChmLogger::Info(L"Activate() : Hitomoji " HM_VERSION L"(" __DATE__ L")" );
 	_pThreadMgr = ptm;
 	_pThreadMgr->AddRef();

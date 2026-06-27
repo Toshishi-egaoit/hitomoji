@@ -1,10 +1,110 @@
-﻿#include "gtest/gtest.h"
+#include "gtest/gtest.h"
 #include "ChmConfig.h"
 #include "ChmRomajiConverter.h"
+#include "TestConfigHelper.h"
 #include <algorithm>
-#include <fstream>
 #include <string>
-#include <vector>
+
+namespace {
+
+static std::wstring ConvertWithPendingForConfigTest(const std::wstring& input,
+                                                    bool bs = true)
+{
+    std::wstring converted;
+    std::wstring pending;
+
+    ChmRomajiConverter::convert(input, converted, pending, bs);
+    return converted + L":" + pending;
+}
+
+
+static std::wstring ValidConfigText()
+{
+    return
+        L"# comment1\n"
+        L"\n"
+        L"[bOOLs]\n"
+        L"bool-true-1=true\n"
+        L"BOOL_TRUE_2 =True\n"
+        L"bool-true-3= TRUE\n"
+        L"Bool-true-4 = yes\n"
+        L"  boOL-true-5=on\n"
+        L"\tbool-true-6=1\n"
+        L"bool_FALSE-1=false\n"
+        L"bool-false-2=no\n"
+        L"bool_false_3=off\n"
+        L"bool-false_4=0\n"
+        L"\n"
+        L"[ numbers]\n"
+        L"long-1=123\n"
+        L"LOng_2 = -789\n"
+        L"loNG-3=\t2100000000\n"
+        L"\n"
+        L"[strings ]\n"
+        L"string-1=Hitomoji\n"
+        L" string_2 = Hitomoji2\n"
+        L"VALID-KEY-9=C:\\temp\\FILE.txt\n"
+        L"\n"
+        L"; comment2\n"
+        L"[ canonize-1 ]\n"
+        L"bool-true-1=true\n"
+        L"bool_false_1=false\n"
+        L"\n"
+        L"; comment2\n";
+}
+
+static std::wstring FunctionKeyConfigText()
+{
+    return
+        L"; FunctionKey test INI\n"
+        L"\n"
+        L"[Function-key]\n"
+        L"CTRL+Z=cancel-finish\n"
+        L"CTRL+Y = CANCEL\n"
+        L"return = FINISH\n"
+        L"SHIFT+ALT+F4=FINISH\n"
+        L"ALT+CONTROL+ENTER=finish-katakana\n"
+        L"CONTROL+ALT+ENTER=finish-katakana\n"
+        L"CTRL+1 = finish-raw\n"
+        L"ALT+A = finish-raw-wide\n"
+        L"SHIFT+CTRL+0=finish-raw\n";
+}
+
+static std::wstring InvalidConfigText()
+{
+    return
+        L"# invalid test file\n"
+        L"\n"
+        L"[valid_section]\n"
+        L"key1=123\n"
+        L"\n"
+        L"[invalid section\n"
+        L"missing_bracket=true\n"
+        L"\n"
+        L"no_section_key=456\n"
+        L"\n"
+        L"[valid_section]\n"
+        L"=missing_key\n"
+        L"\n"
+        L"bad_bool=maybe\n"
+        L"\n"
+        L"bad_long=12abc\n"
+        L"\n"
+        L"[another]\n"
+        L"valid=ok\n";
+}
+
+static void LoadTempConfig(ChmConfig& config,
+                           TempConfigDir& dir,
+                           const std::wstring& fileName,
+                           const std::wstring& content)
+{
+    dir.WriteFile(fileName, content);
+    config.SetBasePath(dir.BaseDir());
+    EXPECT_TRUE(config.LoadFile(fileName));
+}
+
+} // namespace
 
 namespace {
 
@@ -339,6 +439,25 @@ TEST(ConfigTest, KeyTableLoadedFromConfigAffectsRomajiConverter)
     EXPECT_EQ(L"ゐ:", ConvertWithPendingForConfigTest(L"wwi"));
     EXPECT_EQ(L"→:", ConvertWithPendingForConfigTest(L"->"));
     EXPECT_EQ(L"《:", ConvertWithPendingForConfigTest(L"<<"));
+}
+
+TEST(ConfigTest, IncludedKeyTableOverridesEarlierDefinition)
+{
+    TempConfigDir dir;
+    dir.WriteFile(L"sub.ini",
+        L"/k=ゝ\n");
+    dir.WriteFile(L"main.ini",
+        L"[key-table]\n"
+        L"/k=々\n"
+        L"@include sub.ini\n");
+
+    ChmConfig config;
+    config.SetBasePath(dir.BaseDir());
+
+    EXPECT_TRUE(config.LoadFile(L"main.ini"));
+    EXPECT_FALSE(config.HasErrors());
+
+    EXPECT_EQ(L"ゝ:", ConvertWithPendingForConfigTest(L"/k"));
 }
 
 TEST(ConfigTest, LoadFileClearsPreviousKeyTableOverrides)

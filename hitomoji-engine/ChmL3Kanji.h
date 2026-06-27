@@ -5,6 +5,8 @@
 #include <string>
 #include <algorithm>
 #include <fstream>
+#include <cstring>
+#include <unordered_set>
 #include "ChmEnvironment.h"
 #include "ChmConfig.h"
 #include "ChmCandidatePage.h"
@@ -85,17 +87,28 @@ public:
 	// 変換開始
 	BOOL Start(const std::wstring& DictYomi)
 	{
-		char16_t key[6];
-		_makeYomiKey(DictYomi, key);
-		
-		const ChmL3KanjiDict::YomiEntry* e = _findYomi(key);
-		if (!e) {
+		std::vector<std::wstring> yomis;
+		if (!_parseSearchQuery(DictYomi, yomis)) {
 			return FALSE;
 		}
-		Debug(Format(L"   > found yomi: %s, count: %d", DictYomi.c_str(), e->count));
+		if (yomis.empty()) {
+			return FALSE;
+		}
 
-		_list = &_pDict->kanjiList[e->offset];
-		_count = e->count;
+		const ChmL3KanjiDict::YomiEntry* first = _findYomi(yomis[0]);
+		if (!first) {
+			return FALSE;
+		}
+		Debug(Format(L"   > found yomi: %s, count: %d", yomis[0].c_str(), first->count));
+
+		_ownedList.clear();
+		if (yomis.size() == 1) {
+			_list = &_pDict->kanjiList[first->offset];
+			_count = first->count;
+		}
+		else if (!_buildAndList(yomis, *first)) {
+			return FALSE;
+		}
 		_page = 0;
 		return TRUE;
 	}
@@ -105,6 +118,7 @@ public:
 		_list = nullptr;
 		_count = 0;
 		_page = 0;
+		_ownedList.clear();
 	}
 
 	void NextPage()
@@ -117,9 +131,7 @@ public:
 	void PrevPage()
 	{
 		if (!_list || _count == 0 || _pageSize == 0) return;
-		byte maxPage = (_count + _pageSize - 1) / _pageSize;
-		if (_page == 0 ) _page = maxPage - 1;
-		else if (_page > 0) _page--;
+		if (_page > 0) _page--;
 	}
 
 	uint32_t SelectByIndex(byte index)
@@ -151,6 +163,64 @@ private:
 		Debug(Format(L"   Search:>>%s<<", out));
 	}
 
+	BOOL _isYomiChar(wchar_t ch) const
+	{
+		return (ch >= 0x3040 && ch <= 0x309F) || (ch >= 0x30A0 && ch <= 0x30FF);
+	}
+
+	BOOL _isSearchOperator(wchar_t ch) const
+	{
+		return ch == L':' || ch == L'*';
+	}
+
+	BOOL _appendYomi(const std::wstring& query, size_t begin, size_t end, std::vector<std::wstring>& yomis) const
+	{
+		if (begin >= end) return FALSE;
+		for (size_t i = begin; i < end; ++i) {
+			if (!_isYomiChar(query[i])) return FALSE;
+		}
+		yomis.push_back(query.substr(begin, end - begin));
+		return TRUE;
+	}
+
+	BOOL _parseSearchQuery(const std::wstring& query, std::vector<std::wstring>& yomis) const
+	{
+		yomis.clear();
+		if (query.empty()) return FALSE;
+
+		size_t pos = 0;
+		if (!_isSearchOperator(query[pos])) {
+			size_t begin = pos;
+			while (pos < query.length() && !_isSearchOperator(query[pos])) {
+				++pos;
+			}
+			if (!_appendYomi(query, begin, pos, yomis)) return FALSE;
+		}
+
+		while (pos < query.length()) {
+			wchar_t op = query[pos++];
+			if (op == L':') {
+				size_t begin = pos;
+				while (pos < query.length() && !_isSearchOperator(query[pos])) {
+					++pos;
+				}
+				if (!_appendYomi(query, begin, pos, yomis)) return FALSE;
+			}
+			else {
+				return FALSE;
+			}
+		}
+
+		return !yomis.empty();
+	}
+
+	const ChmL3KanjiDict::YomiEntry* _findYomi(const std::wstring& yomi)
+	{
+		char16_t key[6];
+		_makeYomiKey(yomi, key);
+		return _findYomi(key);
+	}
+
 	const ChmL3KanjiDict::YomiEntry* _findYomi(const char16_t* key)
 	{
 		int left = 0;
@@ -170,9 +240,55 @@ private:
 		return nullptr;
 	}
 
+	BOOL _buildAndList(const std::vector<std::wstring>& yomis, const ChmL3KanjiDict::YomiEntry& first)
+	{
+		std::vector<std::unordered_set<uint32_t>> filters;
+		filters.reserve(yomis.size() - 1);
+
+		for (size_t i = 1; i < yomis.size(); ++i) {
+			const ChmL3KanjiDict::YomiEntry* e = _findYomi(yomis[i]);
+			if (!e) return FALSE;
+			Debug(Format(L"   > found yomi: %s, count: %d", yomis[i].c_str(), e->count));
+
+			std::unordered_set<uint32_t> slots;
+			for (uint16_t j = 0; j < e->count; ++j) {
+				uint32_t slot = _pDict->kanjiList[e->offset + j];
+				if (slot != 0) slots.insert(slot);
+			}
+			filters.push_back(std::move(slots));
+		}
+
+		_ownedList.assign(first.count, 0);
+		bool matchedAny = false;
+
+		for (uint16_t i = 0; i < first.count; ++i) {
+			uint32_t slot = _pDict->kanjiList[first.offset + i];
+			if (slot == 0) continue;
+
+			bool foundInAll = true;
+			for (const auto& filter : filters) {
+				if (filter.find(slot) == filter.end()) {
+					foundInAll = false;
+					break;
+				}
+			}
+			if (foundInAll) {
+				_ownedList[i] = slot;
+				matchedAny = true;
+			}
+		}
+
+		if (!matchedAny) return FALSE;
+
+		_list = _ownedList.data();
+		_count = first.count;
+		return TRUE;
+	}
+
 private:
 	ChmL3KanjiDict* _pDict;
 	const uint32_t* _list;
+	std::vector<uint32_t> _ownedList;
 	uint16_t _count;
 	byte _page;
 	byte _pageSize;
@@ -195,7 +311,7 @@ public:
 	{
 		std::wstring map = pConfig->GetString(L"UI", L"select_keymap");
 		if (map.empty()) {
-			map = L"dk fj sl gh ei ru a; wo qp ty c, vm x. z/ bn 38 47 29 10 56";
+			map = L"dk fj sl gh ei ru a; wo qp ty c, vm x. z/ bn 38 47";
 		}
 		BuildTable(ToNarrow(map));
 	}

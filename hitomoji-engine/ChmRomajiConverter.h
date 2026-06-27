@@ -55,7 +55,5 @@ public:
 		_overrideTable.clear();
 	}
 
-private:
-    static std::wstring Trim(const std::wstring& s);
 };
 

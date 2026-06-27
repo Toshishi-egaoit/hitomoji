@@ -6,6 +6,7 @@
 #include "utils.h"
 #include "hitomoji.h"
 #include "ChmConfig.h"
+#include "ChmFunctionKeyMap.h"
 #include "ChmEngine.h"
 
 class ChmRawInputStore;
@@ -29,6 +30,7 @@ public:
         bool   needShift;
         unsigned char   ch;               // CharInput 用
     };
+
 
     // --- utility ---
 	const std::wstring toString() const { 
@@ -55,6 +57,7 @@ public:
                                  const std::wstring& value,
                                  ChmConfig::ParseResult&  errorMsg);
     static std::wstring Dump();
+    static void SetFunctionKeyMap(const ChmFunctionKeyMap& functionKeyMap);
 
     // --- KeyState hook (for testing) ---
 	static void SetKeyStateProvider(KeyStateProvider pFunc);
@@ -82,9 +85,6 @@ public:
 	}
 
 private:
-    // --- KeyTable helper ---
-	static bool _ResolveActionName(const std::wstring& name, ChmFuncType& outType);
-	static bool _ResolveKeyName(const std::wstring& name, UINT& outVk);
     // --- Win32::GetKeyState hook ---
 	static KeyStateProvider pFunc_keyStateProvider;
 
