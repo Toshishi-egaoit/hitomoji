@@ -751,14 +751,25 @@ STDMETHODIMP ChmTsfInterface::OnEndEdit(
 BOOL ChmTsfInterface::ToggleIME() 
 {
 	if (!_pEngine) return FALSE;
-	if (_GetCompartmentBool(GUID_COMPARTMENT_KEYBOARD_DISABLED, FALSE) ||
-		_GetCompartmentBool(GUID_COMPARTMENT_EMPTYCONTEXT, FALSE)) {
+
+	ITfContext* pContext = nullptr;
+	if (FAILED(_GetFocusedContext(&pContext))) {
+		pContext = nullptr;
+	}
+
+	BOOL keyboardDisabled =
+		_GetCompartmentBool(pContext, GUID_COMPARTMENT_KEYBOARD_DISABLED, FALSE) ||
+		_GetCompartmentBool(GUID_COMPARTMENT_KEYBOARD_DISABLED, FALSE);
+	BOOL emptyContext =
+		_GetCompartmentBool(pContext, GUID_COMPARTMENT_EMPTYCONTEXT, FALSE) ||
+		_GetCompartmentBool(GUID_COMPARTMENT_EMPTYCONTEXT, FALSE);
+	if (keyboardDisabled || emptyContext) {
+		if (pContext) pContext->Release();
 		_SetImeOpenState(FALSE, nullptr, FALSE);
 		return FALSE;
 	}
 
-	ITfContext* pContext = nullptr;
-	if (SUCCEEDED(_GetFocusedContext(&pContext)) && pContext) {
+	if (pContext) {
 		if (_IsPasswordContext(pContext)) {
 			pContext->Release();
 			_SetImeOpenState(FALSE, nullptr, TRUE);
@@ -769,7 +780,6 @@ BOOL ChmTsfInterface::ToggleIME()
 	_SetImeOpenState(!_pEngine->IsON(), nullptr, TRUE);
 	return TRUE;
 }
-
 void ChmTsfInterface::_SetImeOpenState(BOOL fOpen, ITfContext* pic, BOOL fNotifyOs)
 {
 	if (!_pEngine) return;
@@ -799,7 +809,6 @@ void ChmTsfInterface::_SetImeOpenState(BOOL fOpen, ITfContext* pic, BOOL fNotify
 		_pLangBarItem->SetImeState(fOpen);
 	}
 }
-
 // IME ON/OFF を OS に通知する
 void ChmTsfInterface::_SetImeOpenClose(BOOL fOpen)
 {
@@ -926,11 +935,21 @@ void ChmTsfInterface::_SyncImeOpenCloseFromCompartment(ITfContext* pic)
 
 void ChmTsfInterface::_ApplyAppInputMode(ITfContext* pic)
 {
-	BOOL keyboardDisabled = _GetCompartmentBool(GUID_COMPARTMENT_KEYBOARD_DISABLED, FALSE);
-	BOOL emptyContext = _GetCompartmentBool(GUID_COMPARTMENT_EMPTYCONTEXT, FALSE);
+	BOOL contextKeyboardDisabled = _GetCompartmentBool(pic, GUID_COMPARTMENT_KEYBOARD_DISABLED, FALSE);
+	BOOL contextEmpty = _GetCompartmentBool(pic, GUID_COMPARTMENT_EMPTYCONTEXT, FALSE);
+	BOOL threadKeyboardDisabled = _GetCompartmentBool(GUID_COMPARTMENT_KEYBOARD_DISABLED, FALSE);
+	BOOL threadEmpty = _GetCompartmentBool(GUID_COMPARTMENT_EMPTYCONTEXT, FALSE);
+	BOOL keyboardDisabled = contextKeyboardDisabled || threadKeyboardDisabled;
+	BOOL emptyContext = contextEmpty || threadEmpty;
 	OutputDebugStringW(Format(
-		L"[Hitomoji][investigate] _ApplyAppInputMode pic=%p keyboardDisabled=%d emptyContext=%d",
-		pic, keyboardDisabled, emptyContext).c_str());
+		L"[Hitomoji][investigate] _ApplyAppInputMode pic=%p keyboardDisabled=%d emptyContext=%d contextDisabled=%d contextEmpty=%d threadDisabled=%d threadEmpty=%d",
+		pic,
+		keyboardDisabled,
+		emptyContext,
+		contextKeyboardDisabled,
+		contextEmpty,
+		threadKeyboardDisabled,
+		threadEmpty).c_str());
 
 	if (keyboardDisabled || emptyContext) {
 		OutputDebugStringW(L"[Hitomoji][investigate] _ApplyAppInputMode -> OFF by compartment");
@@ -949,13 +968,17 @@ void ChmTsfInterface::_ApplyAppInputMode(ITfContext* pic)
 	OutputDebugStringW(L"[Hitomoji][investigate] _ApplyAppInputMode -> sync open/close compartment");
 	_SyncImeOpenCloseFromCompartment(pic);
 }
-
 BOOL ChmTsfInterface::_GetCompartmentBool(REFGUID rguid, BOOL defaultValue)
 {
-	if (!_pThreadMgr) return defaultValue;
+	return _GetCompartmentBool(_pThreadMgr, rguid, defaultValue);
+}
+
+BOOL ChmTsfInterface::_GetCompartmentBool(IUnknown* pObject, REFGUID rguid, BOOL defaultValue)
+{
+	if (!pObject) return defaultValue;
 
 	ITfCompartmentMgr* pCompMgr = nullptr;
-	if (FAILED(_pThreadMgr->QueryInterface(IID_ITfCompartmentMgr, (void**)&pCompMgr))) {
+	if (FAILED(pObject->QueryInterface(IID_ITfCompartmentMgr, (void**)&pCompMgr))) {
 		return defaultValue;
 	}
 
@@ -977,7 +1000,6 @@ BOOL ChmTsfInterface::_GetCompartmentBool(REFGUID rguid, BOOL defaultValue)
 	pCompMgr->Release();
 	return value;
 }
-
 void ChmTsfInterface::_DumpCompartments(LPCWSTR source, ITfDocumentMgr* pDocMgr, ITfContext* pic)
 {
     OutputDebugStringW(Format(
@@ -1144,4 +1166,6 @@ void ChmTsfInterface::OpenFolder()
 	);
 	return;
 }
+
+
 
