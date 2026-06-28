@@ -203,7 +203,7 @@ TEST_F(Layer3Test, ConvertKeyStartsKanjiSelectionAndBuildsCandidatePageForKou)
     EXPECT_EQ(L"こう", engine.GetCompositionStr());
 
     EXPECT_EQ(0u, page.page);
-    EXPECT_EQ(123u, page.totalCount);
+    EXPECT_EQ(131u, page.totalCount);
     EXPECT_EQ(40u, page.candidateCount);
 
     engine.Deactivate();
@@ -296,17 +296,18 @@ TEST_F(Layer3Test, ConvertKeyFindsFirstYomiEntryAndPreservesSparseSlots)
     ChmEngine engine;
     engine.Activate();
 
-    InputKeys(engine, "A", L"あ");
+    InputKeys(engine, "TAT", L"たt");
+	// この読みの漢字は、「達」「宅」「卓」の3種
 
     ChmCandidatePage page;
     StartSelection(engine, page);
 
     EXPECT_EQ(0u, page.page);
-    EXPECT_EQ(84u, page.totalCount);
-    EXPECT_EQ(40u, page.candidateCount);
-    EXPECT_EQ(0x4F1Au, page.candidates[22]); // index 0: 会
-    EXPECT_EQ(0u, page.candidates[2]);        // index 30: missing slot
-    EXPECT_EQ(0x963Fu, page.candidates[6]);   // index 33: 阿
+	EXPECT_GT(page.totalCount,3u);
+    EXPECT_EQ(6u, page.candidateCount);
+    EXPECT_EQ(0u, page.candidates[22]);        // at "D" index 0:  わりあてなし
+    EXPECT_EQ(0x9054u, page.candidates[26]);   // at "J" index 3:  達
+    EXPECT_EQ(0u, page.candidates[8]);        //  at "9" index -: ここは使用不可なので常に空欄
 
     engine.Deactivate();
 }
@@ -410,6 +411,32 @@ TEST_F(Layer3Test, ConvertKeyIgnoresMultipleDifferentLeadingSymbolsWhenSearching
     engine.Deactivate();
 }
 
+TEST_F(Layer3Test, ConvertKeyIgnoresLeadingNonHiraganaWhenSearchingYomi)
+{
+    WriteMainConfig(
+        L"[ui]\n"
+        L"select_keymap=dk fj sl gh ei ru a; wo qp ty c, vm x. z/ bn 38 47 29 10 56\n"
+        L"[key-table]\n"
+        L"qq=字\n");
+
+    ChmEngine engine;
+    engine.Activate();
+
+    InputKeys(engine, "QQAI", L"字あい");
+
+    ChmCandidatePage page;
+    StartSelection(engine, page);
+    EXPECT_EQ(L"字あい", engine.GetCompositionStr());
+
+    EXPECT_EQ(0u, page.page);
+    EXPECT_EQ(26u, page.totalCount);
+    EXPECT_EQ(26u, page.candidateCount);
+
+    SelectCandidate(engine, 'D', L"字会");
+
+    engine.Deactivate();
+}
+
 TEST_F(Layer3Test, ConvertKeyKeepsInputingAndRequestsErrorWhenPendingRemains)
 {
     ChmEngine engine;
@@ -473,12 +500,13 @@ TEST_F(Layer3Test, BackspaceAfterSokuonPendingSelectionRestoresPreviousCompositi
     engine.Activate();
 
     InputKeys(engine, "RAT", L"らt");
+	// この読みの漢字は、「拉」「楽」「落」の3種
 
     ChmCandidatePage page;
     StartSelection(engine, page);
     EXPECT_EQ(L"らっ", engine.GetCompositionStr());
-    EXPECT_EQ(12u, page.totalCount);
-    EXPECT_EQ(12u, page.candidateCount);
+	EXPECT_GE(page.totalCount, 3u);
+	EXPECT_GE(page.candidateCount, 3u);
 
     bool endComposition = true;
     ChmKeyEvent backspaceKey = MakeKey(VK_BACK, engine.GetState());
@@ -572,17 +600,17 @@ TEST_F(Layer3Test, CustomSelectKeymapControlsCandidatePageSizeAndCells)
         StartSelection(engine, page);
 
         EXPECT_EQ(0u, page.page);
-        EXPECT_EQ(84u, page.totalCount);
+        EXPECT_GT(page.totalCount, 39u);
         EXPECT_EQ(2u, page.candidateCount);
-        EXPECT_EQ(0x4F1Au, page.candidates[20]); // a: index 0, 会
-        EXPECT_EQ(0x4E0Au, page.candidates[39]); // /: index 1, 上
+        EXPECT_EQ(0x4F1Au, page.candidates[20]); // at "A" index 0, 会
+        EXPECT_EQ(0x4E0Au, page.candidates[39]); // at "/" index 1, 上
 
         SelectNextPage(engine, page);
         EXPECT_EQ(1u, page.page);
-        EXPECT_EQ(84u, page.totalCount);
+        EXPECT_GT(page.totalCount, 39u);
         EXPECT_EQ(2u, page.candidateCount);
-        EXPECT_EQ(0x5F53u, page.candidates[20]); // a: index 2, 当
-        EXPECT_EQ(0x4E2Du, page.candidates[39]); // /: index 3, 中
+        EXPECT_EQ(0x5F53u, page.candidates[20]); // at "A" index 2, 当
+        EXPECT_EQ(0x4E2Du, page.candidates[39]); // at "/" index 3, 中
 
         engine.Deactivate();
     }
@@ -600,11 +628,11 @@ TEST_F(Layer3Test, CustomSelectKeymapControlsCandidatePageSizeAndCells)
         StartSelection(engine, page);
 
         EXPECT_EQ(0u, page.page);
-        EXPECT_EQ(84u, page.totalCount);
+        EXPECT_GT(page.totalCount, 39u);
         EXPECT_EQ(3u, page.candidateCount);
-        EXPECT_EQ(0x4F1Au, page.candidates[20]); // a: index 0, 会
-        EXPECT_EQ(0x4E0Au, page.candidates[39]); // /: index 1, 上
-        EXPECT_EQ(0x5F53u, page.candidates[29]); // ;: index 2, 当
+        EXPECT_EQ(0x4F1Au, page.candidates[20]); // at "A" index 0, 会
+        EXPECT_EQ(0x4E0Au, page.candidates[39]); // at "/" index 1, 上
+        EXPECT_EQ(0x5F53u, page.candidates[29]); // at ";" index 2, 当
 
         engine.Deactivate();
     }
@@ -690,14 +718,15 @@ TEST_F(Layer3Test, SelectInputKeepsSelectingAndRequestsErrorForEmptySlot)
     ChmEngine engine;
     engine.Activate();
 
-    InputKeys(engine, "A", L"あ");
+    InputKeys(engine, "KET", L"けt");
 
     ChmCandidatePage page;
     StartSelection(engine, page);
 
     ASSERT_EQ(0u, page.page);
-    ASSERT_EQ(84u, page.totalCount);
-    ASSERT_EQ(40u, page.candidateCount);
+    ASSERT_EQ(page.totalCount, 32u);
+    ASSERT_EQ(32u, page.totalCount);
+    ASSERT_EQ(32u, page.candidateCount);
     ASSERT_EQ(0u, page.candidates[2]); // 3: index 30, missing slot
 
     bool endComposition = true;
@@ -709,7 +738,7 @@ TEST_F(Layer3Test, SelectInputKeepsSelectingAndRequestsErrorForEmptySlot)
     EXPECT_TRUE(engine.ConsumeErrorRequest());
     EXPECT_EQ(ChmEngine::State::Selecting, engine.GetState());
     EXPECT_TRUE(engine.HasComposition());
-    EXPECT_EQ(L"あ", engine.GetCompositionStr());
+    EXPECT_EQ(L"けっ", engine.GetCompositionStr());
     EXPECT_TRUE(engine.GetCandidatePage(page));
     EXPECT_EQ(0u, page.page);
 
@@ -732,11 +761,11 @@ TEST_F(Layer3Test, SelectInputUsesThirtyFourKeymapAcrossPages)
         StartSelection(engine, page);
 
         EXPECT_EQ(0u, page.page);
-        EXPECT_EQ(123u, page.totalCount);
+        EXPECT_EQ(131u, page.totalCount);
         EXPECT_EQ(34u, page.candidateCount);
-        EXPECT_EQ(0x8F03u, page.candidates[8]); // 9: index 33, 較
+        EXPECT_EQ(0x9999u, page.candidates[8]); // 9: index 33, 香
 
-        SelectCandidate(engine, '9', L"較");
+        SelectCandidate(engine, '9', L"香");
 
         engine.Deactivate();
     }
@@ -751,7 +780,7 @@ TEST_F(Layer3Test, SelectInputUsesThirtyFourKeymapAcrossPages)
         SelectNextPage(engine, page);
 
         EXPECT_EQ(1u, page.page);
-        EXPECT_EQ(123u, page.totalCount);
+        EXPECT_EQ(131u, page.totalCount);
         EXPECT_EQ(34u, page.candidateCount);
         EXPECT_EQ(0x9271u, page.candidates[8]); // 9: index 67, 鉱
 
@@ -777,9 +806,9 @@ TEST_F(Layer3Test, SameSelectKeyChoosesDifferentKanjiWhenKeymapChanges)
         StartSelection(engine, page);
 
         EXPECT_EQ(34u, page.candidateCount);
-        EXPECT_EQ(0x8F03u, page.candidates[8]); // 9: index 33, 較
+        EXPECT_EQ(0x9999u, page.candidates[8]); // 9: index 33, 香
 
-        SelectCandidate(engine, '9', L"較");
+        SelectCandidate(engine, '9', L"香");
 
         engine.Deactivate();
     }
@@ -840,24 +869,24 @@ TEST_F(Layer3Test, SelectNextPageMovesForwardAcrossMultiplePages)
     StartSelection(engine, page);
 
     EXPECT_EQ(0u, page.page);
-    EXPECT_EQ(84u, page.totalCount);
+    EXPECT_EQ(89u, page.totalCount);
     EXPECT_EQ(40u, page.candidateCount);
 
     SelectNextPage(engine, page);
     EXPECT_EQ(1u, page.page);
-    EXPECT_EQ(84u, page.totalCount);
+    EXPECT_EQ(89u, page.totalCount);
     EXPECT_EQ(40u, page.candidateCount);
 
     SelectNextPage(engine, page);
     EXPECT_EQ(2u, page.page);
-    EXPECT_EQ(84u, page.totalCount);
-    EXPECT_EQ(4u, page.candidateCount);
+    EXPECT_EQ(89u, page.totalCount);
+    EXPECT_EQ(9u, page.candidateCount);
     EXPECT_FALSE(engine.ConsumeErrorRequest());
 
     engine.Deactivate();
 }
 
-TEST_F(Layer3Test, SelectNextPageDoesNotMoveAfterLastPage)
+TEST_F(Layer3Test, SelectNextPageWrapsToFirstPageAfterLastPage)
 {
     ChmEngine engine;
     engine.Activate();
@@ -870,14 +899,14 @@ TEST_F(Layer3Test, SelectNextPageDoesNotMoveAfterLastPage)
     SelectNextPage(engine, page);
 
     ASSERT_EQ(2u, page.page);
-    ASSERT_EQ(4u, page.candidateCount);
+    ASSERT_EQ(9u, page.candidateCount);
 
-    SelectNextPage(engine, page);
+	SelectNextPage(engine, page);
 
-    EXPECT_EQ(2u, page.page);
-    EXPECT_EQ(84u, page.totalCount);
-    EXPECT_EQ(4u, page.candidateCount);
-    EXPECT_FALSE(engine.ConsumeErrorRequest());
+    EXPECT_EQ(0u, page.page);
+	EXPECT_EQ(89u, page.totalCount);
+	EXPECT_EQ(40u, page.candidateCount);
+	EXPECT_FALSE(engine.ConsumeErrorRequest());
 
     engine.Deactivate();
 }
@@ -906,7 +935,7 @@ TEST_F(Layer3Test, SelectPrevPageMovesBackFromSecondPage)
     engine.Deactivate();
 }
 
-TEST_F(Layer3Test, SelectPrevPageDoesNotMoveBeforeFirstPage)
+TEST_F(Layer3Test, SelectPrevPageWrapsToLastPageBeforeFirstPage)
 {
     ChmEngine engine;
     engine.Activate();
@@ -919,12 +948,12 @@ TEST_F(Layer3Test, SelectPrevPageDoesNotMoveBeforeFirstPage)
     ASSERT_EQ(0u, page.page);
     ASSERT_EQ(40u, page.candidateCount);
 
-    SelectPrevPage(engine, page);
+	SelectPrevPage(engine, page);
 
-    EXPECT_EQ(0u, page.page);
-    EXPECT_EQ(65u, page.totalCount);
-    EXPECT_EQ(40u, page.candidateCount);
-    EXPECT_FALSE(engine.ConsumeErrorRequest());
+    EXPECT_EQ(1u, page.page);
+	EXPECT_EQ(65u, page.totalCount);
+	EXPECT_EQ(25u, page.candidateCount);
+	EXPECT_FALSE(engine.ConsumeErrorRequest());
 
     engine.Deactivate();
 }

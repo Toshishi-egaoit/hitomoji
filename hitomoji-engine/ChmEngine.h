@@ -94,7 +94,6 @@ private:
 
 	std::wstring _converted; // かな変換できた部分
 	std::wstring _pending; // かなに変換できていない部分（残り）
-	std::wstring _l3LeadingSymbols; // かな漢字変換の読みから外した先頭記号
 	BOOL _useUndoEditSession;
 	LONG _undoDeleteLength;
 	BOOL _hasErrorRequest;

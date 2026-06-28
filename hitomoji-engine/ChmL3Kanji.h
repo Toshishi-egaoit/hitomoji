@@ -85,10 +85,13 @@ public:
 	};
 
 	// 変換開始
-	BOOL Start(const std::wstring& DictYomi)
+	BOOL Start(const std::wstring& composition)
 	{
+		_leadingChars.clear();
+		std::wstring dictYomi = _makeDictYomi(composition);
+
 		std::vector<std::wstring> yomis;
-		if (!_parseSearchQuery(DictYomi, yomis)) {
+		if (!_parseSearchQuery(dictYomi, yomis)) {
 			return FALSE;
 		}
 		if (yomis.empty()) {
@@ -112,26 +115,26 @@ public:
 		_page = 0;
 		return TRUE;
 	}
-
 	void Cancel()
 	{
 		_list = nullptr;
 		_count = 0;
 		_page = 0;
 		_ownedList.clear();
+		_leadingChars.clear();
 	}
-
 	void NextPage()
 	{
 		if (!_list || _count == 0 || _pageSize == 0) return;
 		byte maxPage = (_count + _pageSize - 1) / _pageSize;
-		if (_page + 1 < maxPage) _page++;
+		_page = (_page + 1 < maxPage) ? _page + 1 : 0;
 	}
 
 	void PrevPage()
 	{
 		if (!_list || _count == 0 || _pageSize == 0) return;
-		if (_page > 0) _page--;
+		byte maxPage = (_count + _pageSize - 1) / _pageSize;
+		_page = (_page > 0) ? _page - 1 : maxPage - 1;
 	}
 
 	uint32_t SelectByIndex(byte index)
@@ -146,9 +149,26 @@ public:
 	const uint32_t* GetList() const { return _list; }
 	uint16_t GetCount() const { return _count; }
 	byte GetPage() const { return _page; }
+	const std::wstring& GetLeadingChars() const { return _leadingChars; }
 	BOOL BuildCandidatePage(ChmCandidatePage& page, const ChmL3Helper& helper) const;
 
 private:
+
+	std::wstring _makeDictYomi(const std::wstring& composition)
+	{
+		size_t start = 0;
+		while (start < composition.length() && !_isYomiChar(composition[start])) {
+			++start;
+		}
+
+		if (start == 0 || start == composition.length()) {
+			return composition;
+		}
+
+		_leadingChars = composition.substr(0, start);
+		return composition.substr(start);
+	}
+
 	// wstringから最大5文字までのchar16_t配列に変換
 	void _makeYomiKey(const std::wstring& src, char16_t out[6])
 	{
@@ -292,6 +312,7 @@ private:
 	uint16_t _count;
 	byte _page;
 	byte _pageSize;
+	std::wstring _leadingChars;
 };
 
 

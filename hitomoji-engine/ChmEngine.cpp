@@ -20,7 +20,7 @@ bool IsSokuonPendingChar(wchar_t ch)
 
 ChmEngine::ChmEngine()
 	: _isON(FALSE), _state(State::None), _converted(L""), _pending(L""),
-	  _l3LeadingSymbols(L""), _useUndoEditSession(FALSE), _undoDeleteLength(0), _hasErrorRequest(FALSE)
+	  _useUndoEditSession(FALSE), _undoDeleteLength(0), _hasErrorRequest(FALSE)
 {
 	_pRawInputStore = new ChmRawInputStore();
 	_pConfig = nullptr;
@@ -336,18 +336,11 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 		case ChmFuncType::CompSelect: {
 			delete _pL3KanjiSelect;
 			_pL3KanjiSelect = nullptr;
-			_l3LeadingSymbols.clear();
 			_pL3KanjiSelect = new ChmL3KanjiSelect(_pL3KanjiDict, static_cast<byte>(_pL3Helper->GetPageSize()));
 			// 促音となりうるパターン(k,s,t,p)がpendingにある場合は「っ」を補う
 			if (_pending.length() == 1 && IsSokuonPendingChar(_pending[0])) {
 				_converted += L"っ" ;
 				_pending = L"";
-			}
-			size_t leadingSymbolCount = CountLayer3LeadingSymbols(_converted);
-			std::wstring selectStr = _converted;
-			if (leadingSymbolCount > 0 && leadingSymbolCount < _converted.length()) {
-				_l3LeadingSymbols = _converted.substr(0, leadingSymbolCount);
-				selectStr = _converted.substr(leadingSymbolCount);
 			}
 
 			if (!_pending.empty() ) {
@@ -355,14 +348,12 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 				SetError();
 				delete _pL3KanjiSelect;
 				_pL3KanjiSelect = nullptr;
-				_l3LeadingSymbols.clear();
 				_state = State::Inputing;
-			} else if ( _pL3KanjiSelect->Start(selectStr) == FALSE ) {
-				Debug(Format(L"   > yomi not found:%s", selectStr.c_str()));
+			} else if ( _pL3KanjiSelect->Start(_converted) == FALSE ) {
+				Debug(Format(L"   > yomi not found:%s", _converted.c_str()));
 				SetError();
 				delete _pL3KanjiSelect;
 				_pL3KanjiSelect = nullptr;
-				_l3LeadingSymbols.clear();
 				_state = State::Inputing;
 			} else {
 				_state = State::Selecting;
@@ -397,7 +388,6 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 					}
 					delete _pL3KanjiSelect;
 					_pL3KanjiSelect = nullptr;
-					_l3LeadingSymbols.clear();
 				} else {
 					_pL3KanjiSelect->PrevPage();
 				}
@@ -411,7 +401,6 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
 			delete _pL3KanjiSelect;
 			_pL3KanjiSelect = nullptr;
-			_l3LeadingSymbols.clear();
 			break;
 		case ChmFuncType::SelectInput:
 			if ( _state == State::Selecting && _pL3KanjiSelect) {
@@ -427,13 +416,12 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 						SetError();
 					}
 					else {
-						_converted = _l3LeadingSymbols + ChmL3Helper::Utf32ToWString(selected);
+						_converted = _pL3KanjiSelect->GetLeadingChars() + ChmL3Helper::Utf32ToWString(selected);
 						_pending = L"";
 						_PrepareUnFinish();
 						_state = State::None;
 						delete _pL3KanjiSelect ;
 						_pL3KanjiSelect = nullptr;
-						_l3LeadingSymbols.clear();
 					}
 				}
 			}
@@ -551,7 +539,6 @@ void ChmEngine::ResetStatus() {
 	_pRawInputStore->clear();
 	_converted = L"";
 	_pending = L"";
-	_l3LeadingSymbols.clear();
 	delete _pL3KanjiSelect;
 	_pL3KanjiSelect = nullptr;
 	return;
