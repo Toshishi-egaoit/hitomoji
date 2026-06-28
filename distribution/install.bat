@@ -85,5 +85,10 @@ if exist "%TARGET_DLL32%.old" (
 echo インストール工程が完了しました。
 echo 必要なファイルは全てコピーされました。
 echo このディレクトリの内容は削除できます
+if exist "%~dp0Update.md" (
+    echo.
+    type "%~dp0Update.md"
+    echo.
+)
 cd
 pause
