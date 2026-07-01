@@ -31,6 +31,7 @@ const FuncKeyDef g_functionKeyTable[] = {
     { VK_SPACE,    false, false, false, ChmEngine::State::Selecting, ChmFuncType::SelectNextPage },
     { VK_BACK,     false, false, false, ChmEngine::State::Selecting, ChmFuncType::SelectPrevPage },
     { VK_ESCAPE,   false, false, false, ChmEngine::State::Selecting, ChmFuncType::SelectCancel   },
+    { VK_OEM_1,    true,  false, false, ChmEngine::State::Selecting, ChmFuncType::SelectCancelAndInput },
     // CTRL+*
     { 'Z',         false, true,  false, ChmEngine::State::None,      ChmFuncType::UnFinish       },
     { 'H',         false, true,  false, ChmEngine::State::Selecting, ChmFuncType::Backspace      },
@@ -56,6 +57,7 @@ const std::map<std::wstring, ChmFuncType> s_actionNameMap = {
     { L"next-page" ,         ChmFuncType::SelectNextPage },
     { L"prev-page" ,         ChmFuncType::SelectPrevPage },
     { L"cancel-select" ,     ChmFuncType::SelectCancel },
+    { L"cancel-select-and-input", ChmFuncType::SelectCancelAndInput },
     { L"select-kanji" ,      ChmFuncType::SelectInput },
     { L"space-char",         ChmFuncType::CharInputSpace },
 #ifdef _DEBUG

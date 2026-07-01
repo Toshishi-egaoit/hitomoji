@@ -16,6 +16,7 @@ enum class ChmFuncType {
 	SelectNextPage,     // 選択中の次ページ
 	SelectPrevPage,     // 選択中の次ページ
 	SelectCancel,       // 選択中のキャンセル
+	SelectCancelAndInput, // 選択中のキャンセル後、同じキーを通常入力
 	Cancel,             // キャンセル(ESC)
 	Backspace,          // 後退(BS)
 	UnFinish,           // 確定取消（将来）(CTRL+Z)

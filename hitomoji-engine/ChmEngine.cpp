@@ -242,6 +242,7 @@ BOOL ChmEngine::IsLayer3Function(ChmFuncType type) {
 		case ChmFuncType::SelectNextPage:
 		case ChmFuncType::SelectPrevPage:
 		case ChmFuncType::SelectCancel:
+		case ChmFuncType::SelectCancelAndInput:
 			return TRUE;
 		default:
 			return FALSE;
@@ -401,6 +402,14 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
 			delete _pL3KanjiSelect;
 			_pL3KanjiSelect = nullptr;
+			break;
+		case ChmFuncType::SelectCancelAndInput:
+			_state = State::Inputing;
+			delete _pL3KanjiSelect;
+			_pL3KanjiSelect = nullptr;
+			_pRawInputStore->push(keyEvent.GetChar());
+			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
 			break;
 		case ChmFuncType::SelectInput:
 			if ( _state == State::Selecting && _pL3KanjiSelect) {

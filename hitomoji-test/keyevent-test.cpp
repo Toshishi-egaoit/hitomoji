@@ -93,6 +93,11 @@ TEST_F(FunctionKeyTestBase, DefaultFunctionKeysByState)
     ChmKeyEvent escapeSelecting(VK_ESCAPE, 0, ChmEngine::State::Selecting);
     EXPECT_EQ(ChmFuncType::SelectCancel, escapeSelecting.GetType());
 
+    TestKeyEventHelper::SetState(true, false, false);
+    ChmKeyEvent colonSelecting(VK_OEM_1, 0, ChmEngine::State::Selecting);
+    EXPECT_EQ(ChmFuncType::SelectCancelAndInput, colonSelecting.GetType());
+    EXPECT_EQ(':', colonSelecting.GetChar());
+
     TestKeyEventHelper::SetState(false, true, false);
     ChmKeyEvent ctrlZ('Z', 0, ChmEngine::State::None);
     EXPECT_EQ(ChmFuncType::UnFinish, ctrlZ.GetType());
@@ -379,6 +384,7 @@ TEST_F(FunctionKeyTestBase, AllActionNamesCovered)
         L"next-page",
         L"prev-page",
         L"cancel-select",
+        L"cancel-select-and-input",
         L"select-kanji",
         L"space-char"
 #ifdef _DEBUG

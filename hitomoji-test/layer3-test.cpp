@@ -584,6 +584,31 @@ TEST_F(Layer3Test, EscapeCancelsSelectionAfterSokuonPendingAndRestoresRawPending
     engine.Deactivate();
 }
 
+TEST_F(Layer3Test, ColonDuringSelectionCancelsSelectionAndAppendsFilterSeparator)
+{
+    ChmEngine engine;
+    engine.Activate();
+
+    InputKeys(engine, "A", L"\x3042");
+
+    ChmCandidatePage page;
+    StartSelection(engine, page);
+    EXPECT_EQ(L"\x3042", engine.GetCompositionStr());
+
+    bool endComposition = true;
+    ChmKeyEvent colonKey = MakeKey(VK_OEM_1, engine.GetState(), true);
+
+    EXPECT_EQ(ChmFuncType::SelectCancelAndInput, colonKey.GetType());
+    EXPECT_TRUE(engine.UpdateComposition(colonKey, endComposition));
+    EXPECT_FALSE(endComposition);
+    EXPECT_EQ(ChmEngine::State::Inputing, engine.GetState());
+    EXPECT_TRUE(engine.HasComposition());
+    EXPECT_EQ(L"\x3042:", engine.GetCompositionStr());
+    EXPECT_FALSE(engine.GetCandidatePage(page));
+
+    engine.Deactivate();
+}
+
 TEST_F(Layer3Test, CustomSelectKeymapControlsCandidatePageSizeAndCells)
 {
     {

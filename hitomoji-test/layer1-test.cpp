@@ -104,6 +104,9 @@ TEST_F(Layer1Test, RecognizesFunctionKeysInSelectingState)
               MakeKey(VK_BACK, ChmEngine::State::Selecting).GetType());
     EXPECT_EQ(ChmFuncType::SelectCancel,
               MakeKey(VK_ESCAPE, ChmEngine::State::Selecting).GetType());
+    EXPECT_EQ(ChmFuncType::SelectCancelAndInput,
+              MakeKey(VK_OEM_1, ChmEngine::State::Selecting,
+                      true, false, false).GetType());
     EXPECT_EQ(ChmFuncType::Backspace,
               MakeKey('H', ChmEngine::State::Selecting,
                       false, true, false).GetType());
