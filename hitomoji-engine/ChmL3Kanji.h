@@ -18,6 +18,22 @@ class ChmL3Helper;
 class ChmL3KanjiDict {
 
 public:
+	static constexpr uint32_t MagicHMJ1 = 0x314A4D48;
+	static constexpr uint32_t MagicHMJ2 = 0x324A4D48;
+	struct DictHeaderV2 {
+		uint32_t magic;
+		uint32_t flags;
+		uint32_t kanjiCount;
+		uint32_t yomiCount;
+		uint32_t variantCount;
+		uint32_t kanjiOffset;
+		uint32_t yomiOffset;
+		uint32_t listOffset;
+		uint32_t variantOffset;
+		uint32_t infoOffset;
+		uint32_t infoSize;
+	};
+	static_assert(sizeof(DictHeaderV2) == 44, "HMJ2 header layout");
 	struct DictHeader {
 		uint32_t magic;
 		uint32_t kanjiCount;
@@ -43,6 +59,8 @@ public:
 
 	bool LoadDict()
 	{
+		DictYomi.clear();
+		kanjiList.clear();
 		Info(L"L3kanjiDict.LoadDict");
 		std::wstring path = g_environment.GetBasePath() + L"hitomoji.dic";
 
@@ -52,25 +70,75 @@ public:
 			return false;
 		}
 
-		DictHeader header;
-		ifs.read((char*)&header, sizeof(header));
+		if (!LoadDict(ifs)) {
+			Error(L"   > invalid or unsupported dictionary");
+			return false;
+		}
+		return true;
+	}
 
-		ifs.seekg(header.yomiOffset);
+	// HMJ2 metadata is not used for selection yet. Load only the legacy candidate data.
+	bool LoadDict(std::istream& input)
+	{
+		static_assert(sizeof(DictHeader) == 24, "HMJ1 header layout");
+		static_assert(sizeof(YomiEntry) == 20, "Yomi entry layout");
+		DictYomi.clear();
+		kanjiList.clear();
+		input.seekg(0, std::ios::end);
+		const auto end = input.tellg();
+		if (end < std::streampos(sizeof(uint32_t))) return false;
+		const uint64_t fileSize = static_cast<uint64_t>(static_cast<std::streamoff>(end));
+		input.seekg(0);
+		uint32_t magic = 0;
+		if (!input.read(reinterpret_cast<char*>(&magic), sizeof(magic))) return false;
+		input.seekg(0);
+		DictHeader header{};
+		uint64_t headerSize = sizeof(DictHeader);
+		uint64_t listEnd = fileSize;
+		if (magic == MagicHMJ1) {
+			if (!input.read(reinterpret_cast<char*>(&header), sizeof(header))) return false;
+		}
+		else if (magic == MagicHMJ2) {
+			DictHeaderV2 v2{};
+			if (!input.read(reinterpret_cast<char*>(&v2), sizeof(v2))) return false;
+			header = {v2.magic, v2.kanjiCount, v2.yomiCount,
+				v2.kanjiOffset, v2.yomiOffset, v2.listOffset};
+			headerSize = sizeof(v2);
+			// Zero offsets denote absent optional blocks; empty blocks may have offsets.
+			if (v2.infoOffset != 0) {
+				if (v2.infoOffset < v2.listOffset ||
+					uint64_t(v2.infoOffset) + v2.infoSize > fileSize) return false;
+				listEnd = v2.infoOffset;
+			}
+			else if (v2.infoSize != 0) return false;
+			if (v2.variantOffset != 0) {
+				if (v2.variantOffset < v2.listOffset ||
+					uint64_t(v2.variantOffset) + uint64_t(v2.variantCount) * 12 > listEnd) return false;
+				listEnd = v2.variantOffset;
+			}
+			else if (v2.variantCount != 0) return false;
+		}
+		else return false;
 
-		DictYomi.resize(header.yomiCount);
-		ifs.read((char*)DictYomi.data(), header.yomiCount * sizeof(YomiEntry));
-		Info(Format(L"   > read yomiCount: %d", header.yomiCount));
-
-		ifs.seekg(header.listOffset);
-		auto cur = ifs.tellg();
-		ifs.seekg(0, std::ios::end);
-		size_t bytes = (size_t)(ifs.tellg() - cur);
-
-		kanjiList.resize(bytes / sizeof(uint32_t));
-		ifs.seekg(header.listOffset);
-		ifs.read((char*)kanjiList.data(), bytes);
-		Info(Format(L"   > read kanjiList: %d" ,bytes));
-
+		if (header.kanjiOffset < headerSize ||
+			uint64_t(header.kanjiOffset) + uint64_t(header.kanjiCount) * 8 > header.yomiOffset ||
+			uint64_t(header.yomiOffset) + uint64_t(header.yomiCount) * sizeof(YomiEntry) > header.listOffset ||
+			header.listOffset > listEnd || listEnd > fileSize) return false;
+		const uint64_t bytes = listEnd - header.listOffset;
+		if (bytes % sizeof(uint32_t) != 0) return false;
+		std::vector<YomiEntry> yomis(header.yomiCount);
+		std::vector<uint32_t> candidates(static_cast<size_t>(bytes / sizeof(uint32_t)));
+		input.seekg(header.yomiOffset);
+		if (!yomis.empty() && !input.read(reinterpret_cast<char*>(yomis.data()),
+			static_cast<std::streamsize>(yomis.size() * sizeof(YomiEntry)))) return false;
+		input.seekg(header.listOffset);
+		if (!candidates.empty() && !input.read(reinterpret_cast<char*>(candidates.data()),
+			static_cast<std::streamsize>(bytes))) return false;
+		for (const auto& yomi : yomis) {
+			if (uint64_t(yomi.offset) + yomi.count > candidates.size()) return false;
+		}
+		DictYomi.swap(yomis);
+		kanjiList.swap(candidates);
 		return true;
 	}
 };

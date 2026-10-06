@@ -1,11 +1,96 @@
 #include "gtest/gtest.h"
 #include "ChmCandidatePage.h"
 #include "ChmEngine.h"
+#include "ChmL3Kanji.h"
 #include "ChmEnvironment.h"
 #include "ChmKeyEvent.h"
 #include "TestConfigHelper.h"
 #include "TestKeyEventHelper.h"
 #include <string>
+#include <sstream>
+
+namespace {
+// Build wire-format bytes explicitly, independently of the loader's C++ structs.
+void PutDict32(std::string& bytes, size_t offset, uint32_t value)
+{
+    for (size_t i = 0; i < 4; ++i) bytes[offset + i] = static_cast<char>(value >> (8 * i));
+}
+
+std::string MakeTestDictionary(bool v2)
+{
+    const uint32_t headerSize = v2 ? 44 : 24;
+    const uint32_t yomiOffset = headerSize + 8;
+    const uint32_t listOffset = yomiOffset + 20;
+    std::string bytes(listOffset + 4 + (v2 ? 15 : 0), '\0');
+    PutDict32(bytes, 0, v2 ? 0x324A4D48 : 0x314A4D48);
+    if (v2) {
+        const uint32_t fields[] = {1, 1, 1, 1, headerSize, yomiOffset,
+            listOffset, listOffset + 4, listOffset + 16, 3};
+        for (size_t i = 0; i < 10; ++i) PutDict32(bytes, 4 + i * 4, fields[i]);
+        PutDict32(bytes, listOffset + 4, 0x7A81);
+        PutDict32(bytes, listOffset + 8, 0xFA55);
+        bytes.replace(listOffset + 16, 3, "abc");
+    }
+    else {
+        const uint32_t fields[] = {1, 1, headerSize, yomiOffset, listOffset};
+        for (size_t i = 0; i < 5; ++i) PutDict32(bytes, 4 + i * 4, fields[i]);
+    }
+    PutDict32(bytes, headerSize, 0x7A81);
+    PutDict32(bytes, yomiOffset, 0x3068); // と
+    bytes[yomiOffset + 12] = 1; // count
+    PutDict32(bytes, listOffset, 0x7A81); // 突
+    return bytes;
+}
+}
+
+TEST(DictionaryFormatTest, LoadsBothVersionsWithoutMetadataAsCandidates)
+{
+    ChmL3KanjiDict dict;
+    for (bool v2 : {false, true}) {
+        std::istringstream input(MakeTestDictionary(v2), std::ios::binary);
+        ASSERT_TRUE(dict.LoadDict(input));
+        ASSERT_EQ(1u, dict.kanjiList.size());
+        EXPECT_EQ(0x7A81u, dict.kanjiList[0]);
+        ChmL3KanjiSelect select(&dict, 40);
+        ASSERT_TRUE(select.Start(L"と"));
+        EXPECT_EQ(0x7A81u, select.SelectByIndex(0));
+    }
+}
+
+TEST(DictionaryFormatTest, SupportsAbsentOptionalBlocks)
+{
+    auto bytes = MakeTestDictionary(true);
+    bytes.resize(76);
+    for (size_t offset : {4u, 16u, 32u, 36u, 40u}) PutDict32(bytes, offset, 0);
+    ChmL3KanjiDict dict;
+    std::istringstream input(bytes, std::ios::binary);
+    ASSERT_TRUE(dict.LoadDict(input));
+    EXPECT_EQ(1u, dict.kanjiList.size());
+}
+
+TEST(DictionaryFormatTest, RejectsInvalidRangesAndClearsPreviousData)
+{
+    const auto valid = MakeTestDictionary(true);
+    std::vector<std::string> invalid;
+    for (size_t size : {0u, 4u, 43u, 90u}) invalid.push_back(valid.substr(0, size));
+    for (const auto& change : std::vector<std::pair<size_t, uint32_t>>{
+        {0, 0}, {8, 0xFFFFFFFF}, {12, 0xFFFFFFFF}, {16, 0xFFFFFFFF},
+        {20, 0}, {24, 0}, {28, 0xFFFFFFFF}, {32, 73}, {36, 77}, {40, 100},
+        {68, 1}}) { // yomi offset beyond its single candidate
+        auto bytes = valid;
+        PutDict32(bytes, change.first, change.second);
+        invalid.push_back(bytes);
+    }
+    ChmL3KanjiDict dict;
+    for (const auto& bytes : invalid) {
+        std::istringstream good(valid, std::ios::binary);
+        ASSERT_TRUE(dict.LoadDict(good));
+        std::istringstream bad(bytes, std::ios::binary);
+        EXPECT_FALSE(dict.LoadDict(bad));
+        EXPECT_TRUE(dict.DictYomi.empty());
+        EXPECT_TRUE(dict.kanjiList.empty());
+    }
+}
 
 namespace {
 
