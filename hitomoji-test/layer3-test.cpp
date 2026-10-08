@@ -288,7 +288,8 @@ TEST_F(Layer3Test, ConvertKeyStartsKanjiSelectionAndBuildsCandidatePageForKou)
     EXPECT_EQ(L"こう", engine.GetCompositionStr());
 
     EXPECT_EQ(0u, page.page);
-    EXPECT_EQ(131u, page.totalCount);
+    // HMJ2: 131 candidates minus 8 accepted variants (indices 0 through 122).
+    EXPECT_EQ(123u, page.totalCount);
     EXPECT_EQ(40u, page.candidateCount);
 
     engine.Deactivate();
