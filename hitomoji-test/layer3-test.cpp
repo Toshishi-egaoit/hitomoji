@@ -57,6 +57,41 @@ TEST(DictionaryFormatTest, LoadsBothVersionsWithoutMetadataAsCandidates)
     }
 }
 
+TEST(DictionaryFormatTest, PageTotalsIncludeEmptyPagesAndRespectPageSize)
+{
+    ChmL3KanjiDict dict;
+    dict.DictYomi = { { {u'と', 0}, 81, 0 } };
+    dict.kanjiList.assign(81, 0);
+    dict.kanjiList.back() = 0x7A81;
+    ChmConfig config;
+    ChmL3Helper helper(&config);
+    for (byte pageSize : {byte(34), byte(40)}) {
+        ChmL3KanjiSelect select(&dict, pageSize);
+        ASSERT_TRUE(select.Start(L"と"));
+        ChmCandidatePage page;
+        for (UINT index = 0; index < 3; ++index) {
+            ASSERT_TRUE(select.BuildCandidatePage(page, helper));
+            EXPECT_EQ(index, page.page);
+            EXPECT_EQ(3u, page.totalPages);
+            if (index < 2) {
+                for (auto cp : page.candidates) EXPECT_EQ(0u, cp);
+            }
+            select.NextPage();
+        }
+        ASSERT_TRUE(select.BuildCandidatePage(page, helper));
+        EXPECT_EQ(0u, page.page);
+        EXPECT_EQ(3u, page.totalPages);
+        select.Cancel();
+        EXPECT_FALSE(select.BuildCandidatePage(page, helper));
+        EXPECT_EQ(0u, page.totalPages);
+    }
+    ChmL3KanjiSelect select(&dict, 1);
+    ASSERT_TRUE(select.Start(L"と"));
+    ChmCandidatePage page;
+    ASSERT_TRUE(select.BuildCandidatePage(page, helper));
+    EXPECT_EQ(81u, page.totalPages);
+}
+
 TEST(DictionaryFormatTest, SupportsAbsentOptionalBlocks)
 {
     auto bytes = MakeTestDictionary(true);
@@ -872,11 +907,11 @@ TEST_F(Layer3Test, SelectInputUsesThirtyFourKeymapAcrossPages)
         StartSelection(engine, page);
 
         EXPECT_EQ(0u, page.page);
-        EXPECT_EQ(131u, page.totalCount);
+        EXPECT_EQ(123u, page.totalCount);
         EXPECT_EQ(34u, page.candidateCount);
-        EXPECT_EQ(0x9999u, page.candidates[8]); // 9: index 33, 香
+        EXPECT_EQ(0x63A7u, page.candidates[8]); // 9: index 33, 控
 
-        SelectCandidate(engine, '9', L"香");
+        SelectCandidate(engine, '9', L"控");
 
         engine.Deactivate();
     }
@@ -891,7 +926,7 @@ TEST_F(Layer3Test, SelectInputUsesThirtyFourKeymapAcrossPages)
         SelectNextPage(engine, page);
 
         EXPECT_EQ(1u, page.page);
-        EXPECT_EQ(131u, page.totalCount);
+        EXPECT_EQ(123u, page.totalCount);
         EXPECT_EQ(34u, page.candidateCount);
         EXPECT_EQ(0x9271u, page.candidates[8]); // 9: index 67, 鉱
 
@@ -917,9 +952,9 @@ TEST_F(Layer3Test, SameSelectKeyChoosesDifferentKanjiWhenKeymapChanges)
         StartSelection(engine, page);
 
         EXPECT_EQ(34u, page.candidateCount);
-        EXPECT_EQ(0x9999u, page.candidates[8]); // 9: index 33, 香
+        EXPECT_EQ(0x63A7u, page.candidates[8]); // 9: index 33, 控
 
-        SelectCandidate(engine, '9', L"香");
+        SelectCandidate(engine, '9', L"控");
 
         engine.Deactivate();
     }
@@ -980,18 +1015,18 @@ TEST_F(Layer3Test, SelectNextPageMovesForwardAcrossMultiplePages)
     StartSelection(engine, page);
 
     EXPECT_EQ(0u, page.page);
-    EXPECT_EQ(89u, page.totalCount);
+    EXPECT_EQ(87u, page.totalCount);
     EXPECT_EQ(40u, page.candidateCount);
 
     SelectNextPage(engine, page);
     EXPECT_EQ(1u, page.page);
-    EXPECT_EQ(89u, page.totalCount);
+    EXPECT_EQ(87u, page.totalCount);
     EXPECT_EQ(40u, page.candidateCount);
 
     SelectNextPage(engine, page);
     EXPECT_EQ(2u, page.page);
-    EXPECT_EQ(89u, page.totalCount);
-    EXPECT_EQ(9u, page.candidateCount);
+    EXPECT_EQ(87u, page.totalCount);
+    EXPECT_EQ(7u, page.candidateCount);
     EXPECT_FALSE(engine.ConsumeErrorRequest());
 
     engine.Deactivate();
@@ -1010,12 +1045,12 @@ TEST_F(Layer3Test, SelectNextPageWrapsToFirstPageAfterLastPage)
     SelectNextPage(engine, page);
 
     ASSERT_EQ(2u, page.page);
-    ASSERT_EQ(9u, page.candidateCount);
+    ASSERT_EQ(7u, page.candidateCount);
 
 	SelectNextPage(engine, page);
 
     EXPECT_EQ(0u, page.page);
-	EXPECT_EQ(89u, page.totalCount);
+	EXPECT_EQ(87u, page.totalCount);
 	EXPECT_EQ(40u, page.candidateCount);
 	EXPECT_FALSE(engine.ConsumeErrorRequest());
 
