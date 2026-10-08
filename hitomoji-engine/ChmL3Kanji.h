@@ -507,6 +507,7 @@ inline BOOL ChmL3KanjiSelect::BuildCandidatePage(ChmCandidatePage& page, const C
 	page.totalCount = _count;
 
 	if (!_list || _count == 0 || _pageSize == 0) return FALSE;
+	page.totalPages = (_count + _pageSize - 1) / _pageSize;
 
 	size_t start = static_cast<size_t>(_page) * _pageSize;
 	if (start >= _count) return FALSE;

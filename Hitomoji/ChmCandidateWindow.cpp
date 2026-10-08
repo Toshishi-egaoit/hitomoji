@@ -1,6 +1,7 @@
 ﻿#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <algorithm>
+#include <string>
 
 #include "ChmCandidateWindow.h"
 
@@ -19,6 +20,23 @@ constexpr int CHM_CANDIDATE_HOME_F_INDEX = 23;
 constexpr int CHM_CANDIDATE_HOME_J_INDEX = 26;
 constexpr int CHM_CANDIDATE_MARKER_HEIGHT = 2;
 constexpr int CHM_CANDIDATE_HOME_MARKER_HEIGHT = 4;
+
+// Keyboard order: left little/ring/middle/index, right index/middle/ring/little.
+// Keep separate entries for all eight fingers for future configuration support.
+constexpr COLORREF CHM_CANDIDATE_FINGER_COLORS[8] = {
+    RGB(64, 64, 64), // Left little
+    RGB(34, 100, 64),   // Left ring: dark green
+    RGB(64, 64, 64), // Left middle
+    RGB(32, 64, 112),   // Left index: navy
+    RGB(128, 72, 40),   // Right index: brown
+    RGB(64, 64, 64), // Right middle
+    RGB(34, 100, 64),   // Right ring: dark green
+    RGB(64, 64, 64), // Right little
+};
+// Each index finger covers two columns (R/T and Y/U, F/G and H/J, V/B and N/M).
+constexpr int CHM_CANDIDATE_COLUMN_FINGERS[CHM_CANDIDATE_COLS] = {
+    0, 1, 2, 3, 3, 4, 4, 5, 6, 7
+};
 
 int Utf32ToUtf16(uint32_t cp, wchar_t out[3])
 {
@@ -65,8 +83,10 @@ void DrawCandidates(HDC hdc, const ChmCandidatePage* page)
     SetBkMode(hdc, TRANSPARENT);
     SetTextColor(hdc, GetSysColor(COLOR_WINDOWTEXT));
 
-    HBRUSH markerBrush = CreateSolidBrush(RGB(192, 192, 192));
-    HBRUSH homeMarkerBrush = CreateSolidBrush(RGB(96, 96, 96));
+    HBRUSH markerBrushes[8]{};
+    for (int finger = 0; finger < 8; ++finger) {
+        markerBrushes[finger] = CreateSolidBrush(CHM_CANDIDATE_FINGER_COLORS[finger]);
+    }
 
     for (int i = 0; i < static_cast<int>(CHM_CANDIDATE_MAX); ++i) {
         int row = i / CHM_CANDIDATE_COLS;
@@ -86,7 +106,7 @@ void DrawCandidates(HDC hdc, const ChmCandidatePage* page)
             cell.right - 5,
             cell.bottom - 5 + markerHeight
         };
-        FillRect(hdc, &marker, isHome ? homeMarkerBrush : markerBrush);
+        FillRect(hdc, &marker, markerBrushes[CHM_CANDIDATE_COLUMN_FINGERS[col]]);
 
         uint32_t cp = page->candidates[i];
         if (cp == 0) continue;
@@ -94,15 +114,33 @@ void DrawCandidates(HDC hdc, const ChmCandidatePage* page)
         wchar_t text[3];
         if (Utf32ToUtf16(cp, text) == 0) continue;
 
-        SetTextColor(hdc, GetSysColor(COLOR_WINDOWTEXT));
+        SetTextColor(hdc, CHM_CANDIDATE_FINGER_COLORS[CHM_CANDIDATE_COLUMN_FINGERS[col]]);
         DrawTextW(hdc, text, -1, &cell, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     }
 
-    if (homeMarkerBrush) {
-        DeleteObject(homeMarkerBrush);
+    for (HBRUSH brush : markerBrushes) {
+        if (brush) DeleteObject(brush);
     }
-    if (markerBrush) {
-        DeleteObject(markerBrush);
+
+    if (page->totalPages > 0) {
+        HFONT pageFont = CreateFontW(
+            -MulDiv(12, GetDeviceCaps(hdc, LOGPIXELSY), 72),
+            0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+            OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+            DEFAULT_PITCH | FF_DONTCARE, L"Yu Gothic UI");
+        HFONT previousFont = pageFont ? static_cast<HFONT>(SelectObject(hdc, pageFont)) : nullptr;
+        const std::wstring label = std::to_wstring(page->page + 1) + L"/" + std::to_wstring(page->totalPages);
+        RECT pageRect{
+            CHM_CANDIDATE_PADDING + CHM_CANDIDATE_COLS * CHM_CANDIDATE_CELL_WIDTH,
+            CHM_CANDIDATE_PADDING,
+            CHM_CANDIDATE_WIDTH - CHM_CANDIDATE_PADDING,
+            CHM_CANDIDATE_PADDING + CHM_CANDIDATE_CELL_HEIGHT
+        };
+        SetTextColor(hdc, RGB(64, 64, 64));
+        DrawTextW(hdc, label.c_str(), -1, &pageRect,
+            DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        if (previousFont) SelectObject(hdc, previousFont);
+        if (pageFont) DeleteObject(pageFont);
     }
 
     if (oldFont) {

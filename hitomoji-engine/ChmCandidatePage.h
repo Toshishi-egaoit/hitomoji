@@ -8,6 +8,7 @@ constexpr size_t CHM_CANDIDATE_MAX = 40;
 
 struct ChmCandidatePage {
     UINT page = 0;
+    UINT totalPages = 0;
     UINT totalCount = 0;
     UINT candidateCount = 0;
     uint32_t candidates[CHM_CANDIDATE_MAX]{};
