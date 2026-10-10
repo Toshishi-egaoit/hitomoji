@@ -43,12 +43,59 @@ public:
 		uint32_t listOffset;
 	};
 
+	struct KanjiEntry {
+		uint32_t codepoint;
+		uint16_t freq;
+		uint16_t reserved16;
+		uint8_t radical;
+		uint8_t grade;
+		uint8_t strokes;
+		uint8_t jisLevel;
+		uint8_t jisPlane;
+		uint8_t jisKu;
+		uint8_t jisTen;
+		uint8_t reserved;
+	};
+	static_assert(sizeof(KanjiEntry) == 16, "Kanji entry layout");
+
+	static ChmKanjiCategory CategoryFromGrade(uint16_t grade)
+	{
+		switch (grade) {
+		case 1: return ChmKanjiCategory::Education1;
+		case 2: return ChmKanjiCategory::Education2;
+		case 3: return ChmKanjiCategory::Education3;
+		case 4: return ChmKanjiCategory::Education4;
+		case 5: return ChmKanjiCategory::Education5;
+		case 6: return ChmKanjiCategory::Education6;
+		case 8: return ChmKanjiCategory::Joyo;
+		case 9:
+		case 10: return ChmKanjiCategory::Jinmeiyo;
+		default: return ChmKanjiCategory::Other;
+		}
+	}
+
+	ChmKanjiInfo GetKanjiInfo(uint32_t codePoint) const
+	{
+		ChmKanjiInfo info;
+		info.codePoint = codePoint;
+		const auto entry = std::find_if(DictKanji.begin(), DictKanji.end(),
+			[codePoint](const KanjiEntry& kanji) { return kanji.codepoint == codePoint; });
+		if (entry != DictKanji.end()) {
+			info.category = CategoryFromGrade(entry->grade);
+			info.radical.number = entry->radical;
+			info.strokeCount = entry->strokes;
+			info.jis = { entry->jisPlane, entry->jisKu, entry->jisTen, entry->jisLevel };
+		}
+		return info;
+	}
+
 	struct YomiEntry {
 		char16_t DictYomi[6];
 		uint16_t count;
 		uint32_t offset;
 	};
 	// データはファイルから読み込んでここに保持する設計
+	std::vector<KanjiEntry> DictKanji;
 	std::vector<YomiEntry> DictYomi;
 	std::vector<uint32_t> kanjiList;
 
@@ -59,6 +106,7 @@ public:
 
 	bool LoadDict()
 	{
+		DictKanji.clear();
 		DictYomi.clear();
 		kanjiList.clear();
 		Info(L"L3kanjiDict.LoadDict");
@@ -77,11 +125,12 @@ public:
 		return true;
 	}
 
-	// HMJ2 metadata is not used for selection yet. Load only the legacy candidate data.
+	// Load 16-byte kanji records; variants remain unused.
 	bool LoadDict(std::istream& input)
 	{
 		static_assert(sizeof(DictHeader) == 24, "HMJ1 header layout");
 		static_assert(sizeof(YomiEntry) == 20, "Yomi entry layout");
+		DictKanji.clear();
 		DictYomi.clear();
 		kanjiList.clear();
 		input.seekg(0, std::ios::end);
@@ -121,13 +170,17 @@ public:
 		else return false;
 
 		if (header.kanjiOffset < headerSize ||
-			uint64_t(header.kanjiOffset) + uint64_t(header.kanjiCount) * 8 > header.yomiOffset ||
+			uint64_t(header.kanjiOffset) + uint64_t(header.kanjiCount) * sizeof(KanjiEntry) > header.yomiOffset ||
 			uint64_t(header.yomiOffset) + uint64_t(header.yomiCount) * sizeof(YomiEntry) > header.listOffset ||
 			header.listOffset > listEnd || listEnd > fileSize) return false;
 		const uint64_t bytes = listEnd - header.listOffset;
 		if (bytes % sizeof(uint32_t) != 0) return false;
+		std::vector<KanjiEntry> kanjis(header.kanjiCount);
 		std::vector<YomiEntry> yomis(header.yomiCount);
 		std::vector<uint32_t> candidates(static_cast<size_t>(bytes / sizeof(uint32_t)));
+		input.seekg(header.kanjiOffset);
+		if (!kanjis.empty() && !input.read(reinterpret_cast<char*>(kanjis.data()),
+			static_cast<std::streamsize>(kanjis.size() * sizeof(KanjiEntry)))) return false;
 		input.seekg(header.yomiOffset);
 		if (!yomis.empty() && !input.read(reinterpret_cast<char*>(yomis.data()),
 			static_cast<std::streamsize>(yomis.size() * sizeof(YomiEntry)))) return false;
@@ -137,6 +190,7 @@ public:
 		for (const auto& yomi : yomis) {
 			if (uint64_t(yomi.offset) + yomi.count > candidates.size()) return false;
 		}
+		DictKanji.swap(kanjis);
 		DictYomi.swap(yomis);
 		kanjiList.swap(candidates);
 		return true;
@@ -519,7 +573,12 @@ inline BOOL ChmL3KanjiSelect::BuildCandidatePage(ChmCandidatePage& page, const C
 	for (size_t i = 0; i < pageCount; ++i) {
 		int cell = helper.IndexToCell(i);
 		if (cell < 0 || cell >= static_cast<int>(CHM_CANDIDATE_MAX)) continue;
-		page.candidates[cell] = _list[start + i];
+		const uint32_t cp = _list[start + i];
+		page.candidates[cell] = cp;
+		if (cp == 0) continue;
+		ChmKanjiInfo info = _pDict->GetKanjiInfo(cp);
+		info.cellIndex = static_cast<size_t>(cell);
+		page.kanjiInfo.push_back(std::move(info));
 	}
 
 	return TRUE;

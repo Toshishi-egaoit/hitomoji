@@ -1,4 +1,4 @@
-#include "gtest/gtest.h"
+﻿#include "gtest/gtest.h"
 #include "ChmCandidatePage.h"
 #include "ChmEngine.h"
 #include "ChmL3Kanji.h"
@@ -19,7 +19,7 @@ void PutDict32(std::string& bytes, size_t offset, uint32_t value)
 std::string MakeTestDictionary(bool v2)
 {
     const uint32_t headerSize = v2 ? 44 : 24;
-    const uint32_t yomiOffset = headerSize + 8;
+    const uint32_t yomiOffset = headerSize + 16;
     const uint32_t listOffset = yomiOffset + 20;
     std::string bytes(listOffset + 4 + (v2 ? 15 : 0), '\0');
     PutDict32(bytes, 0, v2 ? 0x324A4D48 : 0x314A4D48);
@@ -36,6 +36,12 @@ std::string MakeTestDictionary(bool v2)
         for (size_t i = 0; i < 5; ++i) PutDict32(bytes, 4 + i * 4, fields[i]);
     }
     PutDict32(bytes, headerSize, 0x7A81);
+    bytes[headerSize + 8] = 116; // radical
+    bytes[headerSize + 10] = 9; // strokes
+    bytes[headerSize + 11] = 1; // JIS level
+    bytes[headerSize + 12] = 1; // plane
+    bytes[headerSize + 13] = 38; // ku
+    bytes[headerSize + 14] = 45; // ten
     PutDict32(bytes, yomiOffset, 0x3068); // と
     bytes[yomiOffset + 12] = 1; // count
     PutDict32(bytes, listOffset, 0x7A81); // 突
@@ -57,6 +63,59 @@ TEST(DictionaryFormatTest, LoadsBothVersionsWithoutMetadataAsCandidates)
     }
 }
 
+TEST(DictionaryFormatTest, LoadsKanjiGradesAndBuildsDisplayInformation)
+{
+    const std::vector<std::pair<uint16_t, ChmKanjiCategory>> grades = {
+        {1, ChmKanjiCategory::Education1}, {2, ChmKanjiCategory::Education2},
+        {3, ChmKanjiCategory::Education3}, {4, ChmKanjiCategory::Education4},
+        {5, ChmKanjiCategory::Education5}, {6, ChmKanjiCategory::Education6},
+        {8, ChmKanjiCategory::Joyo}, {9, ChmKanjiCategory::Jinmeiyo},
+        {10, ChmKanjiCategory::Jinmeiyo}, {0, ChmKanjiCategory::Other},
+        {7, ChmKanjiCategory::Other}, {255, ChmKanjiCategory::Other}
+    };
+    ChmL3KanjiDict dict;
+    ChmConfig config;
+    ChmL3Helper helper(&config);
+    for (bool v2 : {false, true}) {
+        for (const auto& grade : grades) {
+            auto bytes = MakeTestDictionary(v2);
+            const size_t headerSize = v2 ? 44 : 24;
+            PutDict32(bytes, headerSize + 4, 123u);
+            bytes[headerSize + 9] = static_cast<char>(grade.first);
+            std::istringstream input(bytes, std::ios::binary);
+            ASSERT_TRUE(dict.LoadDict(input));
+            ASSERT_EQ(1u, dict.DictKanji.size());
+            EXPECT_EQ(0x7A81u, dict.DictKanji[0].codepoint);
+            EXPECT_EQ(grade.first, dict.DictKanji[0].grade);
+            EXPECT_EQ(123u, dict.DictKanji[0].freq);
+            ChmL3KanjiSelect select(&dict, static_cast<byte>(helper.GetPageSize()));
+            ASSERT_TRUE(select.Start(L"と"));
+            ChmCandidatePage page;
+            ASSERT_TRUE(select.BuildCandidatePage(page, helper));
+            ASSERT_EQ(1u, page.kanjiInfo.size());
+            const auto& info = page.kanjiInfo[0];
+            EXPECT_EQ(static_cast<size_t>(helper.IndexToCell(0)), info.cellIndex);
+            EXPECT_EQ(info.codePoint, page.candidates[info.cellIndex]);
+            EXPECT_EQ(grade.second, info.category);
+            EXPECT_EQ(1u, info.jis.plane);
+            EXPECT_EQ(1u, info.jis.level);
+            EXPECT_EQ(0u, info.radical.codePoint);
+            EXPECT_TRUE(info.radical.name.empty());
+            EXPECT_EQ(9u, info.strokeCount);
+            EXPECT_EQ(116u, info.radical.number);
+            EXPECT_EQ(38u, info.jis.ku);
+            EXPECT_EQ(45u, info.jis.ten);
+            EXPECT_TRUE(info.variants.empty());
+            auto copiedPage = page;
+            page.kanjiInfo.clear();
+            ASSERT_EQ(1u, copiedPage.kanjiInfo.size());
+            select.Cancel();
+            EXPECT_FALSE(select.BuildCandidatePage(copiedPage, helper));
+            EXPECT_TRUE(copiedPage.kanjiInfo.empty());
+        }
+    }
+    EXPECT_EQ(ChmKanjiCategory::Other, dict.GetKanjiInfo(0x4E00).category);
+}
 TEST(DictionaryFormatTest, PageTotalsIncludeEmptyPagesAndRespectPageSize)
 {
     ChmL3KanjiDict dict;
@@ -95,7 +154,7 @@ TEST(DictionaryFormatTest, PageTotalsIncludeEmptyPagesAndRespectPageSize)
 TEST(DictionaryFormatTest, SupportsAbsentOptionalBlocks)
 {
     auto bytes = MakeTestDictionary(true);
-    bytes.resize(76);
+    bytes.resize(84);
     for (size_t offset : {4u, 16u, 32u, 36u, 40u}) PutDict32(bytes, offset, 0);
     ChmL3KanjiDict dict;
     std::istringstream input(bytes, std::ios::binary);
@@ -110,8 +169,8 @@ TEST(DictionaryFormatTest, RejectsInvalidRangesAndClearsPreviousData)
     for (size_t size : {0u, 4u, 43u, 90u}) invalid.push_back(valid.substr(0, size));
     for (const auto& change : std::vector<std::pair<size_t, uint32_t>>{
         {0, 0}, {8, 0xFFFFFFFF}, {12, 0xFFFFFFFF}, {16, 0xFFFFFFFF},
-        {20, 0}, {24, 0}, {28, 0xFFFFFFFF}, {32, 73}, {36, 77}, {40, 100},
-        {68, 1}}) { // yomi offset beyond its single candidate
+        {20, 0}, {24, 0}, {28, 0xFFFFFFFF}, {32, 81}, {36, 85}, {40, 100},
+        {76, 1}}) { // yomi offset beyond its single candidate
         auto bytes = valid;
         PutDict32(bytes, change.first, change.second);
         invalid.push_back(bytes);
@@ -122,6 +181,7 @@ TEST(DictionaryFormatTest, RejectsInvalidRangesAndClearsPreviousData)
         ASSERT_TRUE(dict.LoadDict(good));
         std::istringstream bad(bytes, std::ios::binary);
         EXPECT_FALSE(dict.LoadDict(bad));
+        EXPECT_TRUE(dict.DictKanji.empty());
         EXPECT_TRUE(dict.DictYomi.empty());
         EXPECT_TRUE(dict.kanjiList.empty());
     }
