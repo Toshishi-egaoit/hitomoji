@@ -10,6 +10,7 @@
 #include "ChmEnvironment.h"
 #include "ChmConfig.h"
 #include "ChmCandidatePage.h"
+#include "ChmL3HelperRadical.h"
 #include "utils.h"
 
 class ChmL3Helper;
@@ -58,6 +59,20 @@ public:
 	};
 	static_assert(sizeof(KanjiEntry) == 16, "Kanji entry layout");
 
+	// Fixed-length wire record; never read a vector-containing object from disk.
+	struct VariantEntry {
+		uint32_t parentCp;
+		uint32_t variantCp;
+		uint16_t displayOrder;
+		uint16_t reserved;
+	};
+	static_assert(sizeof(VariantEntry) == 12, "Variant entry layout");
+
+	struct VariantGroup {
+		uint32_t parent_cp;
+		std::vector<uint32_t> variants; // In displayOrder order.
+	};
+
 	static ChmKanjiCategory CategoryFromGrade(uint16_t grade)
 	{
 		switch (grade) {
@@ -83,8 +98,17 @@ public:
 		if (entry != DictKanji.end()) {
 			info.category = CategoryFromGrade(entry->grade);
 			info.radical.number = entry->radical;
+			if (const auto* radical = ChmL3HelperRadical::FindByNumber(entry->radical)) {
+				info.radical.codePoint = radical->codePoint;
+				info.radical.name = radical->reading;
+			}
 			info.strokeCount = entry->strokes;
 			info.jis = { entry->jisPlane, entry->jisKu, entry->jisTen, entry->jisLevel };
+		}
+		const auto group = std::lower_bound(DictVariant.begin(), DictVariant.end(), codePoint,
+			[](const VariantGroup& value, uint32_t cp) { return value.parent_cp < cp; });
+		if (group != DictVariant.end() && group->parent_cp == codePoint) {
+			for (uint32_t cp : group->variants) info.variants.push_back({cp});
 		}
 		return info;
 	}
@@ -96,6 +120,7 @@ public:
 	};
 	// データはファイルから読み込んでここに保持する設計
 	std::vector<KanjiEntry> DictKanji;
+	std::vector<VariantGroup> DictVariant; // Sorted by parent_cp; one group per parent.
 	std::vector<YomiEntry> DictYomi;
 	std::vector<uint32_t> kanjiList;
 
@@ -106,6 +131,7 @@ public:
 
 	bool LoadDict()
 	{
+		DictVariant.clear();
 		DictKanji.clear();
 		DictYomi.clear();
 		kanjiList.clear();
@@ -125,9 +151,10 @@ public:
 		return true;
 	}
 
-	// Load 16-byte kanji records; variants remain unused.
+	// Load 16-byte kanji records and group fixed-length variant records by parent.
 	bool LoadDict(std::istream& input)
 	{
+		DictVariant.clear();
 		static_assert(sizeof(DictHeader) == 24, "HMJ1 header layout");
 		static_assert(sizeof(YomiEntry) == 20, "Yomi entry layout");
 		DictKanji.clear();
@@ -144,6 +171,8 @@ public:
 		DictHeader header{};
 		uint64_t headerSize = sizeof(DictHeader);
 		uint64_t listEnd = fileSize;
+		uint32_t variantOffset = 0;
+		uint32_t variantCount = 0;
 		if (magic == MagicHMJ1) {
 			if (!input.read(reinterpret_cast<char*>(&header), sizeof(header))) return false;
 		}
@@ -162,8 +191,10 @@ public:
 			else if (v2.infoSize != 0) return false;
 			if (v2.variantOffset != 0) {
 				if (v2.variantOffset < v2.listOffset ||
-					uint64_t(v2.variantOffset) + uint64_t(v2.variantCount) * 12 > listEnd) return false;
+					uint64_t(v2.variantOffset) + uint64_t(v2.variantCount) * sizeof(VariantEntry) > listEnd) return false;
 				listEnd = v2.variantOffset;
+				variantOffset = v2.variantOffset;
+				variantCount = v2.variantCount;
 			}
 			else if (v2.variantCount != 0) return false;
 		}
@@ -190,6 +221,25 @@ public:
 		for (const auto& yomi : yomis) {
 			if (uint64_t(yomi.offset) + yomi.count > candidates.size()) return false;
 		}
+		std::vector<VariantEntry> variantRecords(variantCount);
+		if (!variantRecords.empty()) {
+			input.seekg(variantOffset);
+			if (!input.read(reinterpret_cast<char*>(variantRecords.data()),
+				static_cast<std::streamsize>(variantRecords.size() * sizeof(VariantEntry)))) return false;
+		}
+		// Do not depend on file ordering; equal displayOrder values retain file order.
+		std::stable_sort(variantRecords.begin(), variantRecords.end(),
+			[](const VariantEntry& a, const VariantEntry& b) {
+				return a.parentCp != b.parentCp ? a.parentCp < b.parentCp : a.displayOrder < b.displayOrder;
+			});
+		std::vector<VariantGroup> variants;
+		for (const auto& record : variantRecords) {
+			if (variants.empty() || variants.back().parent_cp != record.parentCp) {
+				variants.push_back({record.parentCp, {}});
+			}
+			variants.back().variants.push_back(record.variantCp);
+		}
+		DictVariant.swap(variants);
 		DictKanji.swap(kanjis);
 		DictYomi.swap(yomis);
 		kanjiList.swap(candidates);

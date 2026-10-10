@@ -36,6 +36,17 @@ private:
     void _OnHide();
     void _ShowPendingPage();
     void _DiscardPendingPage();
+    void _HideTooltip();
+    int _HitTest(POINT point) const;
+    void _OnMouseMove(POINT point);
+    void _ShowTooltip();
+    void _PaintTooltip(HDC hdc);
+
+    HWND _tooltip = nullptr;
+    int _hoverCell = -1;
+    std::wstring _tooltipTitle;
+    std::wstring _tooltipBody;
+    int _tooltipTitleHeight = 0;
 
     HINSTANCE _hInst;
     HANDLE _hThread;

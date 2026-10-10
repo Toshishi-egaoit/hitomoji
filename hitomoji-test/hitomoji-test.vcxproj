@@ -115,6 +115,8 @@
     <ClCompile Include="layer1-test.cpp" />
     <ClCompile Include="layer2-test.cpp" />
     <ClCompile Include="layer3-test.cpp" />
+    <ClCompile Include="radical-test.cpp" />
+    <ClCompile Include="candidate-tooltip-test.cpp" />
     <ClCompile Include="TestKeyEventHelper.cpp" />
   </ItemGroup>
   <ItemGroup>

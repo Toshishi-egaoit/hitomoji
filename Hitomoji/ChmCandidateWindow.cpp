@@ -4,6 +4,7 @@
 #include <string>
 
 #include "ChmCandidateWindow.h"
+#include "ChmCandidateTooltip.h"
 
 namespace {
 constexpr wchar_t CHM_CANDIDATE_WINDOW_CLASS[] = L"HitomojiCandidateWindow";
@@ -20,6 +21,14 @@ constexpr int CHM_CANDIDATE_HOME_F_INDEX = 23;
 constexpr int CHM_CANDIDATE_HOME_J_INDEX = 26;
 constexpr int CHM_CANDIDATE_MARKER_HEIGHT = 2;
 constexpr int CHM_CANDIDATE_HOME_MARKER_HEIGHT = 4;
+
+HFONT TooltipFont(HDC hdc, int points)
+{
+    return CreateFontW(-MulDiv(points, GetDeviceCaps(hdc, LOGPIXELSY), 72),
+        0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+        OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+        DEFAULT_PITCH | FF_DONTCARE, L"Yu Gothic UI");
+}
 
 // Keyboard order: left little/ring/middle/index, right index/middle/ring/little.
 // Keep separate entries for all eight fingers for future configuration support.
@@ -307,6 +316,10 @@ BOOL ChmCandidateWindowThread::_CreateWindow()
 
     if (!_hwnd) return FALSE;
 
+    _tooltip = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
+        CHM_CANDIDATE_WINDOW_CLASS, L"Hitomoji Kanji Info", WS_POPUP,
+        0, 0, 0, 0, _hwnd, nullptr, _hInst, this);
+
     ShowWindow(_hwnd, SW_HIDE);
     return TRUE;
 }
@@ -385,8 +398,122 @@ void ChmCandidateWindowThread::_ShowPendingPage()
 
 void ChmCandidateWindowThread::_DiscardPendingPage()
 {
+    _HideTooltip();
     delete _pendingPage;
     _pendingPage = nullptr;
+}
+
+void ChmCandidateWindowThread::_HideTooltip()
+{
+    if (_tooltip) ShowWindow(_tooltip, SW_HIDE);
+    if (_hwnd) {
+        TRACKMOUSEEVENT tracking{sizeof(tracking), TME_CANCEL | TME_HOVER | TME_LEAVE, _hwnd, 0};
+        TrackMouseEvent(&tracking);
+    }
+    _hoverCell = -1;
+    _tooltipTitle.clear();
+    _tooltipBody.clear();
+}
+
+int ChmCandidateWindowThread::_HitTest(POINT point) const
+{
+    if (_state != State::Visible || !_pendingPage) return -1;
+    const int y = point.y - CHM_CANDIDATE_PADDING;
+    if (y < 0 || y >= CHM_CANDIDATE_ROWS * CHM_CANDIDATE_CELL_HEIGHT) return -1;
+    const int row = y / CHM_CANDIDATE_CELL_HEIGHT;
+    const int x = point.x - CHM_CANDIDATE_PADDING - CHM_CANDIDATE_ROW_OFFSETS[row];
+    if (x < 0 || x >= CHM_CANDIDATE_COLS * CHM_CANDIDATE_CELL_WIDTH) return -1;
+    const int cell = row * CHM_CANDIDATE_COLS + x / CHM_CANDIDATE_CELL_WIDTH;
+    return _pendingPage->candidates[cell] ? cell : -1;
+}
+
+void ChmCandidateWindowThread::_OnMouseMove(POINT point)
+{
+    const int cell = _HitTest(point);
+    if (cell == _hoverCell) return;
+    _HideTooltip();
+    _hoverCell = cell;
+    if (cell >= 0) {
+        TRACKMOUSEEVENT tracking{sizeof(tracking), TME_HOVER | TME_LEAVE, _hwnd, 500};
+        TrackMouseEvent(&tracking);
+    }
+}
+
+void ChmCandidateWindowThread::_ShowTooltip()
+{
+    if (!_tooltip || !_pendingPage || _hoverCell < 0 || _state != State::Visible) return;
+    POINT cursor{};
+    if (!GetCursorPos(&cursor)) return;
+    POINT local = cursor;
+    ScreenToClient(_hwnd, &local);
+    if (_HitTest(local) != _hoverCell) { _HideTooltip(); return; }
+    ChmKanjiInfo info;
+    info.codePoint = _pendingPage->candidates[_hoverCell];
+    for (const auto& value : _pendingPage->kanjiInfo) {
+        if (value.cellIndex == static_cast<size_t>(_hoverCell) && value.codePoint == info.codePoint) {
+            info = value;
+            break;
+        }
+    }
+    _tooltipTitle = ChmCandidateTooltip::Title(info);
+    _tooltipBody = ChmCandidateTooltip::Body(info);
+    if (_tooltipTitle.empty()) return;
+
+    MONITORINFO monitor{sizeof(monitor)};
+    if (!GetMonitorInfoW(MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST), &monitor)) return;
+    HDC hdc = GetDC(_tooltip);
+    if (!hdc) return;
+    HFONT titleFont = TooltipFont(hdc, 24);
+    HFONT bodyFont = TooltipFont(hdc, 12);
+    HGDIOBJ oldFont = GetCurrentObject(hdc, OBJ_FONT);
+    const int maxWidth = (std::max)(1, (std::min)(420, static_cast<int>(monitor.rcWork.right - monitor.rcWork.left) - 24));
+    RECT title{0, 0, maxWidth, 0}, body{0, 0, maxWidth, 0};
+    if (titleFont) SelectObject(hdc, titleFont);
+    DrawTextW(hdc, _tooltipTitle.c_str(), -1, &title, DT_CALCRECT | DT_SINGLELINE | DT_NOPREFIX);
+    if (bodyFont) SelectObject(hdc, bodyFont);
+    if (!_tooltipBody.empty()) DrawTextW(hdc, _tooltipBody.c_str(), -1, &body, DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX);
+    _tooltipTitleHeight = title.bottom;
+    const int width = (std::max)(title.right, body.right) + 24;
+    const int height = title.bottom + body.bottom + 30;
+    SelectObject(hdc, oldFont);
+    if (titleFont) DeleteObject(titleFont);
+    if (bodyFont) DeleteObject(bodyFont);
+    ReleaseDC(_tooltip, hdc);
+
+    RECT candidate{};
+    GetWindowRect(_hwnd, &candidate);
+    int x = candidate.right + 8, y = cursor.y;
+    if (x + width > monitor.rcWork.right) x = candidate.left - width - 8;
+    if (x < monitor.rcWork.left) {
+        x = candidate.left;
+        y = candidate.bottom + 8;
+        if (y + height > monitor.rcWork.bottom) y = candidate.top - height - 8;
+    }
+    x = (std::max)(static_cast<int>(monitor.rcWork.left), (std::min)(x, static_cast<int>(monitor.rcWork.right) - width));
+    y = (std::max)(static_cast<int>(monitor.rcWork.top), (std::min)(y, static_cast<int>(monitor.rcWork.bottom) - height));
+    SetWindowPos(_tooltip, HWND_TOPMOST, x, y, width, height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    InvalidateRect(_tooltip, nullptr, TRUE);
+}
+
+void ChmCandidateWindowThread::_PaintTooltip(HDC hdc)
+{
+    RECT bounds{};
+    GetClientRect(_tooltip, &bounds);
+    FillRect(hdc, &bounds, GetSysColorBrush(COLOR_INFOBK));
+    FrameRect(hdc, &bounds, GetSysColorBrush(COLOR_WINDOWFRAME));
+    SetBkMode(hdc, TRANSPARENT);
+    SetTextColor(hdc, GetSysColor(COLOR_INFOTEXT));
+    HFONT titleFont = TooltipFont(hdc, 24), bodyFont = TooltipFont(hdc, 12);
+    HGDIOBJ oldFont = GetCurrentObject(hdc, OBJ_FONT);
+    RECT title{12, 12, bounds.right - 12, 12 + _tooltipTitleHeight};
+    RECT body{12, title.bottom + 6, bounds.right - 12, bounds.bottom - 12};
+    if (titleFont) SelectObject(hdc, titleFont);
+    DrawTextW(hdc, _tooltipTitle.c_str(), -1, &title, DT_SINGLELINE | DT_NOPREFIX);
+    if (bodyFont) SelectObject(hdc, bodyFont);
+    DrawTextW(hdc, _tooltipBody.c_str(), -1, &body, DT_WORDBREAK | DT_NOPREFIX);
+    SelectObject(hdc, oldFont);
+    if (titleFont) DeleteObject(titleFont);
+    if (bodyFont) DeleteObject(bodyFont);
 }
 
 LRESULT CALLBACK ChmCandidateWindowThread::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
@@ -400,6 +527,21 @@ LRESULT CALLBACK ChmCandidateWindowThread::WndProc(HWND hwnd, UINT msg, WPARAM w
     }
 
     switch (msg) {
+    case WM_MOUSEACTIVATE:
+        return MA_NOACTIVATEANDEAT;
+    case WM_NCHITTEST:
+        if (self && hwnd == self->_tooltip) return HTTRANSPARENT;
+        break;
+    case WM_MOUSEMOVE:
+        if (self && hwnd == self->_hwnd)
+            self->_OnMouseMove({static_cast<short>(LOWORD(lp)), static_cast<short>(HIWORD(lp))});
+        return 0;
+    case WM_MOUSEHOVER:
+        if (self && hwnd == self->_hwnd) self->_ShowTooltip();
+        return 0;
+    case WM_MOUSELEAVE:
+        if (self && hwnd == self->_hwnd) self->_HideTooltip();
+        return 0;
     case WM_TIMER:
         if (self && wp == CHM_CANDIDATE_TIMER_ID) {
             self->_ShowPendingPage();
@@ -409,6 +551,11 @@ LRESULT CALLBACK ChmCandidateWindowThread::WndProc(HWND hwnd, UINT msg, WPARAM w
     case WM_PAINT: {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
+        if (self && hwnd == self->_tooltip) {
+            self->_PaintTooltip(hdc);
+            EndPaint(hwnd, &ps);
+            return 0;
+        }
         RECT rc;
         GetClientRect(hwnd, &rc);
         FillRect(hdc, &rc, reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1));
@@ -420,6 +567,10 @@ LRESULT CALLBACK ChmCandidateWindowThread::WndProc(HWND hwnd, UINT msg, WPARAM w
         return 0;
     }
     case WM_DESTROY:
+        if (self && hwnd == self->_tooltip) {
+            self->_tooltip = nullptr;
+            return 0;
+        }
         if (self) {
             self->_DiscardPendingPage();
         }

@@ -17,6 +17,7 @@ struct ChmJisInfo {
 };
 
 enum class ChmKanjiCategory {
+    Unknown = -1,
     Education1,
     Education2,
     Education3,
@@ -43,7 +44,7 @@ struct ChmKanjiInfo {
     size_t cellIndex = 0; // Corresponding cell in ChmCandidatePage::candidates.
     uint32_t codePoint = 0;
     ChmJisInfo jis;
-    ChmKanjiCategory category = ChmKanjiCategory::Other;
+    ChmKanjiCategory category = ChmKanjiCategory::Unknown;
     ChmRadicalInfo radical;
     uint32_t strokeCount = 0; // 0 denotes unavailable.
     std::vector<ChmVariantInfo> variants;

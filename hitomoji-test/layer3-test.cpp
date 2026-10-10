@@ -63,6 +63,59 @@ TEST(DictionaryFormatTest, LoadsBothVersionsWithoutMetadataAsCandidates)
     }
 }
 
+TEST(DictionaryFormatTest, GroupsVariantsByParentAndDisplayOrder)
+{
+    auto bytes = MakeTestDictionary(true);
+    // Interleaved parents, unsorted orders, and a supplementary-plane code point.
+    const uint32_t records[][3] = {
+        {0x7A81, 0xFA55, 2}, {0x5F01, 0x8FAF, 3},
+        {0x5F01, 0x8FA8, 1}, {0x7A81, 0x20000, 1},
+        {0x5F01, 0x74E3, 2}, {0x7A81, 0x20001, 2}
+    };
+    constexpr size_t count = sizeof(records) / sizeof(records[0]);
+    constexpr size_t variantOffset = 84;
+    const size_t infoOffset = variantOffset + count * 12;
+    bytes.resize(infoOffset + 3, '\0');
+    PutDict32(bytes, 16, static_cast<uint32_t>(count));
+    PutDict32(bytes, 36, static_cast<uint32_t>(infoOffset));
+    for (size_t i = 0; i < count; ++i) {
+        PutDict32(bytes, variantOffset + i * 12, records[i][0]);
+        PutDict32(bytes, variantOffset + i * 12 + 4, records[i][1]);
+        PutDict32(bytes, variantOffset + i * 12 + 8, records[i][2]);
+    }
+    bytes.replace(infoOffset, 3, "abc");
+    ChmL3KanjiDict dict;
+    std::istringstream input(bytes, std::ios::binary);
+    ASSERT_TRUE(dict.LoadDict(input));
+    ASSERT_EQ(2u, dict.DictVariant.size());
+    EXPECT_EQ(0x5F01u, dict.DictVariant[0].parent_cp);
+    EXPECT_EQ((std::vector<uint32_t>{0x8FA8, 0x74E3, 0x8FAF}), dict.DictVariant[0].variants);
+    EXPECT_EQ(0x7A81u, dict.DictVariant[1].parent_cp);
+    EXPECT_EQ((std::vector<uint32_t>{0x20000, 0xFA55, 0x20001}), dict.DictVariant[1].variants);
+    EXPECT_EQ((std::vector<uint32_t>{0x7A81}), dict.kanjiList);
+    ChmConfig config;
+    ChmL3Helper helper(&config);
+    ChmL3KanjiSelect select(&dict, static_cast<byte>(helper.GetPageSize()));
+    ASSERT_TRUE(select.Start(L"と"));
+    ChmCandidatePage page;
+    ASSERT_TRUE(select.BuildCandidatePage(page, helper));
+    ASSERT_EQ(1u, page.kanjiInfo.size());
+    ASSERT_EQ(3u, page.kanjiInfo[0].variants.size());
+    auto copiedPage = page;
+    page.kanjiInfo[0].variants.clear();
+    EXPECT_EQ(0x20000u, copiedPage.kanjiInfo[0].variants[0].codePoint);
+    EXPECT_EQ(0xFA55u, copiedPage.kanjiInfo[0].variants[1].codePoint);
+    EXPECT_EQ(0x20001u, copiedPage.kanjiInfo[0].variants[2].codePoint);
+
+    std::istringstream single(MakeTestDictionary(true), std::ios::binary);
+    ASSERT_TRUE(dict.LoadDict(single));
+    ASSERT_EQ(1u, dict.DictVariant.size());
+    EXPECT_EQ((std::vector<uint32_t>{0xFA55}), dict.DictVariant[0].variants);
+    std::istringstream legacy(MakeTestDictionary(false), std::ios::binary);
+    ASSERT_TRUE(dict.LoadDict(legacy));
+    EXPECT_TRUE(dict.DictVariant.empty());
+}
+
 TEST(DictionaryFormatTest, LoadsKanjiGradesAndBuildsDisplayInformation)
 {
     const std::vector<std::pair<uint16_t, ChmKanjiCategory>> grades = {
@@ -99,13 +152,13 @@ TEST(DictionaryFormatTest, LoadsKanjiGradesAndBuildsDisplayInformation)
             EXPECT_EQ(grade.second, info.category);
             EXPECT_EQ(1u, info.jis.plane);
             EXPECT_EQ(1u, info.jis.level);
-            EXPECT_EQ(0u, info.radical.codePoint);
-            EXPECT_TRUE(info.radical.name.empty());
+            EXPECT_EQ(0x7A74u, info.radical.codePoint); // 穴
+            EXPECT_EQ(L"あな", info.radical.name);
             EXPECT_EQ(9u, info.strokeCount);
             EXPECT_EQ(116u, info.radical.number);
             EXPECT_EQ(38u, info.jis.ku);
             EXPECT_EQ(45u, info.jis.ten);
-            EXPECT_TRUE(info.variants.empty());
+            EXPECT_EQ(v2 ? 1u : 0u, info.variants.size());
             auto copiedPage = page;
             page.kanjiInfo.clear();
             ASSERT_EQ(1u, copiedPage.kanjiInfo.size());
@@ -114,7 +167,7 @@ TEST(DictionaryFormatTest, LoadsKanjiGradesAndBuildsDisplayInformation)
             EXPECT_TRUE(copiedPage.kanjiInfo.empty());
         }
     }
-    EXPECT_EQ(ChmKanjiCategory::Other, dict.GetKanjiInfo(0x4E00).category);
+    EXPECT_EQ(ChmKanjiCategory::Unknown, dict.GetKanjiInfo(0x4E00).category);
 }
 TEST(DictionaryFormatTest, PageTotalsIncludeEmptyPagesAndRespectPageSize)
 {
@@ -160,6 +213,7 @@ TEST(DictionaryFormatTest, SupportsAbsentOptionalBlocks)
     std::istringstream input(bytes, std::ios::binary);
     ASSERT_TRUE(dict.LoadDict(input));
     EXPECT_EQ(1u, dict.kanjiList.size());
+    EXPECT_TRUE(dict.DictVariant.empty());
 }
 
 TEST(DictionaryFormatTest, RejectsInvalidRangesAndClearsPreviousData)
@@ -182,6 +236,7 @@ TEST(DictionaryFormatTest, RejectsInvalidRangesAndClearsPreviousData)
         std::istringstream bad(bytes, std::ios::binary);
         EXPECT_FALSE(dict.LoadDict(bad));
         EXPECT_TRUE(dict.DictKanji.empty());
+        EXPECT_TRUE(dict.DictVariant.empty());
         EXPECT_TRUE(dict.DictYomi.empty());
         EXPECT_TRUE(dict.kanjiList.empty());
     }
