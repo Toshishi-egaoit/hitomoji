@@ -60,6 +60,10 @@ TEST(DictionaryFormatTest, LoadsBothVersionsWithoutMetadataAsCandidates)
         ChmL3KanjiSelect select(&dict, 40);
         ASSERT_TRUE(select.Start(L"と"));
         EXPECT_EQ(0x7A81u, select.SelectByIndex(0));
+        EXPECT_EQ(v2 ? 0xFA55u : 0x7A81u, select.SelectByIndex(0, 1));
+        EXPECT_EQ(0x7A81u, select.SelectByIndex(0, 2));
+        select.Cancel();
+        EXPECT_EQ(0u, select.SelectByIndex(0, 1));
     }
 }
 
@@ -97,6 +101,12 @@ TEST(DictionaryFormatTest, GroupsVariantsByParentAndDisplayOrder)
     ChmL3Helper helper(&config);
     ChmL3KanjiSelect select(&dict, static_cast<byte>(helper.GetPageSize()));
     ASSERT_TRUE(select.Start(L"と"));
+    EXPECT_EQ(0x7A81u, select.SelectByIndex(0, 0));
+    EXPECT_EQ(0x20000u, select.SelectByIndex(0, 1));
+    EXPECT_EQ(0xFA55u, select.SelectByIndex(0, 2));
+    EXPECT_EQ(0x20001u, select.SelectByIndex(0, 3));
+    EXPECT_EQ(0x7A81u, select.SelectByIndex(0, 4));
+    EXPECT_EQ(0u, select.SelectByIndex(1, 1));
     ChmCandidatePage page;
     ASSERT_TRUE(select.BuildCandidatePage(page, helper));
     ASSERT_EQ(1u, page.kanjiInfo.size());
@@ -425,6 +435,39 @@ protected:
 };
 
 } // namespace
+
+TEST_F(Layer3Test, ShiftSelectsVariantUsingLetterOrSymbolWithCapsLock)
+{
+    for (bool symbol : {false, true}) {
+        for (bool shift : {false, true}) {
+            WriteMainConfig(symbol ? L"[ui]\nselect_keymap=/\n" : L"[ui]\nselect_keymap=a\n");
+            ChmEngine engine;
+            engine.Activate();
+            InputKeys(engine, "KOU", L"こう");
+            ChmCandidatePage page;
+            StartSelection(engine, page);
+            const auto pageCount = page.totalPages;
+            bool found = false;
+            for (size_t i = 0; i < pageCount; ++i) {
+                if (!page.kanjiInfo.empty() && !page.kanjiInfo[0].variants.empty()) {
+                    found = true;
+                    break;
+                }
+                SelectNextPage(engine, page);
+            }
+            ASSERT_TRUE(found);
+            const auto& info = page.kanjiInfo[0];
+            const auto expected = ChmL3Helper::Utf32ToWString(shift ? info.variants[0].codePoint : info.codePoint);
+            auto key = MakeKey(symbol ? VK_OEM_2 : 'A', engine.GetState(), shift, false, false, true);
+            ASSERT_EQ(ChmFuncType::SelectInput, key.GetType());
+            bool ended = false;
+            EXPECT_TRUE(engine.UpdateComposition(key, ended));
+            EXPECT_TRUE(ended);
+            EXPECT_EQ(expected, engine.GetCompositionStr());
+            engine.Deactivate();
+        }
+    }
+}
 
 TEST_F(Layer3Test, ConvertKeyStartsKanjiSelectionAndBuildsCandidatePageForKou)
 {

@@ -65,6 +65,8 @@ public:
     // --- accessors ---
     ChmFuncType GetType() const { return _type; }
 	unsigned char GetChar() const ;
+    unsigned char GetSelectionChar() const;
+    size_t GetVariantIndex() const { return _type == ChmFuncType::SelectInput && _shift ? 1 : 0; }
     bool IsShift() const { return _shift; }
 	bool IsUnFinishKey() const;
 	bool IsNavigationFinish() const { return _isNavigationFinish; }

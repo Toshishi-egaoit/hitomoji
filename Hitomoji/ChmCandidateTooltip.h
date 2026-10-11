@@ -55,6 +55,10 @@ inline std::wstring Body(const ChmKanjiInfo& info)
         line(radical);
     }
     if (info.strokeCount) line(std::to_wstring(info.strokeCount) + L"画");
+    return text;
+}
+inline std::wstring Variants(const ChmKanjiInfo& info)
+{
     std::wstring variants;
     for (const auto& variant : info.variants) {
         auto glyph = Glyph(variant.codePoint);
@@ -62,8 +66,7 @@ inline std::wstring Body(const ChmKanjiInfo& info)
         if (!variants.empty()) variants += L" ";
         variants += glyph;
     }
-    if (!variants.empty()) line(L"異体字：" + variants);
-    return text;
+    return variants;
 }
 }
 

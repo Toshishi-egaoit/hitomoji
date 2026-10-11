@@ -56,6 +56,8 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     static HWND hEdit1, hEdit2, hBtn1;
+	HFONT hEditFont = NULL;
+	HDC hdc = NULL;
     switch (message) {
     case WM_CREATE:
         hEdit1 = CreateWindowEx(0, _T("EDIT"), _T(""),
@@ -63,14 +65,29 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
             10, 10, 360, 25, hWnd, nullptr, hInst, nullptr);
         hEdit2 = CreateWindowEx(0, _T("EDIT"), _T(""),
             WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL | WS_TABSTOP,
-            10, 40, 360, 30, hWnd, nullptr, hInst, nullptr);
+            10, 40, 360, 50, hWnd, nullptr, hInst, nullptr);
         hBtn1 = CreateWindowEx(0, _T("BUTTON"), _T(""),
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_CHECKBOX,
-            10, 80, 80, 25, hWnd, nullptr, hInst, nullptr);
+            10, 130, 80, 25, hWnd, nullptr, hInst, nullptr);
         hBtn1 = CreateWindowEx(0, _T("BUTTON"), _T(""),
             WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP | BS_PUSHBUTTON,
-            210, 80, 100, 25, hWnd, nullptr, hInst, nullptr);
-        break;
+            210, 130, 100, 25, hWnd, nullptr, hInst, nullptr);
+		hdc = GetDC(hWnd);
+		hEditFont = CreateFontW(
+			-MulDiv(24, GetDeviceCaps(hdc, LOGPIXELSY), 72),
+			0, 0, 0, FW_NORMAL,
+			FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+			OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+			CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
+			L"游明朝");
+		ReleaseDC(hWnd, hdc);
+
+		if (hEditFont) {
+			SendMessage(hEdit2, WM_SETFONT,
+				reinterpret_cast<WPARAM>(hEditFont), TRUE);
+		}
+		break;
+
     case WM_SETFOCUS:
         if (pThreadMgr == nullptr) break;
         if (hWnd == hEdit1) {

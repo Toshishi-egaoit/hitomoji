@@ -89,6 +89,7 @@ void DrawCandidates(HDC hdc, const ChmCandidatePage* page)
         DEFAULT_PITCH | FF_DONTCARE,
         L"Yu Gothic UI");
     HFONT oldFont = font ? static_cast<HFONT>(SelectObject(hdc, font)) : nullptr;
+    HFONT variantFont = TooltipFont(hdc, 10);
     SetBkMode(hdc, TRANSPARENT);
     SetTextColor(hdc, GetSysColor(COLOR_WINDOWTEXT));
 
@@ -125,7 +126,21 @@ void DrawCandidates(HDC hdc, const ChmCandidatePage* page)
 
         SetTextColor(hdc, CHM_CANDIDATE_FINGER_COLORS[CHM_CANDIDATE_COLUMN_FINGERS[col]]);
         DrawTextW(hdc, text, -1, &cell, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        const bool hasVariants = std::any_of(page->kanjiInfo.begin(), page->kanjiInfo.end(),
+            [i, cp](const ChmKanjiInfo& info) {
+                return info.cellIndex == static_cast<size_t>(i) && info.codePoint == cp
+                    && !info.variants.empty();
+            });
+        if (hasVariants && variantFont) {
+            HGDIOBJ previousFont = SelectObject(hdc, variantFont);
+            // Move toward the kanji, but lower the enlarged indicator to keep it clear.
+            RECT indicator{cell.left, cell.top, cell.right, cell.bottom + 3};
+            DrawTextW(hdc, L"v", -1, &indicator, DT_LEFT | DT_BOTTOM | DT_SINGLELINE | DT_NOPREFIX);
+            SelectObject(hdc, previousFont);
+        }
     }
+
+    if (variantFont) DeleteObject(variantFont);
 
     for (HBRUSH brush : markerBrushes) {
         if (brush) DeleteObject(brush);
@@ -412,6 +427,7 @@ void ChmCandidateWindowThread::_HideTooltip()
     }
     _hoverCell = -1;
     _tooltipTitle.clear();
+    _tooltipVariants.clear();
     _tooltipBody.clear();
 }
 
@@ -456,6 +472,7 @@ void ChmCandidateWindowThread::_ShowTooltip()
         }
     }
     _tooltipTitle = ChmCandidateTooltip::Title(info);
+    _tooltipVariants = ChmCandidateTooltip::Variants(info);
     _tooltipBody = ChmCandidateTooltip::Body(info);
     if (_tooltipTitle.empty()) return;
 
@@ -467,14 +484,22 @@ void ChmCandidateWindowThread::_ShowTooltip()
     HFONT bodyFont = TooltipFont(hdc, 12);
     HGDIOBJ oldFont = GetCurrentObject(hdc, OBJ_FONT);
     const int maxWidth = (std::max)(1, (std::min)(420, static_cast<int>(monitor.rcWork.right - monitor.rcWork.left) - 24));
-    RECT title{0, 0, maxWidth, 0}, body{0, 0, maxWidth, 0};
+    RECT title{0, 0, maxWidth, 0}, variants{0, 0, (std::max)(1, maxWidth - 16), 0}, body{0, 0, maxWidth, 0};
+    RECT variantLabel{};
     if (titleFont) SelectObject(hdc, titleFont);
     DrawTextW(hdc, _tooltipTitle.c_str(), -1, &title, DT_CALCRECT | DT_SINGLELINE | DT_NOPREFIX);
+    if (!_tooltipVariants.empty()) DrawTextW(hdc, _tooltipVariants.c_str(), -1, &variants, DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX);
     if (bodyFont) SelectObject(hdc, bodyFont);
+    if (!_tooltipVariants.empty()) DrawTextW(hdc, L"異体字：", -1, &variantLabel, DT_CALCRECT | DT_SINGLELINE | DT_NOPREFIX);
     if (!_tooltipBody.empty()) DrawTextW(hdc, _tooltipBody.c_str(), -1, &body, DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX);
     _tooltipTitleHeight = title.bottom;
-    const int width = (std::max)(title.right, body.right) + 24;
-    const int height = title.bottom + body.bottom + 30;
+    _tooltipVariantsHeight = variants.bottom;
+    _tooltipVariantLabelHeight = variantLabel.bottom;
+    const LONG variantWidth = _tooltipVariants.empty() ? 0 : (std::max)(variantLabel.right, variants.right + 16);
+    const int width = (std::max)(title.right, (std::max)(variantWidth, body.right)) + 24;
+    const int height = title.bottom + 24
+        + (_tooltipVariants.empty() ? 0 : variantLabel.bottom + variants.bottom + 12)
+        + (_tooltipBody.empty() ? 0 : body.bottom + 6);
     SelectObject(hdc, oldFont);
     if (titleFont) DeleteObject(titleFont);
     if (bodyFont) DeleteObject(bodyFont);
@@ -506,10 +531,14 @@ void ChmCandidateWindowThread::_PaintTooltip(HDC hdc)
     HFONT titleFont = TooltipFont(hdc, 24), bodyFont = TooltipFont(hdc, 12);
     HGDIOBJ oldFont = GetCurrentObject(hdc, OBJ_FONT);
     RECT title{12, 12, bounds.right - 12, 12 + _tooltipTitleHeight};
-    RECT body{12, title.bottom + 6, bounds.right - 12, bounds.bottom - 12};
+    RECT variantLabel{12, title.bottom + 12, bounds.right - 12, title.bottom + 12 + _tooltipVariantLabelHeight};
+    RECT variants{28, variantLabel.bottom, bounds.right - 12, variantLabel.bottom + _tooltipVariantsHeight};
+    RECT body{12, (_tooltipVariants.empty() ? title.bottom : variants.bottom) + 6, bounds.right - 12, bounds.bottom - 12};
     if (titleFont) SelectObject(hdc, titleFont);
     DrawTextW(hdc, _tooltipTitle.c_str(), -1, &title, DT_SINGLELINE | DT_NOPREFIX);
+    if (!_tooltipVariants.empty()) DrawTextW(hdc, _tooltipVariants.c_str(), -1, &variants, DT_WORDBREAK | DT_NOPREFIX);
     if (bodyFont) SelectObject(hdc, bodyFont);
+    if (!_tooltipVariants.empty()) DrawTextW(hdc, L"異体字：", -1, &variantLabel, DT_SINGLELINE | DT_NOPREFIX);
     DrawTextW(hdc, _tooltipBody.c_str(), -1, &body, DT_WORDBREAK | DT_NOPREFIX);
     SelectObject(hdc, oldFont);
     if (titleFont) DeleteObject(titleFont);

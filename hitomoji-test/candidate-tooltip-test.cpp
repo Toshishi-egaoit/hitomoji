@@ -6,6 +6,7 @@ TEST(CandidateTooltipTest, OmitsMissingInformation)
     ChmKanjiInfo info;
     info.codePoint = 0x7A81;
     EXPECT_EQ(L"突  U+7A81", ChmCandidateTooltip::Title(info));
+    EXPECT_TRUE(ChmCandidateTooltip::Variants(info).empty());
     EXPECT_TRUE(ChmCandidateTooltip::Body(info).empty());
     info.jis.ku = 38; // A partial coordinate must not be presented as valid.
     EXPECT_TRUE(ChmCandidateTooltip::Body(info).empty());
@@ -22,8 +23,9 @@ TEST(CandidateTooltipTest, FormatsDetailsAndMultipleVariantsInOrder)
     info.radical = {55, 0x5EFE, L"にじゅうあし"};
     info.strokeCount = 5;
     info.variants = {{0x8FA8}, {0x8FAF}, {0x74E3}};
-    EXPECT_EQ(L"教育漢字（小学1年）\nJIS第1水準  1面42区59点\n部首：廾（にじゅうあし）\n5画\n異体字：辨 辯 瓣",
+    EXPECT_EQ(L"教育漢字（小学1年）\nJIS第1水準  1面42区59点\n部首：廾（にじゅうあし）\n5画",
         ChmCandidateTooltip::Body(info));
+    EXPECT_EQ(L"辨 辯 瓣", ChmCandidateTooltip::Variants(info));
 }
 
 TEST(CandidateTooltipTest, HandlesSupplementaryAndInvalidCodePoints)
@@ -33,7 +35,10 @@ TEST(CandidateTooltipTest, HandlesSupplementaryAndInvalidCodePoints)
         EXPECT_TRUE(ChmCandidateTooltip::Glyph(cp).empty());
     ChmKanjiInfo info;
     info.variants = {{0}, {0xD800}, {0xFA55}};
-    EXPECT_EQ(L"異体字：突", ChmCandidateTooltip::Body(info));
+    EXPECT_EQ(L"突", ChmCandidateTooltip::Variants(info));
+    EXPECT_TRUE(ChmCandidateTooltip::Body(info).empty());
+    info.variants = {{0}, {0xD800}};
+    EXPECT_TRUE(ChmCandidateTooltip::Variants(info).empty());
     info.variants.clear();
     info.radical.number = 116;
     EXPECT_EQ(L"部首：116", ChmCandidateTooltip::Body(info));

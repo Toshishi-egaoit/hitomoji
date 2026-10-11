@@ -176,6 +176,12 @@ void ChmKeyEvent::_TranslateByTable()
     _type = ChmFuncType::None;
 }
 
+unsigned char ChmKeyEvent::GetSelectionChar() const {
+    unsigned char ch = 0;
+    ChmKeyLayout::Translate(_wp, false, false, ch);
+    return ch;
+}
+
 unsigned char ChmKeyEvent::GetChar() const {
 	unsigned char ch;
 	if (ChmKeyLayout::Translate(_wp, _shift, _caps, ch)) {

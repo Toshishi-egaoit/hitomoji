@@ -413,13 +413,13 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 			break;
 		case ChmFuncType::SelectInput:
 			if ( _state == State::Selecting && _pL3KanjiSelect) {
-				int index = _pL3Helper->KeyToIndex(keyEvent.GetChar());
+				int index = _pL3Helper->KeyToIndex(keyEvent.GetSelectionChar());
 				if (index < 0) {
 					Debug(L"   > invalid key");
 					SetError();
 				}
 				else {
-					uint32_t selected = _pL3KanjiSelect->SelectByIndex(index) ;
+					uint32_t selected = _pL3KanjiSelect->SelectByIndex(index, keyEvent.GetVariantIndex());
 					if ( selected == 0) {
 						Debug(L"   > invalid posision");
 						SetError();

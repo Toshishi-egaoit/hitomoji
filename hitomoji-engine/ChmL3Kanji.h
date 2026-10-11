@@ -309,13 +309,23 @@ public:
 		_page = (_page > 0) ? _page - 1 : maxPage - 1;
 	}
 
-	uint32_t SelectByIndex(byte index)
+	// Zero selects the parent; missing one-based variant indices fall back to it.
+	uint32_t SelectByIndex(byte index, size_t variantIndex = 0)
 	{
+		if (!_list || index >= _pageSize) return 0;
 		size_t slotNo = (_page * _pageSize) + index;
 		Debug(Format(L"SelectByIndex: index=%d, page=%d, slotNo=%d", index, _page, slotNo));
 		if (slotNo >= _count) return 0;
 
-		return _list[slotNo];
+		const uint32_t parent = _list[slotNo];
+		if (parent && variantIndex) {
+			const auto& groups = _pDict->DictVariant;
+			const auto group = std::lower_bound(groups.begin(), groups.end(), parent,
+				[](const ChmL3KanjiDict::VariantGroup& value, uint32_t cp) { return value.parent_cp < cp; });
+			if (group != groups.end() && group->parent_cp == parent && variantIndex <= group->variants.size())
+				return group->variants[variantIndex - 1];
+		}
+		return parent;
 	}
 
 	const uint32_t* GetList() const { return _list; }

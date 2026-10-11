@@ -45,8 +45,11 @@ private:
     HWND _tooltip = nullptr;
     int _hoverCell = -1;
     std::wstring _tooltipTitle;
+    std::wstring _tooltipVariants;
     std::wstring _tooltipBody;
     int _tooltipTitleHeight = 0;
+    int _tooltipVariantsHeight = 0;
+    int _tooltipVariantLabelHeight = 0;
 
     HINSTANCE _hInst;
     HANDLE _hThread;

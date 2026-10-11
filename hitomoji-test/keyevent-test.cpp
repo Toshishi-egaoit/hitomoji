@@ -33,6 +33,27 @@ protected:
 // ---------------------------------------------
 // 初期化テスト
 // ---------------------------------------------
+TEST_F(FunctionKeyTestBase, SelectionSeparatesBaseKeyFromVariantIndex)
+{
+    ChmKeyEvent::InitFunctionKey();
+    for (bool shift : {false, true}) {
+        for (bool caps : {false, true}) {
+            TestKeyEventHelper::SetState(shift, false, false, caps);
+            ChmKeyEvent letter('A', 0, ChmEngine::State::Selecting);
+            ChmKeyEvent symbol(VK_OEM_2, 0, ChmEngine::State::Selecting);
+            EXPECT_EQ('a', letter.GetSelectionChar());
+            EXPECT_EQ('/', symbol.GetSelectionChar());
+            EXPECT_EQ(shift ? 1u : 0u, letter.GetVariantIndex());
+            EXPECT_EQ(shift ? 1u : 0u, symbol.GetVariantIndex());
+            EXPECT_EQ(shift ? '?' : '/', symbol.GetChar());
+        }
+    }
+    TestKeyEventHelper::SetState(true);
+    ChmKeyEvent colon(VK_OEM_1, 0, ChmEngine::State::Selecting);
+    EXPECT_EQ(ChmFuncType::SelectCancelAndInput, colon.GetType());
+    EXPECT_EQ(0u, colon.GetVariantIndex());
+}
+
 TEST_F(FunctionKeyTestBase, InitAndClear)
 {
     // 初期化
