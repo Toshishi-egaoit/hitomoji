@@ -8,6 +8,7 @@
 #include "ChmKeyEvent.h"
 #include "ChmL3Kanji.h"
 #include "Hitomoji.h"
+#include "utils.h"
 
 namespace {
 
@@ -83,6 +84,9 @@ void ChmEngine::InitConfig() {
 		else if (logLevelStr == L"warn")  ChmLogger::SetLogLevel(ChmLogger::WarnLevel);
 		else if (logLevelStr == L"info")  ChmLogger::SetLogLevel(ChmLogger::InfoLevel);
 		else if (logLevelStr == L"debug") ChmLogger::SetLogLevel(ChmLogger::DebugLevel);
+#ifdef _DEBUG
+		else if (!bSuccess) ChmLogger::SetLogLevel(ChmLogger::DebugLevel); // Debugビルドで指定がない場合はDebugLevelにする
+#endif
 		else {
 			ChmLogger::SetLogLevel(ChmLogger::InfoLevel);
 			Warn(L"   > Invalid LogLevel in config, defaulting to Info");
@@ -199,6 +203,7 @@ void ChmEngine::_ClearUnFinish() {
 }
 
 void ChmEngine::SetError(void) {
+	Debug(L"   > SetError() called");
 	_hasErrorRequest = TRUE;
 }
 
@@ -292,7 +297,7 @@ BOOL ChmEngine::UpdateLayer2(const ChmKeyEvent& keyEvent, bool& pEndComposition)
 			if (del > len) del = len;
 
 			_pRawInputStore->pop(del);
-			OutputDebugStringWithInt(L"[Hitomoji] Backspace %d chars",(ULONG)del);
+			Debug(Format(L"   > Backspace %d chars",(ULONG)del));
 
 			if (_pRawInputStore->get().empty()) {
 				_converted = L"";
@@ -325,6 +330,7 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 
 	if (_type == ChmFuncType::None) {
 		if (_state == State::Selecting) {
+			Debug(L"   > ChmFuncType::None key in selecting state");
 			SetError();
 			pEndComposition = FALSE;
 			return TRUE;
@@ -365,6 +371,7 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 			if (_pL3KanjiSelect) {
 				_pL3KanjiSelect->NextPage();
 			} else {
+				Debug(L"   > SelectNextPage but _pL3KanjiSelect is null");
 				SetError();
 			}
 			break;
@@ -393,6 +400,7 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 					_pL3KanjiSelect->PrevPage();
 				}
 			} else {
+				Debug(L"   > SelectPrevPage but _pL3KanjiSelect is null");
 				SetError();
 			}
 			break;
@@ -437,6 +445,7 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 			break ;
 		default:
 			if (_state == State::Selecting) {
+				Debug(Format(L"   > other type(%d) in Selecting",(int)_type));
 				SetError();
 				break;
 			}

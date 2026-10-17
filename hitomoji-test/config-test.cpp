@@ -2,10 +2,32 @@
 #include "ChmConfig.h"
 #include "ChmRomajiConverter.h"
 #include "TestConfigHelper.h"
+#include "ChmEnvironment.h"
 #include <algorithm>
 #include <string>
 
 namespace {
+
+TEST(LoggerTest, UsesCurrentBasePathAfterEarlyLoggingAndPathChanges)
+{
+    struct RestoreBasePath {
+        std::wstring path = g_environment.GetBasePath();
+        ~RestoreBasePath() { g_environment.SetBasePath(path); }
+    } restore;
+    TempConfigDir first, second;
+    // Register the files for cleanup and start with empty contents.
+    first.WriteFile(L"Hitomoji.log", L"");
+    second.WriteFile(L"Hitomoji.log", L"");
+    g_environment.SetBasePath(L"");
+    ChmLogger::Error(L"Before environment initialization");
+    for (const auto& path : {first.BaseDir(), second.BaseDir()}) {
+        g_environment.SetBasePath(path.substr(0, path.size() - 1));
+        ChmLogger::Error(L"Logger path regression test");
+        WIN32_FILE_ATTRIBUTE_DATA data{};
+        ASSERT_TRUE(GetFileAttributesExW((path + L"Hitomoji.log").c_str(), GetFileExInfoStandard, &data));
+        EXPECT_GT(data.nFileSizeLow, 2u);
+    }
+}
 
 static std::wstring ConvertWithPendingForConfigTest(const std::wstring& input,
                                                     bool bs = true)

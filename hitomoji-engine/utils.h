@@ -25,7 +25,7 @@ public:
     static std::wstring  Format(const wchar_t* fmt, ...);
 private:
 	static void _Output(const std::wstring& level, const std::wstring& msg);
-	static std::wstring& _GetLogFile();
+	static std::wstring _GetLogFile();
 	static void _RotateIfNeeded();
 	static void _WriteFile(const std::wstring& line);
 

@@ -59,6 +59,7 @@ void ChmLogger::_Output(const std::wstring& level, const std::wstring& msg)
 void ChmLogger::_RotateIfNeeded()
 {
 	std::wstring logFile = _GetLogFile();
+	if (logFile.empty()) return;
 	WIN32_FILE_ATTRIBUTE_DATA fad;
 	if (GetFileAttributesExW(logFile.c_str(), GetFileExInfoStandard, &fad))
 	{
@@ -75,15 +76,18 @@ void ChmLogger::_RotateIfNeeded()
 	}
 }
 
-std::wstring& ChmLogger::_GetLogFile() {
-	static std::wstring _logFile = g_environment.GetBasePath()+ L"Hitomoji.log";
-	return _logFile;
+std::wstring ChmLogger::_GetLogFile() {
+	std::wstring basePath = g_environment.GetBasePath();
+	if (basePath.empty()) return {};
+	if (basePath.back() != L'\\' && basePath.back() != L'/') basePath += L'\\';
+	return basePath + L"Hitomoji.log";
 }
 
 void ChmLogger::_WriteFile(const std::wstring& msg)
 {
 	std::wstring logFile = _GetLogFile();
 	assert(!logFile.empty());
+	if (logFile.empty()) return;
 
 	HANDLE hFile = CreateFileW(
 		logFile.c_str(),

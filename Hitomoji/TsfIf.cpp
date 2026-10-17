@@ -257,14 +257,14 @@ STDMETHODIMP ChmTsfInterface::OnTestKeyDown(ITfContext* pic, WPARAM wp, LPARAM l
 		_pEngine->InvalidateUnFinishByKey(wp);
 	}
 	ChmKeyEvent kEv(wp, lp,_pEngine->GetState());
-	OutputDebugStringWithString(((std::wstring)L"[Hitomoji] OnTestKeyDown eat=%s" + kEv.toString()).c_str(), *pfEaten ? L"TRUE" : L"FALSE") ;
+	Debug(Format(L"OnTestKeyDown eat=%s %s" , kEv.toString().c_str(), *pfEaten ? L"TRUE" : L"FALSE"));
 
 	return S_OK;
 }
 
 STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten)
 {
-	OutputDebugString(L"[Hitomoji] OnKeyDown");
+	Debug(L"OnKeyDown");
 	*pfEaten = _pEngine->IsKeyEaten(wp);
 	if (*pfEaten) {
 
@@ -274,6 +274,7 @@ STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, B
 		ChmCandidatePage page{};
 		BOOL hasCandidatePage = FALSE;
 
+		Debug(Format(L"  ->eat=%s %s" , kEv.toString().c_str(), *pfEaten ? L"TRUE" : L"FALSE"));
 		if (ChmEngine::IsLayer3Function(type)) {
 			if (!_pEngine->UpdateLayer3(kEv, fEnd, &page)) return S_OK;
 			hasCandidatePage = page.candidateCount > 0;
@@ -336,7 +337,7 @@ STDMETHODIMP ChmTsfInterface::OnPreservedKey(ITfContext* pic, REFGUID rguid, BOO
 		_CommitComposition(pic);
 
 		ToggleIME();
-		OutputDebugString(L"[Hitomoji]OnPreservedKey:processed");
+		Debug(L"OnPreservedKey:processed");
 		*pfEaten = TRUE;
 	}
 	return S_OK;
@@ -383,7 +384,7 @@ HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
 	if (_pComposition) {
 		// context mismatch -> clear
 		if (_pContextForComposition != pic) {
-			OutputDebugString(L"[Hitomoji] _InvokeEditSession: context mismatch -> clear");
+			Debug(L"_InvokeEditSession: context mismatch -> clear");
 			ClearComposition();
 			_pEngine->ResetStatus();
 		} else {
@@ -394,7 +395,7 @@ HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
 				// TODO： OnEndEditが届かない場合、_pCompositionが初期化されずここに来る。でも、その検出手段がない。
 				// 　　　 ここを通ると、エンジン側のRawInputがクリアされ、フォーカス移動直後の1文字が消失するが、
 				// 　　　 現状では対抗手段がないので、この仕様を受容する。
-				OutputDebugString(L"[Hitomoji] _InvokeEditSession: no view -> clear");
+				Debug(L"_InvokeEditSession: no view -> clear");
 				ClearComposition();
 				_pEngine->ResetStatus();
 			} else {
@@ -488,7 +489,7 @@ void ChmTsfInterface::_UninitDisplayAttributeInfo() {
 
 STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 {
-	OutputDebugString(L"[Hitomoji] OnSetThreadFocus()");
+	Debug(L"OnSetThreadFocus()");
 
 	if (_pCandidateWindowThread) {
 		_pCandidateWindowThread->Hide();
@@ -507,7 +508,7 @@ STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 
 
 STDMETHODIMP ChmTsfInterface::OnKillThreadFocus() {
-	OutputDebugString(L"OnKillThreadFocus()");
+	Debug(L"OnKillThreadFocus()");
 	if (_pCandidateWindowThread) {
 		_pCandidateWindowThread->Hide();
 	}
@@ -534,7 +535,7 @@ STDMETHODIMP ChmTsfInterface::OnUninitDocumentMgr(ITfDocumentMgr* /*pdim*/)
 
 STDMETHODIMP ChmTsfInterface::OnSetFocus(ITfDocumentMgr* pdimFocus, ITfDocumentMgr* /*pdimPrevFocus*/)
 {
-	OutputDebugString(L"[Hitomoji] ITfThreadMgrEventSink::OnSetFocus()");
+	Debug(L"ITfThreadMgrEventSink::OnSetFocus()");
 
 	if (_pCandidateWindowThread) {
 		_pCandidateWindowThread->Hide();
@@ -622,7 +623,7 @@ STDMETHODIMP ChmTsfInterface::OnEndEdit(
 	TfEditCookie ecReadOnly,
 	ITfEditRecord* pEditRecord)
 {
-	OutputDebugString(L"[Hitomoji] OnEndEdit()");
+	Debug(L"OnEndEdit()");
 
 	// 編集中でなければ何もしない
 	if (_pComposition == nullptr) return S_OK;
@@ -631,7 +632,7 @@ STDMETHODIMP ChmTsfInterface::OnEndEdit(
 
 	// Composition の属する Context と異なる編集が入った場合のみ確定
 	if (_pContextForComposition && pic != GetCompositionContext()) {
-		OutputDebugString(L"   > InvokeEditSession via composition context");
+		Debug(L"   > InvokeEditSession via composition context");
 		_InvokeEditSession(GetCompositionContext(), TRUE);
 		_pEngine->ResetStatus();
 	}
