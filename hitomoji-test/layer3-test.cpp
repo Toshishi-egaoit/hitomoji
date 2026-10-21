@@ -9,6 +9,13 @@
 #include <string>
 #include <sstream>
 
+void EngineActivate(ChmEngine& engine, std::wstring dictFilePath) {
+    
+	// テストプログラム側
+	std::ifstream st(dictFilePath.c_str(), std::ios::binary);
+	engine.Activate(st);
+}
+
 namespace {
 // Build wire-format bytes explicitly, independently of the loader's C++ structs.
 void PutDict32(std::string& bytes, size_t offset, uint32_t value)
@@ -442,7 +449,7 @@ TEST_F(Layer3Test, ShiftSelectsVariantUsingLetterOrSymbolWithCapsLock)
         for (bool shift : {false, true}) {
             WriteMainConfig(symbol ? L"[ui]\nselect_keymap=/\n" : L"[ui]\nselect_keymap=a\n");
             ChmEngine engine;
-            engine.Activate();
+			EngineActivate(engine);
             InputKeys(engine, "KOU", L"こう");
             ChmCandidatePage page;
             StartSelection(engine, page);
@@ -472,7 +479,7 @@ TEST_F(Layer3Test, ShiftSelectsVariantUsingLetterOrSymbolWithCapsLock)
 TEST_F(Layer3Test, ConvertKeyStartsKanjiSelectionAndBuildsCandidatePageForKou)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputKeys(engine, "KOU", L"こう");
 
@@ -491,7 +498,7 @@ TEST_F(Layer3Test, ConvertKeyStartsKanjiSelectionAndBuildsCandidatePageForKou)
 TEST_F(Layer3Test, ConvertKeyFiltersKanjiSelectionByAdditionalYomiOperator)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputKeys(engine, "KOU", L"\x3053\x3046");
     InputKey(engine, VK_OEM_1, L"\x3053\x3046:", true);
@@ -523,7 +530,7 @@ TEST_F(Layer3Test, ConvertKeyFiltersKanjiSelectionByAdditionalYomiOperator)
 TEST_F(Layer3Test, ConvertKeyKeepsInputingAndRequestsErrorWhenYomiDoesNotExist)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputKeys(engine, "NN", L"ん");
 
@@ -549,7 +556,7 @@ TEST_F(Layer3Test, ConvertKeyKeepsInputingAndRequestsErrorWhenDictionaryIsMissin
     ASSERT_TRUE(DeleteFileW((_dir.BaseDir() + L"hitomoji.dic").c_str()));
 
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine,_dir.BaseDir() + L"hitomoji.dic");
 
     InputKeys(engine, "KOU", L"こう");
 
@@ -573,7 +580,7 @@ TEST_F(Layer3Test, ConvertKeyKeepsInputingAndRequestsErrorWhenDictionaryIsMissin
 TEST_F(Layer3Test, ConvertKeyFindsFirstYomiEntryAndPreservesSparseSlots)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputKeys(engine, "TAT", L"たt");
 	// この読みの漢字は、「達」「宅」「卓」の3種
@@ -594,7 +601,7 @@ TEST_F(Layer3Test, ConvertKeyFindsFirstYomiEntryAndPreservesSparseSlots)
 TEST_F(Layer3Test, ConvertKeyFindsLastYomiEntryAndPreservesSparseSlots)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputKeys(engine, "WO", L"を");
 
@@ -619,7 +626,7 @@ TEST_F(Layer3Test, ConvertKeyFindsLastYomiEntryAndPreservesSparseSlots)
 TEST_F(Layer3Test, ConvertKeyIgnoresLeadingSymbolsWhenSearchingYomi)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     bool endComposition = true;
     ChmKeyEvent minusKey = MakeKey(VK_OEM_MINUS, engine.GetState());
@@ -650,7 +657,8 @@ TEST_F(Layer3Test, ConvertKeyIgnoresLeadingSymbolsWhenSearchingYomi)
 TEST_F(Layer3Test, ConvertKeyIgnoresMultipleDifferentLeadingSymbolsWhenSearchingYomi)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
+
 
     bool endComposition = true;
     ChmKeyEvent minusKey = MakeKey(VK_OEM_MINUS, engine.GetState());
@@ -699,7 +707,8 @@ TEST_F(Layer3Test, ConvertKeyIgnoresLeadingNonHiraganaWhenSearchingYomi)
         L"qq=字\n");
 
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
+
 
     InputKeys(engine, "QQAI", L"字あい");
 
@@ -719,7 +728,8 @@ TEST_F(Layer3Test, ConvertKeyIgnoresLeadingNonHiraganaWhenSearchingYomi)
 TEST_F(Layer3Test, ConvertKeyKeepsInputingAndRequestsErrorWhenPendingRemains)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
+
 
     InputKeys(engine, "AIY", L"あいy");
 
@@ -757,7 +767,7 @@ TEST_F(Layer3Test, ConvertKeyCompletesSokuonPendingBeforeSearchingYomi)
         SCOPED_TRACE(c.input);
 
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         InputKeys(engine, c.input, c.composition);
 
@@ -776,7 +786,7 @@ TEST_F(Layer3Test, ConvertKeyCompletesSokuonPendingBeforeSearchingYomi)
 TEST_F(Layer3Test, BackspaceAfterSokuonPendingSelectionRestoresPreviousComposition)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputKeys(engine, "RAT", L"らt");
 	// この読みの漢字は、「拉」「楽」「落」の3種
@@ -804,7 +814,7 @@ TEST_F(Layer3Test, BackspaceAfterSokuonPendingSelectionRestoresPreviousCompositi
 TEST_F(Layer3Test, EscapeCancelsSelectionAndRestoresInputingComposition)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputKeys(engine, "A", L"あ");
 
@@ -824,7 +834,7 @@ TEST_F(Layer3Test, EscapeCancelsSelectionAndRestoresInputingComposition)
 TEST_F(Layer3Test, EscapeCancelsSelectionWithLeadingSymbolsAndRestoresComposition)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     bool endComposition = true;
     ChmKeyEvent minusKey = MakeKey(VK_OEM_MINUS, engine.GetState());
@@ -850,7 +860,7 @@ TEST_F(Layer3Test, EscapeCancelsSelectionWithLeadingSymbolsAndRestoresCompositio
 TEST_F(Layer3Test, EscapeCancelsSelectionAfterSokuonPendingAndRestoresRawPending)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputKeys(engine, "RAT", L"らt");
 
@@ -866,7 +876,8 @@ TEST_F(Layer3Test, EscapeCancelsSelectionAfterSokuonPendingAndRestoresRawPending
 TEST_F(Layer3Test, ColonDuringSelectionCancelsSelectionAndAppendsFilterSeparator)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
+
 
     InputKeys(engine, "A", L"\x3042");
 
@@ -896,7 +907,8 @@ TEST_F(Layer3Test, CustomSelectKeymapControlsCandidatePageSizeAndCells)
             L"select_keymap=a/\n");
 
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
+
 
         InputKeys(engine, "A", L"あ");
 
@@ -924,7 +936,8 @@ TEST_F(Layer3Test, CustomSelectKeymapControlsCandidatePageSizeAndCells)
             L"select_keymap=a/;\n");
 
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
+
 
         InputKeys(engine, "A", L"あ");
 
@@ -950,7 +963,8 @@ TEST_F(Layer3Test, SelectInputUsesCustomSelectKeymapIncludingOemKeys)
 
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
+
 
         InputKeys(engine, "A", L"あ");
 
@@ -963,7 +977,8 @@ TEST_F(Layer3Test, SelectInputUsesCustomSelectKeymapIncludingOemKeys)
     }
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
+
 
         InputKeys(engine, "A", L"あ");
 
@@ -976,7 +991,8 @@ TEST_F(Layer3Test, SelectInputUsesCustomSelectKeymapIncludingOemKeys)
     }
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
+
 
         InputKeys(engine, "A", L"あ");
 
@@ -992,7 +1008,8 @@ TEST_F(Layer3Test, SelectInputUsesCustomSelectKeymapIncludingOemKeys)
 TEST_F(Layer3Test, SelectInputPreservesLeadingSymbolsInCommittedComposition)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
+
 
     bool endComposition = true;
     ChmKeyEvent minusKey = MakeKey(VK_OEM_MINUS, engine.GetState());
@@ -1020,7 +1037,8 @@ TEST_F(Layer3Test, SelectInputPreservesLeadingSymbolsInCommittedComposition)
 TEST_F(Layer3Test, SelectInputKeepsSelectingAndRequestsErrorForEmptySlot)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
+
 
     InputKeys(engine, "KET", L"けt");
 
@@ -1057,7 +1075,8 @@ TEST_F(Layer3Test, SelectInputUsesThirtyFourKeymapAcrossPages)
 
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
+
 
         InputKeys(engine, "KOU", L"こう");
 
@@ -1075,7 +1094,8 @@ TEST_F(Layer3Test, SelectInputUsesThirtyFourKeymapAcrossPages)
     }
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
+
 
         InputKeys(engine, "KOU", L"こう");
 
@@ -1102,7 +1122,8 @@ TEST_F(Layer3Test, SameSelectKeyChoosesDifferentKanjiWhenKeymapChanges)
             L"select_keymap=dk fj sl gh ei ru a; wo qp ty c, vm x. z/ bn 34 89\n");
 
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
+
 
         InputKeys(engine, "KOU", L"こう");
 
@@ -1122,7 +1143,8 @@ TEST_F(Layer3Test, SameSelectKeyChoosesDifferentKanjiWhenKeymapChanges)
             L"select_keymap=dk fj sl gh ei ru a; wo qp ty c, vm x. z/ bn 38 47 29 10 56\n");
 
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
+
 
         InputKeys(engine, "KOU", L"こう");
 
@@ -1141,7 +1163,7 @@ TEST_F(Layer3Test, SameSelectKeyChoosesDifferentKanjiWhenKeymapChanges)
 TEST_F(Layer3Test, SelectNextPageDoesNotMoveWhenOnlyOnePageExists)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputKeys(engine, "AI", L"あい");
 
@@ -1165,7 +1187,7 @@ TEST_F(Layer3Test, SelectNextPageDoesNotMoveWhenOnlyOnePageExists)
 TEST_F(Layer3Test, SelectNextPageMovesForwardAcrossMultiplePages)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputKeys(engine, "A", L"あ");
 
@@ -1193,7 +1215,7 @@ TEST_F(Layer3Test, SelectNextPageMovesForwardAcrossMultiplePages)
 TEST_F(Layer3Test, SelectNextPageWrapsToFirstPageAfterLastPage)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputKeys(engine, "A", L"あ");
 
@@ -1218,7 +1240,7 @@ TEST_F(Layer3Test, SelectNextPageWrapsToFirstPageAfterLastPage)
 TEST_F(Layer3Test, SelectPrevPageMovesBackFromSecondPage)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputKeys(engine, "WO", L"を");
 
@@ -1242,7 +1264,7 @@ TEST_F(Layer3Test, SelectPrevPageMovesBackFromSecondPage)
 TEST_F(Layer3Test, SelectPrevPageWrapsToLastPageBeforeFirstPage)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputKeys(engine, "WO", L"を");
 
@@ -1265,7 +1287,7 @@ TEST_F(Layer3Test, SelectPrevPageWrapsToLastPageBeforeFirstPage)
 TEST_F(Layer3Test, DISABLED_ConvertKeyRejectsYomiLongerThanFiveChars)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputKeys(engine, "ATATAMERUA", L"あたためるあ");
 
@@ -1291,7 +1313,7 @@ TEST_F(Layer3Test, InvalidKeysDuringSelectionAreEatenAndKeepSelectingState)
         SCOPED_TRACE(key);
 
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
         engine.SetIME(TRUE);
 
         InputKeys(engine, "KOU", L"こう");

@@ -86,7 +86,7 @@ std::wstring ChmLogger::_GetLogFile() {
 void ChmLogger::_WriteFile(const std::wstring& msg)
 {
 	std::wstring logFile = _GetLogFile();
-	assert(!logFile.empty());
+	// assert(!logFile.empty());
 	if (logFile.empty()) return;
 
 	HANDLE hFile = CreateFileW(

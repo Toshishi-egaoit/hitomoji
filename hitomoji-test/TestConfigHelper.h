@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <windows.h>
 #include <fstream>
@@ -62,3 +62,5 @@ private:
     std::wstring _baseDir;
     std::vector<std::wstring> _files;
 };
+
+extern void EngineActivate(ChmEngine& engine, std::wstring dictFilePath = L"..\\distribution\\hitomoji.dic") ;

@@ -124,33 +124,6 @@ public:
 	std::vector<YomiEntry> DictYomi;
 	std::vector<uint32_t> kanjiList;
 
-	ChmL3KanjiDict()
-	{
-		LoadDict();
-	};
-
-	bool LoadDict()
-	{
-		DictVariant.clear();
-		DictKanji.clear();
-		DictYomi.clear();
-		kanjiList.clear();
-		Info(L"L3kanjiDict.LoadDict");
-		std::wstring path = g_environment.GetBasePath() + L"hitomoji.dic";
-
-		std::ifstream ifs(path, std::ios::binary);
-		if (!ifs) {
-			Error(Format(L"   > failed to open dic file:%s" , path));
-			return false;
-		}
-
-		if (!LoadDict(ifs)) {
-			Error(L"   > invalid or unsupported dictionary");
-			return false;
-		}
-		return true;
-	}
-
 	// Load 16-byte kanji records and group fixed-length variant records by parent.
 	bool LoadDict(std::istream& input)
 	{

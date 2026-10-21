@@ -162,7 +162,7 @@ protected:
 TEST_F(Layer2Test, CharInputStartsComposition)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     bool endComposition = true;
     ChmKeyEvent key = MakeKey('A', engine.GetState());
@@ -181,7 +181,7 @@ TEST_F(Layer2Test, SpaceCharUsesWideSpaceConfigAndShiftInvertsIt)
 {
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         bool endComposition = false;
         ChmKeyEvent spaceKey = MakeKey(VK_SPACE, engine.GetState());
@@ -197,7 +197,7 @@ TEST_F(Layer2Test, SpaceCharUsesWideSpaceConfigAndShiftInvertsIt)
     }
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         bool endComposition = false;
         ChmKeyEvent shiftSpaceKey = MakeKey(VK_SPACE, engine.GetState(), true);
@@ -215,7 +215,7 @@ TEST_F(Layer2Test, SpaceCharUsesWideSpaceConfigAndShiftInvertsIt)
             L"wide-space=false\n");
 
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         bool endComposition = false;
         ChmKeyEvent spaceKey = MakeKey(VK_SPACE, engine.GetState());
@@ -229,7 +229,7 @@ TEST_F(Layer2Test, SpaceCharUsesWideSpaceConfigAndShiftInvertsIt)
     }
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         bool endComposition = false;
         ChmKeyEvent shiftSpaceKey = MakeKey(VK_SPACE, engine.GetState(), true);
@@ -246,7 +246,7 @@ TEST_F(Layer2Test, SpaceCharUsesWideSpaceConfigAndShiftInvertsIt)
 TEST_F(Layer2Test, RomajiInputUpdatesCompositionStepByStep)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputChar(engine, 'K', L"k");
     InputChar(engine, 'A', L"か");
@@ -266,7 +266,7 @@ TEST_F(Layer2Test, RomajiInputAcceptsDigitsAndUppercaseLetters)
 {
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         InputChar(engine, 'K', L"k");
         InputChar(engine, '1', L"k1");
@@ -275,7 +275,7 @@ TEST_F(Layer2Test, RomajiInputAcceptsDigitsAndUppercaseLetters)
     }
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         InputChar(engine, 'K', L"K", true);
         InputChar(engine, 'A', L"か");
@@ -284,7 +284,7 @@ TEST_F(Layer2Test, RomajiInputAcceptsDigitsAndUppercaseLetters)
     }
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         InputChar(engine, 'K', L"k");
         InputChar(engine, 'A', L"か", true);
@@ -304,7 +304,7 @@ TEST_F(Layer2Test, UserKeyTableOverridesLayer2Conversion)
 
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         InputChar(engine, VK_OEM_MINUS, L"ー");
         InputChar(engine, VK_OEM_PERIOD, L"→", true);
@@ -313,7 +313,7 @@ TEST_F(Layer2Test, UserKeyTableOverridesLayer2Conversion)
     }
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         InputChar(engine, VK_OEM_2, L"/");
         InputChar(engine, 'K', L"々");
@@ -322,7 +322,7 @@ TEST_F(Layer2Test, UserKeyTableOverridesLayer2Conversion)
     }
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         InputChar(engine, VK_OEM_2, L"/");
         InputChar(engine, 'K', L"々");
@@ -340,7 +340,7 @@ TEST_F(Layer2Test, UserKeyTableOverridesDefaultLayer2Conversion)
         L"wi=うぃ\n");
 
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputChar(engine, 'W', L"w");
     InputChar(engine, 'I', L"うぃ");
@@ -359,7 +359,7 @@ TEST_F(Layer2Test, UserKeyTableUsesLongestMatchForMultiCharacterKeys)
         L"-->=→→\n");
 
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputChar(engine, VK_OEM_MINUS, L"ー");
     InputChar(engine, VK_OEM_MINUS, L"ーー");
@@ -372,7 +372,7 @@ TEST_F(Layer2Test, FinishKeysEndCompositionAndKeepCommitTextForTsf)
 {
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         InputChar(engine, 'K', L"k");
         InputChar(engine, 'A', L"か");
@@ -382,7 +382,7 @@ TEST_F(Layer2Test, FinishKeysEndCompositionAndKeepCommitTextForTsf)
     }
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         InputChar(engine, 'K', L"k");
         InputChar(engine, 'A', L"か");
@@ -393,7 +393,7 @@ TEST_F(Layer2Test, FinishKeysEndCompositionAndKeepCommitTextForTsf)
     }
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         InputChar(engine, 'K', L"k");
         InputChar(engine, 'A', L"か");
@@ -404,7 +404,7 @@ TEST_F(Layer2Test, FinishKeysEndCompositionAndKeepCommitTextForTsf)
     }
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         InputChar(engine, 'K', L"k");
         InputChar(engine, 'A', L"か");
@@ -414,7 +414,7 @@ TEST_F(Layer2Test, FinishKeysEndCompositionAndKeepCommitTextForTsf)
     }
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         InputChar(engine, 'K', L"k");
         InputChar(engine, 'A', L"か");
@@ -428,7 +428,7 @@ TEST_F(Layer2Test, FinishKeysEndCompositionAndKeepCommitTextForTsf)
 TEST_F(Layer2Test, KatakanaFinishCommitsConvertedAndPendingText)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputChar(engine, 'K', L"k");
     InputChar(engine, 'A', L"か");
@@ -443,7 +443,7 @@ TEST_F(Layer2Test, KatakanaFinishCommitsConvertedAndPendingText)
 TEST_F(Layer2Test, FinishKeysAreIgnoredWhenThereIsNoComposition)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     EXPECT_EQ(ChmEngine::State::None, engine.GetState());
     EXPECT_FALSE(engine.HasComposition());
@@ -461,7 +461,7 @@ TEST_F(Layer2Test, BackspaceDeletesLastConvertedUnitByDefault)
 {
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         InputChar(engine, 'K', L"k");
         InputChar(engine, 'Y', L"ky");
@@ -471,7 +471,7 @@ TEST_F(Layer2Test, BackspaceDeletesLastConvertedUnitByDefault)
     }
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         InputChar(engine, 'K', L"k");
         InputChar(engine, 'Y', L"ky");
@@ -482,7 +482,7 @@ TEST_F(Layer2Test, BackspaceDeletesLastConvertedUnitByDefault)
     }
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         InputChar(engine, 'K', L"k");
         InputChar(engine, 'A', L"か");
@@ -502,7 +502,7 @@ TEST_F(Layer2Test, BackspaceDeletesUserKeyTableUnitByDefault)
         L"->=→\n");
 
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputChar(engine, VK_OEM_MINUS, L"ー");
     InputChar(engine, VK_OEM_PERIOD, L"→", true);
@@ -521,7 +521,7 @@ TEST_F(Layer2Test, BackspaceDeletesOneRawKeyWhenConfigured)
 
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         InputChar(engine, 'K', L"k");
         InputChar(engine, 'Y', L"ky");
@@ -534,7 +534,7 @@ TEST_F(Layer2Test, BackspaceDeletesOneRawKeyWhenConfigured)
     }
     {
         ChmEngine engine;
-        engine.Activate();
+		EngineActivate(engine);
 
         InputChar(engine, VK_OEM_MINUS, L"ー");
         InputChar(engine, VK_OEM_PERIOD, L"→", true);
@@ -548,7 +548,7 @@ TEST_F(Layer2Test, BackspaceDeletesOneRawKeyWhenConfigured)
 TEST_F(Layer2Test, BackspaceIsIgnoredWhenThereIsNoComposition)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     EXPECT_EQ(ChmEngine::State::None, engine.GetState());
     EXPECT_FALSE(engine.HasComposition());
@@ -561,7 +561,7 @@ TEST_F(Layer2Test, BackspaceIsIgnoredWhenThereIsNoComposition)
 TEST_F(Layer2Test, EscapeClearsConvertedComposition)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputChar(engine, 'K', L"k");
     InputChar(engine, 'A', L"か");
@@ -573,7 +573,7 @@ TEST_F(Layer2Test, EscapeClearsConvertedComposition)
 TEST_F(Layer2Test, EscapeClearsPendingComposition)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputChar(engine, 'K', L"k");
     InputChar(engine, 'Y', L"ky");
@@ -585,7 +585,7 @@ TEST_F(Layer2Test, EscapeClearsPendingComposition)
 TEST_F(Layer2Test, EscapeClearsConvertedAndPendingComposition)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputChar(engine, 'K', L"k");
     InputChar(engine, 'A', L"か");
@@ -604,7 +604,7 @@ TEST_F(Layer2Test, EscapeClearsUserKeyTableComposition)
         L"->=→\n");
 
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     InputChar(engine, VK_OEM_MINUS, L"ー");
     InputChar(engine, VK_OEM_PERIOD, L"→", true);
@@ -616,7 +616,7 @@ TEST_F(Layer2Test, EscapeClearsUserKeyTableComposition)
 TEST_F(Layer2Test, EscapeIsIgnoredWhenThereIsNoComposition)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     EXPECT_EQ(ChmEngine::State::None, engine.GetState());
     EXPECT_FALSE(engine.HasComposition());
@@ -629,7 +629,7 @@ TEST_F(Layer2Test, EscapeIsIgnoredWhenThereIsNoComposition)
 TEST_F(Layer2Test, CtrlZRestoresCompositionAfterExplicitFinish)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
     engine.SetIME(TRUE);
 
     InputChar(engine, 'K', L"k");
@@ -648,7 +648,7 @@ TEST_F(Layer2Test, CtrlZRestoresCompositionAfterExplicitFinish)
 TEST_F(Layer2Test, CtrlZRestoresRawCompositionAfterRawFinish)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
     engine.SetIME(TRUE);
 
     InputChar(engine, 'K', L"k");
@@ -667,7 +667,7 @@ TEST_F(Layer2Test, CtrlZRestoresRawCompositionAfterRawFinish)
 TEST_F(Layer2Test, CtrlZIsNotAvailableAfterEscapeCancel)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
     engine.SetIME(TRUE);
 
     InputChar(engine, 'K', L"k");
@@ -683,7 +683,7 @@ TEST_F(Layer2Test, CtrlZIsNotAvailableAfterEscapeCancel)
 TEST_F(Layer2Test, CtrlZIsNotAvailableAfterNavigationFinish)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
     engine.SetIME(TRUE);
 
     InputChar(engine, 'K', L"k");

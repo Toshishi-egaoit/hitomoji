@@ -130,6 +130,9 @@ copy /y "$(TargetPath)" "$(SolutionDir)dbg_distribution\x86\"
 copy /y "$(TargetPath)" "$(SolutionDir)distribution\x86\"
 </Command>
     </PostBuildEvent>
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>$(SolutionDir)\distribution;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -200,6 +203,7 @@ copy /y "$(TargetPath)" "$(SolutionDir)distribution\x64\"
   </ItemGroup>
   <ItemGroup>
     <None Include="Hitomoji.def" />
+    <None Include="rcdata1.bin" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="resource.rc">
