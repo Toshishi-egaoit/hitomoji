@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Hitomoji Project. All rights reserved.
 #include <cctype>
 #include <map>
+#include <utility>
 #include "ChmRawInputStore.h"
 #include "ChmEngine.h"
 #include "ChmRomajiConverter.h"
@@ -19,9 +20,10 @@ bool IsSokuonPendingChar(wchar_t ch)
 
 } // namespace
 
-ChmEngine::ChmEngine()
+ChmEngine::ChmEngine(DefaultConfigLoader defaultConfigLoader)
 	: _isON(FALSE), _state(State::None), _converted(L""), _pending(L""),
-	  _useUndoEditSession(FALSE), _undoDeleteLength(0), _hasErrorRequest(FALSE)
+	  _useUndoEditSession(FALSE), _undoDeleteLength(0), _hasErrorRequest(FALSE),
+	  _defaultConfigLoader(std::move(defaultConfigLoader))
 {
 	_pRawInputStore = new ChmRawInputStore();
 	_pConfig = nullptr;
@@ -34,12 +36,13 @@ ChmEngine::~ChmEngine() {
 	if (_pRawInputStore) delete _pRawInputStore;
 }
 
-void ChmEngine::Activate(std::istream& stream) {
-	Debug(L"ChmEngine::Activate");
-	InitConfig();
-	_initLayer2();
-	_initLayer3();
-	_initL3Dict(stream);
+BOOL ChmEngine::Activate(std::istream& stream) {
+    Debug(L"ChmEngine::Activate");
+    if (!InitConfig()) return FALSE;
+    _initLayer2();
+    _initLayer3();
+    _initL3Dict(stream);
+    return TRUE;
 }
 
 void ChmEngine::Deactivate() {
@@ -54,29 +57,60 @@ void ChmEngine::Deactivate() {
 	_pL3Helper = nullptr ;
 }
 
-void ChmEngine::InitConfig() {
-	// ChmConfigの初期化
-	ChmConfig* newConfig = new ChmConfig();
-	BOOL bSuccess = newConfig->LoadFile();
+BOOL ChmEngine::InitConfig() {
+    // 現在の入力動作を保ち、作成に失敗した場合は共有テーブルも元へ戻す。
+    auto previousOverrides = _overrideTable;
+    auto createDefaultConfig = [this]() -> std::unique_ptr<ChmConfig> {
+        auto defaults = _defaultConfigLoader ? _defaultConfigLoader() : nullptr;
+        if (_defaultConfigLoader && !defaults) {
+            ChmLogger::Error(L"Cannot acquire default configuration stream");
+            return nullptr;
+        }
+        auto config = std::make_unique<ChmConfig>();
+        if (defaults && !config->InitConfig(*defaults)) {
+            Warn((std::wstring(L"=== Default config errors ===\n") + config->DumpErrors()).c_str());
+            return nullptr;
+        }
+        return config;
+    };
 
-	if (newConfig->HasErrors())
-	{
-		Warn((std::wstring(L"===Errors===\n") + newConfig->DumpErrors()).c_str());
-		Warn((std::wstring(L"===Infos===\n") + newConfig->DumpInfos()).c_str());
-	}
-	if (!bSuccess && _pConfig) {
-		delete newConfig;
-		Warn(L"   > keeping old _pConfig");
-	} else {
-		if (!bSuccess) {
-			newConfig->InitConfig();
-			Warn(L"   > using empty config");
-		}
-		delete _pConfig;
-		_pConfig = newConfig;
-		Info((std::wstring(L"=== Configs ===\n") + _pConfig->Dump()).c_str());
-		Info((std::wstring(L"=== Function-Keys ===\n") + ChmKeyEvent::Dump()).c_str());
-	}
+    auto newConfig = createDefaultConfig();
+    if (!newConfig) {
+        _overrideTable = std::move(previousOverrides);
+        return FALSE;
+    }
+
+    // ユーザーINIがない場合は、今回取得した内蔵設定だけを採用する。
+    DWORD attributes = GetFileAttributesW(newConfig->GetConfigFile().c_str());
+    DWORD fileError = attributes == INVALID_FILE_ATTRIBUTES ? GetLastError() : ERROR_SUCCESS;
+    bool missing = attributes == INVALID_FILE_ATTRIBUTES &&
+        (fileError == ERROR_FILE_NOT_FOUND || fileError == ERROR_PATH_NOT_FOUND);
+    BOOL bSuccess = missing || newConfig->LoadFile();
+    if (newConfig->HasErrors()) {
+        Warn((std::wstring(L"===Errors===\n") + newConfig->DumpErrors()).c_str());
+        Warn((std::wstring(L"===Infos===\n") + newConfig->DumpInfos()).c_str());
+    }
+    if (!bSuccess && _pConfig) {
+        _overrideTable = std::move(previousOverrides);
+        Warn(L"   > keeping old _pConfig");
+        return FALSE;
+    }
+    if (!bSuccess) {
+        // 初回のユーザーINIエラー時も、原文を保持せずリソースを取得し直す。
+        newConfig = createDefaultConfig();
+        if (!newConfig) {
+            _overrideTable = std::move(previousOverrides);
+            return FALSE;
+        }
+        Warn(L"   > using default config");
+    }
+    delete _pConfig;
+    _pConfig = newConfig.release();
+    ChmKeyEvent::SetFunctionKeyMap(_pConfig->GetFunctionKeyMap());
+    // 再読み込みで選択キー配列が変更された場合も反映する。
+    if (_pL3Helper) _pL3Helper->InitDefault(_pConfig);
+    Info((std::wstring(L"=== Configs ===\n") + _pConfig->Dump()).c_str());
+    Info((std::wstring(L"=== Function-Keys ===\n") + ChmKeyEvent::Dump()).c_str());
 
 	// Loggerのログレベルを設定
 	{
@@ -94,7 +128,7 @@ void ChmEngine::InitConfig() {
 		}
 
 	}
-	return ;
+	return TRUE;
 }
 
 std::wstring ChmEngine::GetConfigFile() {
@@ -526,7 +560,7 @@ BOOL ChmEngine::UpdateOther(const ChmKeyEvent& keyEvent, bool& pEndComposition){
 			_state = State::None;
 			break;
 		case ChmFuncType::ReloadIni: {
-			bool bRet = _pConfig->LoadFile();
+			bool bRet = InitConfig();
 			if (bRet) {
 				Debug(L"   > reload OK");
 			}else {

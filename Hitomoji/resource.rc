@@ -7,3 +7,4 @@ IDI_HITOMOJI_ON   ICON  "icon-on.ico"
 IDI_HITOMOJI_OFF  ICON  "icon-off.ico"
 
 IDI_HITOMOJI_DIC  RCDATA "..\\build\\hitomoji.dic"
+IDR_HITOMOJI_DEFAULT_CONFIG RCDATA "..\\build\\merged-default.ini"

@@ -33,6 +33,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "build", "build", "{046EADA8-CD13-49AD-A505-1E5FE470B503}"
 	ProjectSection(SolutionItems) = preProject
 		build\hitomoji-default.ini = build\hitomoji-default.ini
+		build\merge-default.ps1 = build\merge-default.ps1
 		build\hitomoji.dic = build\hitomoji.dic
 	EndProjectSection
 EndProject

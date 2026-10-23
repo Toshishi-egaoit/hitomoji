@@ -22,7 +22,7 @@ ChmConfig::ChmConfig()
 	InitConfig();
 }
 
-void ChmConfig::InitConfig()
+BOOL ChmConfig::InitConfig()
 {
 	m_config.clear();
 	m_errors.clear();
@@ -32,6 +32,18 @@ void ChmConfig::InitConfig()
 	// key-table テーブルを初期化
 	ChmKeytableParser::ClearOverrideTable();
 
+    return TRUE;
+}
+
+BOOL ChmConfig::InitConfig(std::wistream& defaultConfig)
+{
+    InitConfig();
+    if (!defaultConfig.good()) {
+        m_errors.push_back({ L"<embedded:merged-default.ini>", 0, L"cannot read default configuration stream" });
+        return FALSE;
+    }
+    // 内蔵設定は外部ファイルへ依存しない。include は許可しない。
+    return _LoadStreamInternal(defaultConfig, L"<embedded:merged-default.ini>", FALSE, L"");
 }
 
 // --- include 対応内部ローダ ---
@@ -204,8 +216,6 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 		ifs.getloc(),
 		new std::codecvt_utf8<wchar_t>
 	));
-
-	InitConfig();
 
 	BOOL bRet = _LoadStreamInternal(ifs, path, /*isMain*/ TRUE, L"");
 	if (bRet)

@@ -7,6 +7,7 @@
 #include "TestConfigHelper.h"
 #include "TestKeyEventHelper.h"
 #include <string>
+#include <sstream>
 
 namespace {
 
@@ -143,7 +144,7 @@ TEST_F(EngineConfigTest, InitConfigKeepsExistingConfigAndFunctionKeysAfterFailed
 
     engine.Deactivate();
 }
-TEST_F(EngineConfigTest, DISABLED_InitConfigKeepsKeyTableOverridesAfterFailedReload)
+TEST_F(EngineConfigTest, InitConfigKeepsKeyTableOverridesAfterFailedReload)
 {
     WriteConfig(
         L"[ui]\n"
@@ -171,3 +172,121 @@ TEST_F(EngineConfigTest, DISABLED_InitConfigKeepsKeyTableOverridesAfterFailedRel
 
     engine.Deactivate();
 }
+
+TEST_F(EngineConfigTest, ActivateReloadAndReactivateAcquireFreshDefaultStreams)
+{
+    int acquisitions = 0;
+    ChmEngine engine([&]() -> std::unique_ptr<std::wistream> {
+        ++acquisitions;
+        return std::make_unique<std::wistringstream>(
+            L"[ui]\ncandidate-delay=" + std::to_wstring(500 + acquisitions) +
+            L"\n[function-key]\nCTRL+Y=finish-raw\n[key-table]\n/half=\u00BD\n");
+    });
+    std::istringstream dictionary;
+    ASSERT_TRUE(engine.Activate(dictionary));
+    ASSERT_NE(nullptr, engine.GetConfig());
+    EXPECT_EQ(1, acquisitions);
+    EXPECT_EQ(501, engine.GetConfig()->GetLong(L"ui", L"candidate-delay"));
+    EXPECT_EQ(ChmFuncType::CompFinishKey, TypeForKey('Y', true));
+    EXPECT_EQ(L"\u00BD:", ConvertWithPending(L"/half"));
+    ASSERT_TRUE(engine.InitConfig());
+    EXPECT_EQ(2, acquisitions);
+    EXPECT_EQ(502, engine.GetConfig()->GetLong(L"ui", L"candidate-delay"));
+    engine.Deactivate();
+    ASSERT_TRUE(engine.Activate(dictionary));
+    EXPECT_EQ(3, acquisitions);
+    EXPECT_EQ(503, engine.GetConfig()->GetLong(L"ui", L"candidate-delay"));
+    engine.Deactivate();
+}
+
+TEST_F(EngineConfigTest, UserOverridesFreshDefaultsAndReloadRestoresRemovedOverrides)
+{
+    WriteConfig(L"[ui]\ncandidate-delay=123\n");
+    int acquisitions = 0;
+    ChmEngine engine([&]() -> std::unique_ptr<std::wistream> {
+        ++acquisitions;
+        return std::make_unique<std::wistringstream>(L"[ui]\ncandidate-delay=500\nwide-space=false\n");
+    });
+    std::istringstream dictionary;
+    ASSERT_TRUE(engine.Activate(dictionary));
+    EXPECT_EQ(1, acquisitions);
+    EXPECT_EQ(123, engine.GetConfig()->GetLong(L"ui", L"candidate-delay"));
+    EXPECT_FALSE(engine.GetConfig()->GetBool(L"ui", L"wide-space"));
+    WriteConfig(L"# use defaults\n");
+    ASSERT_TRUE(engine.InitConfig());
+    EXPECT_EQ(2, acquisitions);
+    EXPECT_EQ(500, engine.GetConfig()->GetLong(L"ui", L"candidate-delay"));
+    EXPECT_FALSE(engine.GetConfig()->GetBool(L"ui", L"wide-space"));
+    engine.Deactivate();
+}
+
+TEST_F(EngineConfigTest, FailedResourceAcquisitionKeepsExistingConfig)
+{
+    int acquisitions = 0;
+    ChmEngine engine([&]() -> std::unique_ptr<std::wistream> {
+        if (++acquisitions == 2) return nullptr;
+        return std::make_unique<std::wistringstream>(L"[ui]\ncandidate-delay=500\n[key-table]\n/half=\u00BD\n");
+    });
+    std::istringstream dictionary;
+    ASSERT_TRUE(engine.Activate(dictionary));
+    ChmConfig* previous = engine.GetConfig();
+    EXPECT_FALSE(engine.InitConfig());
+    EXPECT_EQ(previous, engine.GetConfig());
+    EXPECT_EQ(500, engine.GetConfig()->GetLong(L"ui", L"candidate-delay"));
+    EXPECT_EQ(L"\u00BD:", ConvertWithPending(L"/half"));
+    engine.Deactivate();
+}
+
+TEST_F(EngineConfigTest, InvalidFreshDefaultsKeepExistingConfigAndSymbols)
+{
+    int acquisitions = 0;
+    ChmEngine engine([&]() -> std::unique_ptr<std::wistream> {
+        if (++acquisitions == 2)
+            return std::make_unique<std::wistringstream>(L"[ui\n[key-table]\n/half=wrong\n");
+        return std::make_unique<std::wistringstream>(L"[ui]\ncandidate-delay=500\n[key-table]\n/half=\u00BD\n");
+    });
+    std::istringstream dictionary;
+    ASSERT_TRUE(engine.Activate(dictionary));
+    ChmConfig* previous = engine.GetConfig();
+    EXPECT_FALSE(engine.InitConfig());
+    EXPECT_EQ(previous, engine.GetConfig());
+    EXPECT_EQ(L"\u00BD:", ConvertWithPending(L"/half"));
+    engine.Deactivate();
+}
+
+TEST_F(EngineConfigTest, InitialUserSyntaxErrorAcquiresDefaultsAgain)
+{
+    WriteConfig(L"[ui\n[key-table]\n/half=wrong\n");
+    int acquisitions = 0;
+    ChmEngine engine([&]() -> std::unique_ptr<std::wistream> {
+        ++acquisitions;
+        return std::make_unique<std::wistringstream>(L"[ui]\ncandidate-delay=500\n[key-table]\n/half=\u00BD\n");
+    });
+    std::istringstream dictionary;
+    ASSERT_TRUE(engine.Activate(dictionary));
+    EXPECT_EQ(2, acquisitions);
+    EXPECT_EQ(500, engine.GetConfig()->GetLong(L"ui", L"candidate-delay"));
+    EXPECT_FALSE(engine.GetConfig()->HasErrors());
+    EXPECT_EQ(L"\u00BD:", ConvertWithPending(L"/half"));
+    engine.Deactivate();
+}
+
+#ifdef _DEBUG
+TEST_F(EngineConfigTest, DebugReloadKeyAlsoAcquiresFreshDefaults)
+{
+    int acquisitions = 0;
+    ChmEngine engine([&]() -> std::unique_ptr<std::wistream> {
+        ++acquisitions;
+        return std::make_unique<std::wistringstream>(L"[ui]\ncandidate-delay=500\n");
+    });
+    std::istringstream dictionary;
+    ASSERT_TRUE(engine.Activate(dictionary));
+    TestKeyEventHelper::SetState(true, true);
+    ChmKeyEvent key('R', 0, ChmEngine::State::None);
+    ASSERT_EQ(ChmFuncType::ReloadIni, key.GetType());
+    bool endComposition = false;
+    ASSERT_TRUE(engine.UpdateOther(key, endComposition));
+    EXPECT_EQ(2, acquisitions);
+    engine.Deactivate();
+}
+#endif

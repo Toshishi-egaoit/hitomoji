@@ -5,6 +5,7 @@
 #include "ChmEnvironment.h"
 #include <algorithm>
 #include <string>
+#include <sstream>
 
 namespace {
 
@@ -329,22 +330,23 @@ TEST(ConfigTest, IncludedKeyTableOverridesEarlierDefinition)
     EXPECT_EQ(L"ゝ:", ConvertWithPendingForConfigTest(L"/k"));
 }
 
-TEST(ConfigTest, LoadFileClearsPreviousKeyTableOverrides)
+TEST(ConfigTest, ExplicitInitializationClearsPreviousKeyTableOverrides)
 {
     TempConfigDir dir;
     dir.WriteFile(L"override.ini",
         L"[key-table]\n"
-        L"wi=うぃ\n");
+        L"wi=ゐ\n");
     dir.WriteFile(L"empty.ini", L"");
 
     ChmConfig config;
     config.SetBasePath(dir.BaseDir());
 
     EXPECT_TRUE(config.LoadFile(L"override.ini"));
-    EXPECT_EQ(L"うぃ:", ConvertWithPendingForConfigTest(L"wi"));
+    EXPECT_EQ(L"ゐ:", ConvertWithPendingForConfigTest(L"wi"));
 
+    ASSERT_TRUE(config.InitConfig());
     EXPECT_TRUE(config.LoadFile(L"empty.ini"));
-    EXPECT_EQ(L"\x3090:", ConvertWithPendingForConfigTest(L"wi"));
+    EXPECT_EQ(L"うぃ:", ConvertWithPendingForConfigTest(L"wi"));
 }
 
 TEST(ConfigTest, LoadInvalidFile)
@@ -403,4 +405,54 @@ TEST(ConfigTest, IncludeWithCustomBasePath)
 
     EXPECT_TRUE(config.LoadFile(L"main.ini"));
     EXPECT_EQ(123, config.GetLong(L"numbers", L"value"));
+}
+
+TEST(ConfigTest, InitializesDefaultValuesSymbolsAndFunctionKeysFromStream)
+{
+    ChmConfig config;
+    std::wistringstream defaults(
+        L"[ui]\ncandidate-delay=500\nwide-space=false\n"
+        L"[function-key]\nCTRL+Y=finish-raw\n"
+        L"[key-table]\n/half=\u00BD\n");
+    ASSERT_TRUE(config.InitConfig(defaults)) << config.DumpErrors();
+    EXPECT_EQ(500, config.GetLong(L"ui", L"candidate-delay"));
+    EXPECT_FALSE(config.GetBool(L"ui", L"wide-space"));
+    EXPECT_EQ(L"\u00BD:", ConvertWithPendingForConfigTest(L"/half"));
+    EXPECT_EQ(ChmFuncType::CompFinishKey, config.GetFunctionKeyMap().Resolve(
+        'Y', false, true, false, ChmEngine::State::Inputing));
+}
+
+TEST(ConfigTest, InitializationConsumesFreshStreamAndUserFileOnlyOverlays)
+{
+    TempConfigDir dir;
+    dir.WriteFile(L"Hitomoji.ini", L"[ui]\ncandidate-delay=123\n");
+    ChmConfig config;
+    config.SetBasePath(dir.BaseDir());
+    {
+        std::wistringstream defaults(L"[ui]\ncandidate-delay=500\nwide-space=false\n");
+        ASSERT_TRUE(config.InitConfig(defaults));
+    }
+    ASSERT_TRUE(config.LoadFile());
+    EXPECT_EQ(123, config.GetLong(L"ui", L"candidate-delay"));
+    EXPECT_FALSE(config.GetBool(L"ui", L"wide-space"));
+    ASSERT_TRUE(config.InitConfig());
+    EXPECT_EQ(0, config.GetLong(L"ui", L"candidate-delay"));
+    std::wistringstream refreshed(L"[ui]\ncandidate-delay=600\n");
+    ASSERT_TRUE(config.InitConfig(refreshed));
+    dir.WriteFile(L"Hitomoji.ini", L"# no user overrides\n");
+    ASSERT_TRUE(config.LoadFile());
+    EXPECT_EQ(600, config.GetLong(L"ui", L"candidate-delay"));
+}
+
+TEST(ConfigTest, ReportsInvalidDefaultsAndDisallowsExternalIncludes)
+{
+    TempConfigDir dir;
+    dir.WriteFile(L"external.ini", L"[ui]\ncandidate-delay=123\n");
+    ChmConfig config;
+    config.SetBasePath(dir.BaseDir());
+    std::wistringstream defaults(L"[ui\n@include external.ini\n");
+    EXPECT_FALSE(config.InitConfig(defaults));
+    EXPECT_TRUE(config.HasErrors());
+    EXPECT_NE(std::wstring::npos, config.DumpErrors().find(L"<embedded:merged-default.ini>"));
+    EXPECT_EQ(0, config.GetLong(L"ui", L"candidate-delay"));
 }
