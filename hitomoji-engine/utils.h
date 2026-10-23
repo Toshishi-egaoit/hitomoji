@@ -24,6 +24,7 @@ public:
     static void Debug(const std::wstring& msg);
     static std::wstring  Format(const wchar_t* fmt, ...);
 private:
+	static void _InspectDbgViewProcess();
 	static void _Output(const std::wstring& level, const std::wstring& msg);
 	static std::wstring _GetLogFile();
 	static void _RotateIfNeeded();
@@ -31,6 +32,7 @@ private:
 
 	static std::wstring _logBase ;
 	static enum LogLevel _logLevel ;
+	static bool _isDbgViewProcess ;
 };
 
 #define Debug(msg) ChmLogger::Debug(msg)

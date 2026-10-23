@@ -45,15 +45,35 @@ void OutputDebugStringWithGuid(wchar_t const* format, const IID iid)
 // --- ChmLogger Implementation ---
 ChmLogger::LogLevel ChmLogger::_logLevel = ChmLogger::LogLevel::InfoLevel; 
 
+void ChmLogger::_InspectDbgViewProcess()
+{
+	WCHAR path[MAX_PATH] = {};
+	_isDbgViewProcess = false;
+
+	DWORD len = GetModuleFileNameW(nullptr, path, ARRAYSIZE(path));
+	if (len == 0 || len >= ARRAYSIZE(path)) return ;
+
+	LPCWSTR fileName = path;
+	for (LPCWSTR p = path; *p; ++p) {
+		if (*p == L'\\' || *p == L'/') {
+			fileName = p + 1;
+		}
+	}
+	_isDbgViewProcess = lstrcmpiW(fileName, L"Dbgview.exe") == 0 ||
+		lstrcmpiW(fileName, L"Dbgview64.exe") == 0 ||
+		lstrcmpiW(fileName, L"Dbgview64a.exe") == 0;
+}
+
 void ChmLogger::_Output(const std::wstring& level, const std::wstring& msg)
 {
 	std::wstring line = L"[" + level + L"] " + msg + L"\n";
+	_RotateIfNeeded();
+	_WriteFile(line);
+
 #ifdef _DEBUG
 	std::wstring line2 = L"[Hitomoji] " + line;
 	OutputDebugStringW(line2.c_str());
 #endif
-	_RotateIfNeeded();
-	_WriteFile(line);
 }
 
 void ChmLogger::_RotateIfNeeded()
