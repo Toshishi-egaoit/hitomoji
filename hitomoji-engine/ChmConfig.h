@@ -68,7 +68,8 @@ private:
 	BOOL _LoadStreamInternal(std::wistream& is,
 		const std::wstring& fileName,
 		BOOL isMain,
-		std::wstring currentSection);
+		std::wstring currentSection,
+		ChmFunctionKeyMap& functionKeys);
 	BOOL _parseSection(const std::wstring& rawTrim,
 		std::wstring& currentSection,
 		ParseResult& errorMsg);
@@ -78,6 +79,7 @@ private:
 		ParseResult& errorMsg);
 	BOOL _parseFunctionKey(const std::wstring& key,
 		const std::wstring& value,
+		ChmFunctionKeyMap& functionKeys,
 		ParseResult& errorMsg);
 	BOOL _parseValue(const std::wstring& keyTrim,
 		const std::wstring& valueTrim,

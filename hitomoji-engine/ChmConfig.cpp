@@ -43,7 +43,11 @@ BOOL ChmConfig::InitConfig(std::wistream& defaultConfig)
         return FALSE;
     }
     // 内蔵設定は外部ファイルへ依存しない。include は許可しない。
-    return _LoadStreamInternal(defaultConfig, L"<embedded:merged-default.ini>", FALSE, L"");
+    ChmFunctionKeyMap functionKeys;
+    functionKeys.Clear();
+    BOOL success = _LoadStreamInternal(defaultConfig, L"<embedded:merged-default.ini>", FALSE, L"", functionKeys);
+    if (success) m_functionKeyMap.MergeFrom(functionKeys);
+    return success;
 }
 
 // --- include 対応内部ローダ ---
@@ -51,7 +55,8 @@ BOOL ChmConfig::InitConfig(std::wistream& defaultConfig)
 BOOL ChmConfig::_LoadStreamInternal(std::wistream& is,
 	const std::wstring& fileName,
 	BOOL isMain,
-	std::wstring currentSection)
+	std::wstring currentSection,
+	ChmFunctionKeyMap& functionKeys)
 {
 	// ファイル名はここで一元管理する
 	std::wstring prevFile = m_currentFile;
@@ -113,7 +118,7 @@ BOOL ChmConfig::_LoadStreamInternal(std::wistream& is,
 			));
 
 			// include 内ではさらに include を許可しない（isMain = FALSE）
-			_LoadStreamInternal(incIfs, fullPath, FALSE, currentSection);
+			_LoadStreamInternal(incIfs, fullPath, FALSE, currentSection, functionKeys);
 			continue;
 		}
 
@@ -161,7 +166,7 @@ BOOL ChmConfig::_LoadStreamInternal(std::wistream& is,
 			}
 			else if (currentSection == L"function-key")
 			{
-				bRet = _parseFunctionKey(key, value, errorMsg);
+				bRet = _parseFunctionKey(key, value, functionKeys, errorMsg);
 			}
 			else
 			{
@@ -217,9 +222,13 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 		new std::codecvt_utf8<wchar_t>
 	));
 
-	BOOL bRet = _LoadStreamInternal(ifs, path, /*isMain*/ TRUE, L"");
+	// 親INIとinclude先を1つの読み込み単位として重複判定する。
+	ChmFunctionKeyMap functionKeys;
+	functionKeys.Clear();
+	BOOL bRet = _LoadStreamInternal(ifs, path, /*isMain*/ TRUE, L"", functionKeys);
 	if (bRet)
 	{
+		m_functionKeyMap.MergeFrom(functionKeys);
 		ChmKeyEvent::SetFunctionKeyMap(m_functionKeyMap);
 	}
 
@@ -496,10 +505,11 @@ BOOL ChmConfig::_divideRawTrim(const std::wstring& rawTrim,
 
 BOOL ChmConfig::_parseFunctionKey(const std::wstring& key,
                                   const std::wstring& value,
+                                  ChmFunctionKeyMap& functionKeys,
                                   ParseResult& errorMsg)
 {
     ParseResult result;
-    BOOL ret = m_functionKeyMap.ParseFunctionKey(key, value, result);
+    BOOL ret = functionKeys.ParseFunctionKey(key, value, result);
     if (result.level == ParseLevel::Error)
     {
         SetError(errorMsg, result.message);

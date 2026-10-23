@@ -83,13 +83,13 @@ const std::unordered_set<wchar_t>& ChmRomajiConverter::sokuonConsonants() {
     return set;
 }
 
-// Find: override優先 → base
-static const std::wstring* FindEntry(const std::wstring& key)
+// key-tableは大文字小文字を区別し、標準ローマ字変換だけ小文字で照合する。
+static const std::wstring* FindEntry(const std::wstring& key, const std::wstring& lowerKey)
 {
     auto itO = _overrideTable.find(key);
     if (itO != _overrideTable.end()) return &itO->second;
 
-    auto itB = _baseTable.find(key);
+    auto itB = _baseTable.find(lowerKey);
     if (itB != _baseTable.end()) return &itB->second;
 
     return nullptr;
@@ -110,8 +110,8 @@ bool ChmRomajiConverter::TryConvertOne(const std::wstring& rawInput,
 
     for (int len = MAX_KEY_LENGTH ; len >= 1; --len) {
         if (pos + len > lowerInput.size()) continue;
-        auto key = lowerInput.substr(pos, len);
-        auto val = FindEntry(key);
+        auto key = rawInput.substr(pos, len);
+        auto val = FindEntry(key, lowerInput.substr(pos, len));
         if (val) {
             out.output = *val;
             out.rawLength = len;

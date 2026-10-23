@@ -150,3 +150,26 @@ TEST_F(ConvertOverrideTest, OverrideFallbackToBase)
     // base still works for others
     EXPECT_EQ(L"あ:", ConvertWithPending(L"a"));
 }
+
+TEST_F(ConvertOverrideTest, UppercaseOverridesUseExactCaseAndBaseStillIgnoresCase)
+{
+    ChmKeytableParser::RegisterOverrideTable(L"Ka", L"UPPER");
+    ChmKeytableParser::RegisterOverrideTable(L"ka", L"lower");
+    EXPECT_EQ(L"UPPER:", ConvertWithPending(L"Ka"));
+    EXPECT_EQ(L"lower:", ConvertWithPending(L"ka"));
+    EXPECT_EQ(L"か:", ConvertWithPending(L"KA"));
+    EXPECT_EQ(L"か:", ConvertWithPending(L"kA"));
+    EXPECT_EQ(L"きゃ:", ConvertWithPending(L"KYA"));
+    EXPECT_EQ(L"っか:", ConvertWithPending(L"KKA"));
+}
+
+TEST_F(ConvertOverrideTest, CaseSensitiveOverridesKeepLongestMatchAtEachPosition)
+{
+    ChmKeytableParser::RegisterOverrideTable(L"/X", L"short");
+    ChmKeytableParser::RegisterOverrideTable(L"/XY", L"LONG");
+    ChmKeytableParser::RegisterOverrideTable(L"/xy", L"lower");
+    EXPECT_EQ(L"LONGあ:", ConvertWithPending(L"/XYa"));
+    EXPECT_EQ(L"あLONG:", ConvertWithPending(L"a/XY"));
+    EXPECT_EQ(L"lower:", ConvertWithPending(L"/xy"));
+    EXPECT_EQ(L"short:", ConvertWithPending(L"/X"));
+}

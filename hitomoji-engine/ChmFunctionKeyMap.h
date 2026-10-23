@@ -16,6 +16,8 @@ public:
 
     void Clear();
     void InitDefault();
+    // 読み込みに成功した定義だけを上書きでマージする。
+    void MergeFrom(const ChmFunctionKeyMap& definitions);
     BOOL ParseFunctionKey(const std::wstring& key,
                           const std::wstring& value,
                           ParseResult& result);
