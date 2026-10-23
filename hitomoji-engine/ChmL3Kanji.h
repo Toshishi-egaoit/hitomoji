@@ -485,7 +485,7 @@ public:
 	// デフォルトの選択キー定義
 	void InitDefault(ChmConfig* pConfig)
 	{
-		std::wstring map = pConfig->GetString(L"UI", L"select_keymap");
+		std::wstring map = pConfig->GetString(L"UI", L"select-keymap");
 		if (map.empty()) {
 			map = L"dk fj sl gh ei ru a; wo qp ty c, vm x. z/ bn 38 47";
 		}

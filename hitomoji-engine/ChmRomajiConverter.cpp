@@ -28,7 +28,8 @@ static const std::unordered_map<std::wstring, std::wstring> _baseTable = {
         {L"ma", L"ま"}, {L"mi", L"み"}, {L"mu", L"む"}, {L"me", L"め"}, {L"mo", L"も"},
         {L"ya", L"や"}, {L"yu", L"ゆ"}, {L"yo", L"よ"},
         {L"ra", L"ら"}, {L"ri", L"り"}, {L"ru", L"る"}, {L"re", L"れ"}, {L"ro", L"ろ"},
-        {L"wa", L"わ"}, {L"wi", L"ゐ"}, {L"we", L"ゑ"}, {L"wo", L"を"},
+        {L"wa", L"わ"}, {L"wwi", L"ゐ"}, {L"wwe", L"ゑ"}, {L"wo", L"を"},
+
         // --- 以下元テーブル続き（省略なし） ---
         // --- 拗音の清音（y系） ---
 		{L"kya", L"きゃ"}, {L"kyu", L"きゅ"}, {L"kyo", L"きょ"}, 
@@ -68,7 +69,7 @@ static const std::unordered_map<std::wstring, std::wstring> _baseTable = {
         {L"fa", L"ふぁ"}, {L"fi", L"ふぃ"}, {L"fu", L"ふ"}, {L"fe", L"ふぇ"}, {L"fo", L"ふぉ"},
         {L"thi", L"てぃ"}, {L"thu", L"とぅ"}, 
 		{L"dhi", L"でぃ"}, {L"dhu", L"でゅ"},
-        {L"whi", L"うぃ"}, {L"whe", L"うぇ"}, {L"who", L"うぉ"},
+        {L"wi", L"うぃ"}, {L"we", L"うぇ"}, {L"who", L"うぉ"},
         // --- 役物、記号類
         {L".", L"。"}, {L",", L"、"}, {L"?", L"？"}, {L"!", L"！"},
         {L"[", L"「"}, {L"]", L"」"}, 

@@ -100,6 +100,8 @@ v0.2.3以降では、%appdata%/hitomojiディレクトリに hitomoji.ini とい
 ※ %appdata%= C:\Users\ユーザー名\AppData\Roaming
 
 この設定ファイルで、キー割り当ての変更、UIの動作設定、先回り置換の追加ができます。
+記述していない項目にはDLL内蔵のデフォルト設定が適用されます。
+変更したいセクションと項目だけを、hitomoji.sample.ini を参考に記述してください。
 * [function-key] セクション: 機能キーの割り当て変更ができます。
 * [key-table] セクション: 先回り置換（ローマ字じカナ変換のように入力を別の文字列に置換する機能）が登録できます。
 
@@ -110,7 +112,9 @@ v0.2.3以降では、%appdata%/hitomojiディレクトリに hitomoji.ini とい
 先回り置換を使うことで、記号をはじめとする様々な文字が入力できます。
 
 
-%appdata%/hitomoji/Layer2.sample.ini にサンプルがありますので、参考にしてください。
+%APPDATA%\hitomoji\my.ini に独自定義のサンプルがあります。
+利用する場合は hitomoji.ini の「# @include my.ini」の先頭の # を外してください。
+標準の記号定義はDLLに内蔵済みです。hikanji.ini はその一覧を確認するための参照用です。
 
 先回り変換の定義は [key-table] セクションに、追加してください。
 （極端ですが、TUT、超絶技巧入力のような漢字直接入力も登録可能です）
