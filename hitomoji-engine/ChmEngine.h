@@ -4,6 +4,9 @@
 #include <windows.h>
 #include <cstdint>
 #include <string>
+#include <istream>
+#include <functional>
+#include <memory>
 #include "utils.h"
 #include "hitomoji.h"
 #include "ChmCandidatePage.h"
@@ -25,16 +28,18 @@ public:
 		Selecting,
 	} ;
 
-	ChmEngine();
+	// 毎回、新しい内蔵設定ストリームを取得する。原文は保持しない。
+	using DefaultConfigLoader = std::function<std::unique_ptr<std::wistream>()>;
+	explicit ChmEngine(DefaultConfigLoader defaultConfigLoader = {});
 	~ChmEngine();
 
 	// Activate/Deactivate
-	void Activate(std::istream& stream);
+	BOOL Activate(std::istream& stream);
 	void Deactivate();
 
 	// ChmConfigの処理ヘルパ
 	ChmConfig* GetConfig() const { return _pConfig; };
-	void InitConfig();
+	BOOL InitConfig();
 	std::wstring GetConfigFile() ; 
 	std::wstring GetConfigPath() ; 
 	
@@ -85,6 +90,7 @@ private:
 
 	// --- static members ---
 	ChmConfig* _pConfig;
+	DefaultConfigLoader _defaultConfigLoader;
 
 	State _state ;
 	BOOL _isON;

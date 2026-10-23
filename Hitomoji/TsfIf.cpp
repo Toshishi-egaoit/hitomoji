@@ -6,6 +6,7 @@
 #include <string>
 #include <sstream>
 #include <cctype>
+#include <climits>
 #include <initguid.h> // GUIDの実体定義用
 #include <objbase.h>
 #include <inputscope.h>
@@ -62,7 +63,7 @@ ChmTsfInterface::ChmTsfInterface():
 	_isDisabledForProcess(FALSE)
 { 
 	InitializeCriticalSection(&_candidateWindowPositionLock);
-	_pEngine = new ChmEngine();
+	_pEngine = new ChmEngine(&ChmTsfInterface::GetDefaultConfigStream);
 	_pLangBarItem = nullptr;
 }
 
@@ -116,6 +117,10 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 
 	g_environment.Init();
 	ChmLogger::Info(L"Activate() : Hitomoji " HM_VERSION L"(" __DATE__ L")" );
+	// リソース取得に失敗した場合は、TSF登録を始める前に終了する。
+	auto dictStream = GetDictStream();
+	if (!dictStream || !_pEngine->Activate(*dictStream)) return E_FAIL;
+
 	_pThreadMgr = ptm;
 	_pThreadMgr->AddRef();
 	_tfClientId = tid;
@@ -137,10 +142,6 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 		OUTPUT_HR_ON_ERROR(L"Activate.AdviceSink",hr);
 		pSource->Release();
 	}
-
-	// ChmEngine のしょきか
-	std::unique_ptr<std::istream> st = GetDictStream();
-	_pEngine->Activate(*st);
 
 	// 候補ウィンドウ表示スレッドの初期化
 	_pCandidateWindowThread = new ChmCandidateWindowThread(_GetCandidateWindowPositionCallback, this);
@@ -187,6 +188,42 @@ std::unique_ptr<std::istream> ChmTsfInterface::GetDictStream() {
 	);
 	std::unique_ptr<std::istream> stream = std::make_unique<std::istringstream> (data, std::ios::in | std::ios::binary); ;
 	return stream;
+}
+
+std::unique_ptr<std::wistream> ChmTsfInterface::GetDefaultConfigStream() {
+    HRSRC resource = FindResourceW(
+		g_hInst,
+        MAKEINTRESOURCEW(IDR_HITOMOJI_DEFAULT_CONFIG),
+		RT_RCDATA
+	);
+    if (!resource) {
+		// リソースが見つからない
+        ChmLogger::Error(L"Cannot find default configuration resource");
+        return nullptr;
+    }
+
+    HGLOBAL loaded = LoadResource(g_hInst, resource);
+    DWORD size = SizeofResource(g_hInst, resource);
+
+    const char* data = loaded ? static_cast<const char*>(LockResource(loaded)) : nullptr;
+    if (!data || size == 0 || size > INT_MAX) {
+        ChmLogger::Error(L"Cannot load default configuration resource");
+        return nullptr;
+    }
+    // RCDATAはUTF-8。現在のロケールに依存せずwistreamへ変換する。
+    int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+        data, static_cast<int>(size), nullptr, 0);
+    if (length == 0) {
+        ChmLogger::Error(L"Invalid UTF-8 in default configuration resource");
+        return nullptr;
+    }
+    std::wstring text(length, L'\0');
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+        data, static_cast<int>(size), text.data(), length) != length) {
+        ChmLogger::Error(L"Cannot decode default configuration resource");
+        return nullptr;
+    }
+    return std::make_unique<std::wistringstream>(text);
 }
 
 STDMETHODIMP ChmTsfInterface::Deactivate() {

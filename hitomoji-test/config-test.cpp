@@ -5,6 +5,7 @@
 #include "ChmEnvironment.h"
 #include <algorithm>
 #include <string>
+#include <sstream>
 
 namespace {
 
@@ -329,22 +330,23 @@ TEST(ConfigTest, IncludedKeyTableOverridesEarlierDefinition)
     EXPECT_EQ(L"ゝ:", ConvertWithPendingForConfigTest(L"/k"));
 }
 
-TEST(ConfigTest, LoadFileClearsPreviousKeyTableOverrides)
+TEST(ConfigTest, ExplicitInitializationClearsPreviousKeyTableOverrides)
 {
     TempConfigDir dir;
     dir.WriteFile(L"override.ini",
         L"[key-table]\n"
-        L"wi=うぃ\n");
+        L"wi=ゐ\n");
     dir.WriteFile(L"empty.ini", L"");
 
     ChmConfig config;
     config.SetBasePath(dir.BaseDir());
 
     EXPECT_TRUE(config.LoadFile(L"override.ini"));
-    EXPECT_EQ(L"うぃ:", ConvertWithPendingForConfigTest(L"wi"));
+    EXPECT_EQ(L"ゐ:", ConvertWithPendingForConfigTest(L"wi"));
 
+    ASSERT_TRUE(config.InitConfig());
     EXPECT_TRUE(config.LoadFile(L"empty.ini"));
-    EXPECT_EQ(L"\x3090:", ConvertWithPendingForConfigTest(L"wi"));
+    EXPECT_EQ(L"うぃ:", ConvertWithPendingForConfigTest(L"wi"));
 }
 
 TEST(ConfigTest, LoadInvalidFile)
@@ -403,4 +405,167 @@ TEST(ConfigTest, IncludeWithCustomBasePath)
 
     EXPECT_TRUE(config.LoadFile(L"main.ini"));
     EXPECT_EQ(123, config.GetLong(L"numbers", L"value"));
+}
+
+TEST(ConfigTest, InitializesDefaultValuesSymbolsAndFunctionKeysFromStream)
+{
+    ChmConfig config;
+    std::wistringstream defaults(
+        L"[ui]\ncandidate-delay=500\nwide-space=false\n"
+        L"[function-key]\nCTRL+Y=finish-raw\n"
+        L"[key-table]\n/half=\u00BD\n");
+    ASSERT_TRUE(config.InitConfig(defaults)) << config.DumpErrors();
+    EXPECT_EQ(500, config.GetLong(L"ui", L"candidate-delay"));
+    EXPECT_FALSE(config.GetBool(L"ui", L"wide-space"));
+    EXPECT_EQ(L"\u00BD:", ConvertWithPendingForConfigTest(L"/half"));
+    EXPECT_EQ(ChmFuncType::CompFinishKey, config.GetFunctionKeyMap().Resolve(
+        'Y', false, true, false, ChmEngine::State::Inputing));
+}
+
+TEST(ConfigTest, InitializationConsumesFreshStreamAndUserFileOnlyOverlays)
+{
+    TempConfigDir dir;
+    dir.WriteFile(L"Hitomoji.ini", L"[ui]\ncandidate-delay=123\n");
+    ChmConfig config;
+    config.SetBasePath(dir.BaseDir());
+    {
+        std::wistringstream defaults(L"[ui]\ncandidate-delay=500\nwide-space=false\n");
+        ASSERT_TRUE(config.InitConfig(defaults));
+    }
+    ASSERT_TRUE(config.LoadFile());
+    EXPECT_EQ(123, config.GetLong(L"ui", L"candidate-delay"));
+    EXPECT_FALSE(config.GetBool(L"ui", L"wide-space"));
+    ASSERT_TRUE(config.InitConfig());
+    EXPECT_EQ(0, config.GetLong(L"ui", L"candidate-delay"));
+    std::wistringstream refreshed(L"[ui]\ncandidate-delay=600\n");
+    ASSERT_TRUE(config.InitConfig(refreshed));
+    dir.WriteFile(L"Hitomoji.ini", L"# no user overrides\n");
+    ASSERT_TRUE(config.LoadFile());
+    EXPECT_EQ(600, config.GetLong(L"ui", L"candidate-delay"));
+}
+
+TEST(ConfigTest, ReportsInvalidDefaultsAndDisallowsExternalIncludes)
+{
+    TempConfigDir dir;
+    dir.WriteFile(L"external.ini", L"[ui]\ncandidate-delay=123\n");
+    ChmConfig config;
+    config.SetBasePath(dir.BaseDir());
+    std::wistringstream defaults(L"[ui\n@include external.ini\n");
+    EXPECT_FALSE(config.InitConfig(defaults));
+    EXPECT_TRUE(config.HasErrors());
+    EXPECT_NE(std::wstring::npos, config.DumpErrors().find(L"<embedded:merged-default.ini>"));
+    EXPECT_EQ(0, config.GetLong(L"ui", L"candidate-delay"));
+}
+
+TEST(ConfigTest, FunctionKeyOverridesAcrossReadUnitsDoNotProduceInfo)
+{
+    TempConfigDir dir;
+    dir.WriteFile(L"user.ini", L"[function-key]\nRETURN=finish-raw\n");
+    ChmConfig config;
+    config.SetBasePath(dir.BaseDir());
+    std::wistringstream defaults(L"[function-key]\nENTER=finish\n");
+    ASSERT_TRUE(config.InitConfig(defaults));
+    EXPECT_FALSE(config.HasInfos()); // The built-in map is outside this read unit.
+    ASSERT_TRUE(config.LoadFile(L"user.ini"));
+    EXPECT_FALSE(config.HasInfos()); // Overriding the embedded default is normal.
+    EXPECT_EQ(ChmFuncType::CompFinishKey, config.GetFunctionKeyMap().Resolve(
+        VK_RETURN, false, false, false, ChmEngine::State::Inputing));
+    EXPECT_EQ(ChmFuncType::Cancel, config.GetFunctionKeyMap().Resolve(
+        VK_ESCAPE, false, false, false, ChmEngine::State::Inputing));
+    dir.WriteFile(L"next.ini", L"[function-key]\nENTER=finish-katakana\n");
+    ASSERT_TRUE(config.LoadFile(L"next.ini"));
+    EXPECT_FALSE(config.HasInfos()); // A new LoadFile starts with an empty temporary map.
+    EXPECT_EQ(ChmFuncType::CompFinishKatakana, config.GetFunctionKeyMap().Resolve(
+        VK_RETURN, false, false, false, ChmEngine::State::Inputing));
+}
+
+TEST(ConfigTest, DuplicateFunctionKeysWithinDefaultsProduceInfoAndLastWins)
+{
+    ChmConfig config;
+    std::wistringstream defaults(L"[function-key]\nENTER=finish\nRETURN=finish-raw\n");
+    ASSERT_TRUE(config.InitConfig(defaults));
+    EXPECT_FALSE(config.HasErrors());
+    std::wstring infos = config.DumpInfos();
+    EXPECT_EQ(1, std::count(infos.begin(), infos.end(), L'\n'));
+    EXPECT_NE(std::wstring::npos, infos.find(L"duplicate function-key definition"));
+    EXPECT_NE(std::wstring::npos, infos.find(L"<embedded:merged-default.ini>(3)"));
+    EXPECT_EQ(ChmFuncType::CompFinishKey, config.GetFunctionKeyMap().Resolve(
+        VK_RETURN, false, false, false, ChmEngine::State::Inputing));
+}
+
+TEST(ConfigTest, FunctionKeyDuplicatesIncludeParentAndAllIncludedFiles)
+{
+    TempConfigDir dir;
+    dir.WriteFile(L"main.ini",
+        L"[function-key]\nENTER=finish\n@include first.ini\n"
+        L"SHIFT+CTRL+ENTER=finish\n@include second.ini\nRETURN=finish-raw-wide\n");
+    dir.WriteFile(L"first.ini",
+        L"[function-key]\nRETURN=finish-raw\nCTRL+SHIFT+RETURN=finish-katakana\n");
+    dir.WriteFile(L"second.ini", L"[function-key]\nCONTROL+SHIFT+ENTER=cancel\n");
+    ChmConfig config;
+    config.SetBasePath(dir.BaseDir());
+    ASSERT_TRUE(config.LoadFile(L"main.ini")) << config.DumpErrors();
+    EXPECT_FALSE(config.HasErrors());
+    std::wstring infos = config.DumpInfos();
+    // Alias and modifier order differences resolve to the same KeySignature.
+    EXPECT_EQ(4, std::count(infos.begin(), infos.end(), L'\n'));
+    EXPECT_NE(std::wstring::npos, infos.find(dir.BaseDir() + L"first.ini(2)"));
+    EXPECT_NE(std::wstring::npos, infos.find(dir.BaseDir() + L"main.ini(4)"));
+    EXPECT_NE(std::wstring::npos, infos.find(dir.BaseDir() + L"second.ini(2)"));
+    EXPECT_NE(std::wstring::npos, infos.find(dir.BaseDir() + L"main.ini(6)"));
+    EXPECT_EQ(ChmFuncType::CompFinishKeyWide, config.GetFunctionKeyMap().Resolve(
+        VK_RETURN, false, false, false, ChmEngine::State::Inputing));
+    EXPECT_EQ(ChmFuncType::Cancel, config.GetFunctionKeyMap().Resolve(
+        VK_RETURN, true, true, false, ChmEngine::State::Inputing));
+}
+
+TEST(ConfigTest, FailedIncludedConfigDoesNotMergeAnyFunctionKeys)
+{
+    TempConfigDir dir;
+    dir.WriteFile(L"main.ini", L"[function-key]\nCTRL+Y=finish-raw\nCTRL+Q=finish\n@include bad.ini\n");
+    dir.WriteFile(L"bad.ini", L"[function-key]\nCTRL+X=finish\nCTRL+W=unknown-action\n");
+    ChmConfig config;
+    config.SetBasePath(dir.BaseDir());
+    std::wistringstream defaults(L"[function-key]\nCTRL+Y=cancel\n");
+    ASSERT_TRUE(config.InitConfig(defaults));
+    EXPECT_FALSE(config.LoadFile(L"main.ini"));
+    EXPECT_TRUE(config.HasErrors());
+    EXPECT_EQ(ChmFuncType::Cancel, config.GetFunctionKeyMap().Resolve(
+        'Y', false, true, false, ChmEngine::State::Inputing));
+    for (WPARAM key : { 'Q', 'X' }) {
+        EXPECT_EQ(ChmFuncType::None, config.GetFunctionKeyMap().Resolve(
+            key, false, true, false, ChmEngine::State::Inputing));
+    }
+}
+
+TEST(ConfigTest, FailedDefaultConfigDoesNotMergePartialFunctionKeys)
+{
+    ChmConfig config;
+    std::wistringstream defaults(L"[function-key]\nENTER=finish-raw\nCTRL+Y=cancel\nCTRL+X=unknown-action\n");
+    EXPECT_FALSE(config.InitConfig(defaults));
+    EXPECT_TRUE(config.HasErrors());
+    EXPECT_EQ(ChmFuncType::CompFinish, config.GetFunctionKeyMap().Resolve(
+        VK_RETURN, false, false, false, ChmEngine::State::Inputing));
+    EXPECT_EQ(ChmFuncType::None, config.GetFunctionKeyMap().Resolve(
+        'Y', false, true, false, ChmEngine::State::Inputing));
+}
+
+TEST(ConfigTest, KeyTablePreservesCaseAndOtherSettingsRemainCaseInsensitive)
+{
+    TempConfigDir dir;
+    dir.WriteFile(L"main.ini",
+        L"[UI]\nWIDE_SPACE=false\n"
+        L"[FUNCTION_KEY]\ncontrol+y=FINISH_RAW\n"
+        L"[KEY_TABLE]\n  Ab  =UPPER\nab=lower\n@include more.ini\n");
+    dir.WriteFile(L"more.ini", L"aB=mixed\n");
+    ChmConfig config;
+    config.SetBasePath(dir.BaseDir());
+    ASSERT_TRUE(config.LoadFile(L"main.ini")) << config.DumpErrors();
+    EXPECT_FALSE(config.GetBool(L"ui", L"wide-space"));
+    EXPECT_EQ(ChmFuncType::CompFinishKey, config.GetFunctionKeyMap().Resolve(
+        'Y', false, true, false, ChmEngine::State::Inputing));
+    EXPECT_EQ(L"UPPER:", ConvertWithPendingForConfigTest(L"Ab"));
+    EXPECT_EQ(L"lower:", ConvertWithPendingForConfigTest(L"ab"));
+    EXPECT_EQ(L"mixed:", ConvertWithPendingForConfigTest(L"aB"));
+    EXPECT_EQ(L"あ:B", ConvertWithPendingForConfigTest(L"AB"));
 }

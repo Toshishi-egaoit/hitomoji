@@ -51,6 +51,7 @@ public:
     STDMETHODIMP Activate(ITfThreadMgr* ptm, TfClientId tid);
     STDMETHODIMP Deactivate();
 	std::unique_ptr<std::istream> GetDictStream() ;
+	static std::unique_ptr<std::wistream> GetDefaultConfigStream();
 
     // ITfKeyEventSink
     STDMETHODIMP OnSetFocus(BOOL fForeground) ;

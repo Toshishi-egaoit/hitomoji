@@ -22,3 +22,11 @@ Release/
 /packages
 /SQLite
 /distribution/*.zip
+
+# Editor backups and undo files
+*~
+*.un~
+*.swo
+
+# Generated embedded configuration
+/build/merged-default.ini

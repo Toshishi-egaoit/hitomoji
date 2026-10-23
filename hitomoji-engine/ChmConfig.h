@@ -2,6 +2,7 @@
 #pragma once
 
 #include <string>
+#include <istream>
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -40,9 +41,11 @@ public:
 	const std::wstring GetConfigPath() { return m_basePath ; };
 	const std::wstring GetConfigFile() { return m_basePath + L"Hitomoji.ini"; };
 	
-	// ini 読み込み
+	// 初期化後の設定へユーザーINIを重ねて読み込む。初期化は呼び出し側で行う。
 	BOOL LoadFile(const std::wstring& fileName=L"");
-	void InitConfig();
+	BOOL InitConfig();
+	// 今回取得した内蔵設定から初期化する。原文やストリームは保持しない。
+	BOOL InitConfig(std::wistream& defaultConfig);
 
 	// Getter（見つからない／型不一致は既定値）
 	BOOL GetBool(const std::wstring& section, const std::wstring& key, const BOOL bDefault=GetBool_default) const;
@@ -65,7 +68,8 @@ private:
 	BOOL _LoadStreamInternal(std::wistream& is,
 		const std::wstring& fileName,
 		BOOL isMain,
-		std::wstring currentSection);
+		std::wstring currentSection,
+		ChmFunctionKeyMap& functionKeys);
 	BOOL _parseSection(const std::wstring& rawTrim,
 		std::wstring& currentSection,
 		ParseResult& errorMsg);
@@ -75,6 +79,7 @@ private:
 		ParseResult& errorMsg);
 	BOOL _parseFunctionKey(const std::wstring& key,
 		const std::wstring& value,
+		ChmFunctionKeyMap& functionKeys,
 		ParseResult& errorMsg);
 	BOOL _parseValue(const std::wstring& keyTrim,
 		const std::wstring& valueTrim,

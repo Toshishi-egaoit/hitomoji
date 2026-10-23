@@ -58,9 +58,6 @@
     <None Include="Hitomoji.def">
       <Filter>ソース ファイル</Filter>
     </None>
-    <None Include="rcdata1.bin">
-      <Filter>リソース ファイル</Filter>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="resource.rc">
@@ -77,5 +74,10 @@
     <Image Include="icon-logo.ico">
       <Filter>リソース ファイル</Filter>
     </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\build\merge-default.ps1">
+      <Filter>リソース ファイル</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>

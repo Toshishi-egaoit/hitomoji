@@ -120,6 +120,14 @@ void ChmFunctionKeyMap::InitDefault()
     }
 }
 
+void ChmFunctionKeyMap::MergeFrom(const ChmFunctionKeyMap& definitions)
+{
+    for (const auto& entry : definitions._keyTable)
+    {
+        _keyTable[entry.first] = entry.second;
+    }
+}
+
 bool ChmFunctionKeyMap::ResolveActionName(const std::wstring& name, ChmFuncType& outType)
 {
     auto it = s_actionNameMap.find(name);

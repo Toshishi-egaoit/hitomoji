@@ -1,6 +1,6 @@
 @echo off
 setlocal
-cd /d %~dp0
+cd /d "%~dp0"
 
 :: --- 管理者権限チェック ---
 openfiles >nul 2>&1
@@ -51,7 +51,6 @@ copy /y "x64\hitomoji.dll" "%TARGET_DIR%"
 echo 32ビット版DLLのコピーと登録
 copy /y "x86\hitomoji.dll" "%TARGET_DIR32%"
 "%SYSTEM_DIR32%\regsvr32.exe" /s "%TARGET_DIR32%\hitomoji.dll"
-)
 
 echo プロファイル登録
 copy /y "x64\regHitomoji.exe" "%TARGET_DIR%"
@@ -60,18 +59,22 @@ copy /y "x86\regHitomoji.exe" "%TARGET_DIR32%"
 "%TARGET_DIR32%\regHitomoji.exe"
 
 echo 設定ファイルのコピー
-if exist "%CONFIG_DIR%\hitomoji.ini" (
-    if "%FORCE%"=="0" (
-        echo "   hitomoji.ini が存在します。(上書きする場合は install.bat /f )"
-		goto skip
-	)
+REM ユーザー設定は通常更新で保持する。/f を指定した場合のみ上書きする。
+for %%F in (hitomoji.ini my.ini) do (
+    if not exist "%CONFIG_DIR%\%%F" (
+        copy /y "%%F" "%CONFIG_DIR%\"
+    ) else if "%FORCE%"=="1" (
+        copy /y "%%F" "%CONFIG_DIR%\"
+    ) else (
+        echo    %%F は既存の設定を保持します。
+    )
 )
-copy /y "hitomoji.ini" "%CONFIG_DIR%"
-copy /y "layer2.sample.ini" "%CONFIG_DIR%"
-:skip
+REM 参照用ファイルは既存のユーザー設定に関係なく最新版へ更新する。
+copy /y "hitomoji.sample.ini" "%CONFIG_DIR%\"
+copy /y "hikanji.ini" "%CONFIG_DIR%\"
 
-echo "辞書ファイルのコピー"
-copy /y "hitomoji.dic" "%CONFIG_DIR%"
+echo コピー結果は以下の通り
+dir "%CONFIG_DIR%"
 
 :: 前回のゴミがあれば掃除（リブート後なら消せる）
 if exist "%TARGET_DLL%.old" (
