@@ -29,7 +29,7 @@ public:
 	~ChmEngine();
 
 	// Activate/Deactivate
-	void Activate();
+	void Activate(std::istream& stream);
 	void Deactivate();
 
 	// ChmConfigの処理ヘルパ
@@ -69,8 +69,9 @@ public:
 
 private:
 	// Activate/Deactivateでの初期処理
-	void _initLayer3();
 	void _initLayer2();
+	void _initLayer3();
+	void _initL3Dict(std::istream& stream);
 
 	// ASCII -> 全角 変換（v0.1.3 簡易実装）
 	static std::wstring AsciiToWide(const std::wstring& src);

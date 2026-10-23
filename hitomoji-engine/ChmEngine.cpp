@@ -34,11 +34,12 @@ ChmEngine::~ChmEngine() {
 	if (_pRawInputStore) delete _pRawInputStore;
 }
 
-void ChmEngine::Activate() {
+void ChmEngine::Activate(std::istream& stream) {
 	Debug(L"ChmEngine::Activate");
 	InitConfig();
 	_initLayer2();
 	_initLayer3();
+	_initL3Dict(stream);
 }
 
 void ChmEngine::Deactivate() {
@@ -109,8 +110,12 @@ void ChmEngine::_initLayer2() {
 void ChmEngine::_initLayer3() {
 	if (_pL3Helper == nullptr )
 		_pL3Helper = new ChmL3Helper(_pConfig) ;
+}
+
+void ChmEngine::_initL3Dict(std::istream& stream) {
 	if (_pL3KanjiDict == nullptr )
 		_pL3KanjiDict = new ChmL3KanjiDict ;
+		_pL3KanjiDict->LoadDict(stream);
 }
 
 BOOL ChmEngine::IsKeyEaten(WPARAM wp) {

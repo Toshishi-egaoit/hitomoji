@@ -302,7 +302,7 @@ TEST_F(Layer1Test, IsKeyEatenIgnoresModifierKeysOnly)
 TEST_F(Layer1Test, IsKeyEatenEatsInputAndCompositionKeysWhileInputing)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
     engine.SetIME(TRUE);
 
     bool endComposition = true;

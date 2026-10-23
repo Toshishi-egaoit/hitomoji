@@ -1,6 +1,7 @@
 ﻿// TsfIf.h
 #pragma once
 #include <msctf.h>
+#include <memory>
 #include "utils.h"
 #include "ChmEngine.h"
 
@@ -49,6 +50,7 @@ public:
     // ITfTextInputProcessor
     STDMETHODIMP Activate(ITfThreadMgr* ptm, TfClientId tid);
     STDMETHODIMP Deactivate();
+	std::unique_ptr<std::istream> GetDictStream() ;
 
     // ITfKeyEventSink
     STDMETHODIMP OnSetFocus(BOOL fForeground) ;

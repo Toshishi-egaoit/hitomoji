@@ -63,7 +63,7 @@ TEST_F(EngineConfigTest, ActivateLoadsConfigFromEnvironmentBasePath)
         L"candidate-delay=321\n");
 
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     ASSERT_NE(nullptr, engine.GetConfig());
     EXPECT_EQ(_dir.BaseDir(), engine.GetConfig()->GetConfigPath());
@@ -75,7 +75,7 @@ TEST_F(EngineConfigTest, ActivateLoadsConfigFromEnvironmentBasePath)
 TEST_F(EngineConfigTest, ActivateUsesEmptyConfigWhenInitialLoadFails)
 {
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     ASSERT_NE(nullptr, engine.GetConfig());
     EXPECT_EQ(_dir.BaseDir(), engine.GetConfig()->GetConfigPath());
@@ -95,7 +95,7 @@ TEST_F(EngineConfigTest, InitConfigReplacesExistingConfigAndFunctionKeysAfterSuc
         L"CTRL+Y=cancel\n");
 
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     ASSERT_NE(nullptr, engine.GetConfig());
     EXPECT_EQ(111, engine.GetConfig()->GetLong(L"ui", L"candidate-delay"));
@@ -124,7 +124,7 @@ TEST_F(EngineConfigTest, InitConfigKeepsExistingConfigAndFunctionKeysAfterFailed
         L"CTRL+Y=cancel\n");
 
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     ASSERT_NE(nullptr, engine.GetConfig());
     EXPECT_EQ(111, engine.GetConfig()->GetLong(L"ui", L"candidate-delay"));
@@ -152,7 +152,7 @@ TEST_F(EngineConfigTest, DISABLED_InitConfigKeepsKeyTableOverridesAfterFailedRel
         L"wi=うぃ\n");
 
     ChmEngine engine;
-    engine.Activate();
+	EngineActivate(engine);
 
     ASSERT_NE(nullptr, engine.GetConfig());
     EXPECT_EQ(111, engine.GetConfig()->GetLong(L"ui", L"candidate-delay"));

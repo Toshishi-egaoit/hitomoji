@@ -4,6 +4,7 @@
 #include <msctf.h>
 #include <cstdio>
 #include <string>
+#include <sstream>
 #include <cctype>
 #include <initguid.h> // GUIDの実体定義用
 #include <objbase.h>
@@ -138,7 +139,8 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 	}
 
 	// ChmEngine のしょきか
-	_pEngine->Activate();
+	std::unique_ptr<std::istream> st = GetDictStream();
+	_pEngine->Activate(*st);
 
 	// 候補ウィンドウ表示スレッドの初期化
 	_pCandidateWindowThread = new ChmCandidateWindowThread(_GetCandidateWindowPositionCallback, this);
@@ -149,6 +151,42 @@ STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
 	}
 
 	return S_OK;
+}
+
+std::unique_ptr<std::istream> ChmTsfInterface::GetDictStream() {
+	// 漢字辞書リソースの取得
+	HRSRC hRes = FindResourceW(
+		g_hInst,
+		MAKEINTRESOURCEW(IDI_HITOMOJI_DIC),
+		RT_RCDATA
+	);
+
+	if (!hRes) {
+		// リソースが見つからない
+		MessageBox(0L,L"Cannot open Kanji Dictionary Resource",L"LOAD ERROR",MB_OK);
+		return nullptr;
+	}
+
+	HGLOBAL hData = LoadResource(g_hInst, hRes);
+	const void* pData = NULL ;
+	DWORD size;
+	if (hData != NULL) {
+		pData = LockResource(hData);
+		size = SizeofResource(g_hInst, hRes);
+	}
+
+	if (!hData || !pData || size == 0) {
+		MessageBox(0L,L"Cannot load/lock/count Kanji Dictionary Resource",L"LOAD ERROR",MB_OK);
+		return nullptr;
+	}
+
+	// バイナリデータを文字列ベースのistreamに変換
+	std::string data(
+		static_cast<const char*>(pData),
+		static_cast<size_t>(size)
+	);
+	std::unique_ptr<std::istream> stream = std::make_unique<std::istringstream> (data, std::ios::in | std::ios::binary); ;
+	return stream;
 }
 
 STDMETHODIMP ChmTsfInterface::Deactivate() {
