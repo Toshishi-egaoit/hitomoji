@@ -111,7 +111,7 @@ public:
     }
     STDMETHODIMP GetIcon(HICON *phIcon) {
         *phIcon = (_bOn) ? _hIconOn : _hIconOff;
-		OutputDebugStringWithString(L"   > GetIcon: %s", (*phIcon == _hIconOn) ? L"ON" : L"OFF");
+		Debug(Format(L"   > GetIcon: %s", (*phIcon == _hIconOn) ? L"ON" : L"OFF"));
         return *phIcon ? S_OK : E_FAIL;
     }
 

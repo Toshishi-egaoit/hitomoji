@@ -133,7 +133,7 @@ public:
 	{
 		if (_pComposition)
 		{
-			OutputDebugString(L"ClearComposition");
+			Debug(L"ClearComposition");
 			_pComposition->Release();
 			_pComposition = nullptr;
 		}
@@ -219,7 +219,7 @@ private:
 {\
 	WCHAR buf[128];\
 	swprintf_s(buf, funcName L" failed HR: 0x%08X", hr);\
-	OutputDebugString(buf);\
+	Debug(buf);\
 }
 
 #define OUTPUT_HR_ON_ERROR(funcName,hr) \

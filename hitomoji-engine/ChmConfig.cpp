@@ -232,8 +232,7 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 		ChmKeyEvent::SetFunctionKeyMap(m_functionKeyMap);
 	}
 
-	OutputDebugStringWithInt(L"   > LoadFile end. m_errors.size(): %d\n", (ULONG)m_errors.size());
-	OutputDebugStringWithInt(L"   >               m_infos.size(): %d\n", (ULONG)m_infos.size());
+	Info(Format(L"   > LoadFile end. m_errors: %d / m_infos: %d\n", (ULONG)m_errors.size(),(ULONG)m_infos.size()));
 
 	return bRet;
 }

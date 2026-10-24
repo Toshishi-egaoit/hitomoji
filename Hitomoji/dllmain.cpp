@@ -120,19 +120,23 @@ BOOL WINAPI DllMain(HINSTANCE hInst, DWORD dwReason, LPVOID pvReserved) {
     if (dwReason == DLL_PROCESS_ATTACH) {
         g_hInst = hInst;
         DisableThreadLibraryCalls(hInst);
-		OutputDebugString(L"[Hitomoji] dllmain(PROCESS_ATTACH) " HM_VERSION  
+#if 0
+		Debug(L"[Hitomoji] dllmain(PROCESS_ATTACH) " HM_VERSION  
 #if defined(_WIN64)
 			L"(x64)"
 #else
 			L"(x86)"
 #endif
 			L" (" __DATE__ L" " __TIME__ L")");
+#endif
     }
     return TRUE;
 }
 
 STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, void** ppv) {
-	OutputDebugStringWithGuid(L"[Hitomoji]DllGetClassObject:%s",riid);
+	wchar_t iidText[40]{};
+	StringFromGUID2(riid, iidText, ARRAYSIZE(iidText));
+	Debug(Format(L"[Hitomoji]DllGetClassObject:%s",iidText));
     if (IsEqualCLSID(rclsid, CLSID_Hitomoji)) {
         CHitomojiClassFactory* pCF = new CHitomojiClassFactory();
         if (!pCF) return E_OUTOFMEMORY;
@@ -151,7 +155,7 @@ STDAPI DllCanUnloadNow() {
 STDAPI DllRegisterServer() {
 	wchar_t dllPath[MAX_PATH];
 	GetModuleFileNameW(g_hInst, dllPath, _countof(dllPath));
-	OutputDebugStringWithString(L"DllRegisterServer: %s", dllPath);
+	Debug(Format(L"DllRegisterServer: %s", dllPath));
 	return RegisterCLSID(dllPath);
 }
 
