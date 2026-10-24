@@ -2,11 +2,6 @@
 #include <windows.h>
 #include <string>
 
-// --- debug support functions
-extern void OutputDebugStringWithInt(wchar_t const* format, ULONG lvalue);
-extern void OutputDebugStringWithString(wchar_t const* format, wchar_t const* value);
-extern void OutputDebugStringWithGuid(wchar_t const* format, const IID value);
-
 class ChmLogger
 {
 public:
@@ -23,8 +18,9 @@ public:
     static void Info(const std::wstring& msg);
     static void Debug(const std::wstring& msg);
     static std::wstring  Format(const wchar_t* fmt, ...);
+	static bool IsDbgViewProcess();
 private:
-	static void _InspectDbgViewProcess();
+	static bool _InspectDbgViewProcess();
 	static void _Output(const std::wstring& level, const std::wstring& msg);
 	static std::wstring _GetLogFile();
 	static void _RotateIfNeeded();
@@ -32,7 +28,6 @@ private:
 
 	static std::wstring _logBase ;
 	static enum LogLevel _logLevel ;
-	static bool _isDbgViewProcess ;
 };
 
 #define Debug(msg) ChmLogger::Debug(msg)

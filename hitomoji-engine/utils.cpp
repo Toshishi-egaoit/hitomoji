@@ -7,51 +7,15 @@
 #include "utils.h"
 #include "ChmEnvironment.h"
 
-// debug support functions
-void OutputDebugStringWithInt(wchar_t const* format, ULONG lvalue)
-{
-	wchar_t buff[255];
-	// TODO: assertで255を越えたら落ちるようにする
-
-	wsprintf(buff, format, lvalue);
-	OutputDebugStringW(buff);
-	return;
-}
-
-void OutputDebugStringWithString(wchar_t const* format, wchar_t const* value)
-{
-	wchar_t buff[255];
-	// TODO: assertで255を越えたら落ちるようにする
-
-	wsprintf(buff, format, value);
-	OutputDebugStringW(buff);
-	return;
-}
-
-void OutputDebugStringWithGuid(wchar_t const* format, const IID iid)
-{
-	// TODO: assertで255を越えたら落ちるようにする
-	wchar_t buff[255];
-	wchar_t guidStr[40] = {0}; // GUID文字列用バッファ
-
-	// GUIDを文字列に変換
-	StringFromGUID2(iid, guidStr, ARRAYSIZE(guidStr));
-
-	wsprintf(buff, format, guidStr);
-	OutputDebugStringW(buff);
-	return;
-}
-
 // --- ChmLogger Implementation ---
 ChmLogger::LogLevel ChmLogger::_logLevel = ChmLogger::LogLevel::InfoLevel; 
 
-void ChmLogger::_InspectDbgViewProcess()
+bool ChmLogger::_InspectDbgViewProcess()
 {
 	WCHAR path[MAX_PATH] = {};
-	_isDbgViewProcess = false;
 
 	DWORD len = GetModuleFileNameW(nullptr, path, ARRAYSIZE(path));
-	if (len == 0 || len >= ARRAYSIZE(path)) return ;
+	if (len == 0 || len >= ARRAYSIZE(path)) return false;
 
 	LPCWSTR fileName = path;
 	for (LPCWSTR p = path; *p; ++p) {
@@ -59,10 +23,17 @@ void ChmLogger::_InspectDbgViewProcess()
 			fileName = p + 1;
 		}
 	}
-	_isDbgViewProcess = lstrcmpiW(fileName, L"Dbgview.exe") == 0 ||
+	return  lstrcmpiW(fileName, L"Dbgview.exe") == 0 ||
 		lstrcmpiW(fileName, L"Dbgview64.exe") == 0 ||
 		lstrcmpiW(fileName, L"Dbgview64a.exe") == 0;
 }
+
+bool ChmLogger::IsDbgViewProcess()
+{
+    static const bool isDbgView = _InspectDbgViewProcess();
+    return isDbgView;
+}
+
 
 void ChmLogger::_Output(const std::wstring& level, const std::wstring& msg)
 {
@@ -71,8 +42,11 @@ void ChmLogger::_Output(const std::wstring& level, const std::wstring& msg)
 	_WriteFile(line);
 
 #ifdef _DEBUG
-	std::wstring line2 = L"[Hitomoji] " + line;
-	OutputDebugStringW(line2.c_str());
+	if (!IsDbgViewProcess())
+	{
+		std::wstring line2 = L"[Hitomoji] " + line;
+		//OutputDebugStringW(line2.c_str());
+	}
 #endif
 }
 
