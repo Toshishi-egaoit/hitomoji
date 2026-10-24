@@ -73,8 +73,8 @@ REM 参照用ファイルは既存のユーザー設定に関係なく最新版へ更新する。
 copy /y "hitomoji.sample.ini" "%CONFIG_DIR%\"
 copy /y "hikanji.ini" "%CONFIG_DIR%\"
 
-echo コピー結果は以下の通り
-dir "%CONFIG_DIR%"
+REM echo コピー結果は以下の通り
+REM dir "%CONFIG_DIR%"
 
 :: 前回のゴミがあれば掃除（リブート後なら消せる）
 if exist "%TARGET_DLL%.old" (
@@ -84,10 +84,7 @@ if exist "%TARGET_DLL32%.old" (
     del /q "%TARGET_DLL32%.old" >nul 2>&1
 )
 
-
-echo インストール工程が完了しました。
-echo 必要なファイルは全てコピーされました。
-echo このディレクトリの内容は削除できます
+echo インストールが完了しました。このディレクトリは削除しても問題ありません。
 if exist "%~dp0Update.md" (
     echo.
     type "%~dp0Update.md"
