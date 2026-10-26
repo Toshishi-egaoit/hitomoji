@@ -212,14 +212,13 @@ private:
 	CRITICAL_SECTION _candidateWindowPositionLock;
 	POINT _candidateWindowPosition;
 	BOOL _hasCandidateWindowPosition;
-	BOOL _isDisabledForProcess;
 };
 
 #define OUTPUT_HR(funcName,hr) \
 {\
 	WCHAR buf[128];\
 	swprintf_s(buf, funcName L" failed HR: 0x%08X", hr);\
-	Debug(buf);\
+	Info(buf);\
 }
 
 #define OUTPUT_HR_ON_ERROR(funcName,hr) \

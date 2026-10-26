@@ -23,17 +23,13 @@ bool ChmLogger::_InspectDbgViewProcess()
 			fileName = p + 1;
 		}
 	}
-	return  lstrcmpiW(fileName, L"Dbgview.exe") == 0 ||
+	bool retValue = lstrcmpiW(fileName, L"Dbgview.exe") == 0 ||
 		lstrcmpiW(fileName, L"Dbgview64.exe") == 0 ||
 		lstrcmpiW(fileName, L"Dbgview64a.exe") == 0;
-}
 
-bool ChmLogger::IsDbgViewProcess()
-{
-    static const bool isDbgView = _InspectDbgViewProcess();
-    return isDbgView;
+	Info(Format(L"ChmLogger::isDbgView? name=%s result=%s", fileName, retValue ? L"true" : L"false"));
+	return retValue;
 }
-
 
 void ChmLogger::_Output(const std::wstring& level, const std::wstring& msg)
 {
@@ -42,10 +38,10 @@ void ChmLogger::_Output(const std::wstring& level, const std::wstring& msg)
 	_WriteFile(line);
 
 #ifdef _DEBUG
-	if (!IsDbgViewProcess())
+	if (!_InspectDbgViewProcess())
 	{
 		std::wstring line2 = L"[Hitomoji] " + line;
-		//OutputDebugStringW(line2.c_str());
+		OutputDebugStringW(line2.c_str());
 	}
 #endif
 }

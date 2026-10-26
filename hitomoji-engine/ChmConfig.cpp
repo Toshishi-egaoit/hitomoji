@@ -189,7 +189,7 @@ WriteLog:
 
 BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 {
-	ChmLogger::Info(L" ChmConfig::LoadFile");
+	ChmLogger::Info(Format(L"ChmConfig::LoadFile: %s", fileName));
 
 	std::wstring path;
 	if (fileName.empty())
@@ -200,20 +200,19 @@ BOOL ChmConfig::LoadFile(const std::wstring& fileName)
 	{
 		path = m_basePath + fileName;
 	}
+	ChmLogger::Debug(Format(L"   > path=%s", path));
 
 	DWORD attr = GetFileAttributesW(path.c_str());
 	if (attr == INVALID_FILE_ATTRIBUTES || (attr & FILE_ATTRIBUTE_DIRECTORY))
 	{
-		std::wstring errorMsg = L"file not found: " + path;
-		ChmLogger::Error(errorMsg);
+		Error(L"   > file not found");
 		return FALSE;
 	}
 
 	std::wifstream ifs(path);
 	if (!ifs.is_open())
 	{
-		std::wstring errorMsg = L"cannot open: " + path;
-		ChmLogger::Error(errorMsg);
+		Error(L"   > cannot open: %s");
 		return FALSE;
 	}
 

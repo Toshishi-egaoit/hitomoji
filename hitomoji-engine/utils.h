@@ -18,7 +18,6 @@ public:
     static void Info(const std::wstring& msg);
     static void Debug(const std::wstring& msg);
     static std::wstring  Format(const wchar_t* fmt, ...);
-	static bool IsDbgViewProcess();
 private:
 	static bool _InspectDbgViewProcess();
 	static void _Output(const std::wstring& level, const std::wstring& msg);

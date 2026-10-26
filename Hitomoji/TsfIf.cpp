@@ -20,27 +20,6 @@
 #include "ChmEnvironment.h"
 #include "ChmCandidateWindow.h"
 
-namespace {
-BOOL IsDbgViewProcess()
-{
-	WCHAR path[MAX_PATH] = {};
-	DWORD len = GetModuleFileNameW(nullptr, path, ARRAYSIZE(path));
-	if (len == 0 || len >= ARRAYSIZE(path)) return FALSE;
-
-	LPCWSTR fileName = path;
-	for (LPCWSTR p = path; *p; ++p) {
-		if (*p == L'\\' || *p == L'/') {
-			fileName = p + 1;
-		}
-	}
-	ChmLogger::Info(Format(L"process name: %s", fileName));
-
-	return lstrcmpiW(fileName, L"Dbgview.exe") == 0 ||
-		lstrcmpiW(fileName, L"Dbgview64.exe") == 0 ||
-		lstrcmpiW(fileName, L"Dbgview64a.exe") == 0;
-}
-}
-
 // --- CTsfInterface クラスの実装 ---
 
 ChmTsfInterface::ChmTsfInterface():
@@ -59,8 +38,7 @@ ChmTsfInterface::ChmTsfInterface():
 	_isSettingOpenClose(FALSE),
 	_pCandidateWindowThread(nullptr),
 	_candidateWindowPosition{},
-	_hasCandidateWindowPosition(FALSE),
-	_isDisabledForProcess(FALSE)
+	_hasCandidateWindowPosition(FALSE)
 { 
 	InitializeCriticalSection(&_candidateWindowPositionLock);
 	_pEngine = new ChmEngine(&ChmTsfInterface::GetDefaultConfigStream);
@@ -110,13 +88,9 @@ STDMETHODIMP_(ULONG) ChmTsfInterface::Release() {
 // -----
 
 STDMETHODIMP ChmTsfInterface::Activate(ITfThreadMgr* ptm, TfClientId tid) {
-	if (IsDbgViewProcess()) {
-		_isDisabledForProcess = TRUE;
-		return S_OK;
-	}
 
 	g_environment.Init();
-	ChmLogger::Info(L"Activate() : Hitomoji " HM_VERSION L"(" __DATE__ L")" );
+	ChmLogger::Info(L"Activate() : Hitomoji " HM_VERSION L"(" __DATE__ __TIME__ L")" );
 	// リソース取得に失敗した場合は、TSF登録を始める前に終了する。
 	auto dictStream = GetDictStream();
 	if (!dictStream || !_pEngine->Activate(*dictStream)) return E_FAIL;
@@ -227,11 +201,6 @@ std::unique_ptr<std::wistream> ChmTsfInterface::GetDefaultConfigStream() {
 }
 
 STDMETHODIMP ChmTsfInterface::Deactivate() {
-	if (_isDisabledForProcess) {
-		_isDisabledForProcess = FALSE;
-		return S_OK;
-	}
-
 	ChmLogger::Info(L"Deactivate()");
 	ClearComposition();
 	if (_pCandidateWindowThread) {
@@ -564,7 +533,7 @@ void ChmTsfInterface::_UninitDisplayAttributeInfo() {
 
 STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 {
-	Debug(L"OnSetThreadFocus()");
+	Info(L"OnSetThreadFocus()");
 
 	if (_pCandidateWindowThread) {
 		_pCandidateWindowThread->Hide();
@@ -583,7 +552,7 @@ STDMETHODIMP ChmTsfInterface::OnSetThreadFocus()
 
 
 STDMETHODIMP ChmTsfInterface::OnKillThreadFocus() {
-	Debug(L"OnKillThreadFocus()");
+	Info(L"OnKillThreadFocus()");
 	if (_pCandidateWindowThread) {
 		_pCandidateWindowThread->Hide();
 	}
@@ -610,7 +579,7 @@ STDMETHODIMP ChmTsfInterface::OnUninitDocumentMgr(ITfDocumentMgr* /*pdim*/)
 
 STDMETHODIMP ChmTsfInterface::OnSetFocus(ITfDocumentMgr* pdimFocus, ITfDocumentMgr* /*pdimPrevFocus*/)
 {
-	Debug(L"ITfThreadMgrEventSink::OnSetFocus()");
+	Info(L"ITfThreadMgrEventSink::OnSetFocus()");
 
 	if (_pCandidateWindowThread) {
 		_pCandidateWindowThread->Hide();
@@ -648,11 +617,11 @@ void ChmTsfInterface::_ResetCompositionOnFocusChange(ITfContext* pNewContext, LP
 	if (!pCompositionContext) return;
 
 	if (_IsSameContext(pCompositionContext, pNewContext)) {
-		Debug(Format(L"%s: keep composition on same context", source ? source : L"focus"));
+		Info(Format(L"%s: keep composition on same context", source ? source : L"focus"));
 		return;
 	}
 
-	Debug(Format(L"%s: context changed -> clear composition", source ? source : L"focus"));
+	Info(Format(L"%s: context changed -> clear composition", source ? source : L"focus"));
 	ClearComposition();
 	_pEngine->ResetStatus();
 }
@@ -698,7 +667,7 @@ STDMETHODIMP ChmTsfInterface::OnEndEdit(
 	TfEditCookie ecReadOnly,
 	ITfEditRecord* pEditRecord)
 {
-	Debug(L"OnEndEdit()");
+	Info(L"OnEndEdit()");
 
 	// 編集中でなければ何もしない
 	if (_pComposition == nullptr) return S_OK;

@@ -120,7 +120,10 @@ BOOL ChmEngine::InitConfig() {
 		else if (logLevelStr == L"info")  ChmLogger::SetLogLevel(ChmLogger::InfoLevel);
 		else if (logLevelStr == L"debug") ChmLogger::SetLogLevel(ChmLogger::DebugLevel);
 #ifdef _DEBUG
-		else if (!bSuccess) ChmLogger::SetLogLevel(ChmLogger::DebugLevel); // Debugビルドで指定がない場合はDebugLevelにする
+		else if (!bSuccess) {
+			ChmLogger::SetLogLevel(ChmLogger::DebugLevel); // Debugビルドで指定がない場合はDebugLevelにする
+			Info(L"   > No LogLevel in config, setting to Debug");
+		}
 #endif
 		else {
 			ChmLogger::SetLogLevel(ChmLogger::InfoLevel);
