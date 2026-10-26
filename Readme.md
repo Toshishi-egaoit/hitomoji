@@ -314,6 +314,13 @@ https://github.com/toshishi-egaoit/hitomoji
 - 同様にconfigのデフォルト値もリソース化する。(利用者のconfig.iniはそのまま使える)
 - 上記に伴い、インストーラを改修
 
+### v0.6.0.1
+
+目的：DbgViewでの動作改善
+
+- DbgViewでの動作が不安定になることがあるのを修正
+- OutputDebugStringでのログ出力をすべてChmLogger経由に変更
+
 ### v0.6.1
 
 目的：候補ウィンドウのカスタマイズ対応
