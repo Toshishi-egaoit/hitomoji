@@ -30,3 +30,4 @@ Release/
 
 # Generated embedded configuration
 /build/merged-default.ini
+/research/excel-dropdown-list
