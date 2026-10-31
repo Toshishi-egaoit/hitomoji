@@ -27,7 +27,6 @@ bool ChmLogger::_InspectDbgViewProcess()
 		lstrcmpiW(fileName, L"Dbgview64.exe") == 0 ||
 		lstrcmpiW(fileName, L"Dbgview64a.exe") == 0;
 
-	Info(Format(L"ChmLogger::isDbgView? name=%s result=%s", fileName, retValue ? L"true" : L"false"));
 	return retValue;
 }
 

@@ -305,7 +305,7 @@ protected:
         ASSERT_TRUE(FileExists(_distributionBasePath + L"hitomoji.dic"));
         _dir.WriteFile(L"Hitomoji.ini",
             L"[ui]\n"
-            L"select-keymap=dk fj sl gh ei ru a; wo qp ty c, vm x. z/ bn 38 47 29 10 56\n"
+            L"select-keymap=dk fj sl gh ei ru a\\; wo qp ty c, vm x. z/ bn 38 47 29 10 56\n"
             L"[key-table]\n"
             L"->=→\n"
             L"<<=《\n");
@@ -702,7 +702,7 @@ TEST_F(Layer3Test, ConvertKeyIgnoresLeadingNonHiraganaWhenSearchingYomi)
 {
     WriteMainConfig(
         L"[ui]\n"
-        L"select-keymap=dk fj sl gh ei ru a; wo qp ty c, vm x. z/ bn 38 47 29 10 56\n"
+        L"select-keymap=dk fj sl gh ei ru a\\; wo qp ty c, vm x. z/ bn 38 47 29 10 56\n"
         L"[key-table]\n"
         L"qq=字\n");
 
@@ -933,7 +933,7 @@ TEST_F(Layer3Test, CustomSelectKeymapControlsCandidatePageSizeAndCells)
     {
         WriteMainConfig(
             L"[ui]\n"
-            L"select-keymap=a/;\n");
+            L"select-keymap=a/\\;\n");
 
         ChmEngine engine;
 		EngineActivate(engine);
@@ -959,7 +959,7 @@ TEST_F(Layer3Test, SelectInputUsesCustomSelectKeymapIncludingOemKeys)
 {
     WriteMainConfig(
         L"[ui]\n"
-        L"select-keymap=a/;\n");
+        L"select-keymap=a/\\;\n");
 
     {
         ChmEngine engine;
@@ -1071,7 +1071,7 @@ TEST_F(Layer3Test, SelectInputUsesThirtyFourKeymapAcrossPages)
 {
     WriteMainConfig(
         L"[ui]\n"
-        L"select-keymap=dk fj sl gh ei ru a; wo qp ty c, vm x. z/ bn 34 89\n");
+        L"select-keymap=dk fj sl gh ei ru a\\; wo qp ty c, vm x. z/ bn 34 89\n");
 
     {
         ChmEngine engine;
@@ -1119,7 +1119,7 @@ TEST_F(Layer3Test, SameSelectKeyChoosesDifferentKanjiWhenKeymapChanges)
     {
         WriteMainConfig(
             L"[ui]\n"
-            L"select-keymap=dk fj sl gh ei ru a; wo qp ty c, vm x. z/ bn 34 89\n");
+            L"select-keymap=dk fj sl gh ei ru a\\; wo qp ty c, vm x. z/ bn 34 89\n");
 
         ChmEngine engine;
 		EngineActivate(engine);
@@ -1140,7 +1140,7 @@ TEST_F(Layer3Test, SameSelectKeyChoosesDifferentKanjiWhenKeymapChanges)
     {
         WriteMainConfig(
             L"[ui]\n"
-            L"select-keymap=dk fj sl gh ei ru a; wo qp ty c, vm x. z/ bn 38 47 29 10 56\n");
+            L"select-keymap=dk fj sl gh ei ru a\\; wo qp ty c, vm x. z/ bn 38 47 29 10 56\n");
 
         ChmEngine engine;
 		EngineActivate(engine);

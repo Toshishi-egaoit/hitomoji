@@ -8,6 +8,10 @@ namespace ChmStringUtil {
 }
 
 namespace ChmConfigParse {
+    // Only INI syntax characters are escaped. Other backslashes remain literal.
+    size_t FindUnescaped(const std::wstring& s, const std::wstring& characters);
+    std::wstring Unescape(const std::wstring& s);
+
     enum class Level {
         None,
         Info,

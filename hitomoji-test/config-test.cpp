@@ -569,3 +569,77 @@ TEST(ConfigTest, KeyTablePreservesCaseAndOtherSettingsRemainCaseInsensitive)
     EXPECT_EQ(L"mixed:", ConvertWithPendingForConfigTest(L"aB"));
     EXPECT_EQ(L"あ:B", ConvertWithPendingForConfigTest(L"AB"));
 }
+
+TEST(ConfigTest, CommentsStartAnywhereWithoutWhitespace)
+{
+    ChmConfig config;
+    std::wistringstream ini(
+        L"\xFEFF  # comment\n  ; comment\n"
+        L"[ui]# section comment\n"
+        L"number=123;comment=ignored\n"
+        L"flag=false#comment\n"
+        L"text=abc;def\n"
+        L"empty=#comment\n"
+        L"[function-key];comment\nCTRL+Y=finish-raw#comment\n"
+        L"[key-table]#comment\n/q=記号;comment\n");
+    ASSERT_TRUE(config.InitConfig(ini)) << config.DumpErrors();
+    EXPECT_EQ(123, config.GetLong(L"ui", L"number"));
+    EXPECT_FALSE(config.GetBool(L"ui", L"flag"));
+    EXPECT_EQ(L"abc", config.GetString(L"ui", L"text"));
+    EXPECT_EQ(L"", config.GetString(L"ui", L"empty"));
+    EXPECT_EQ(L"記号:", ConvertWithPendingForConfigTest(L"/q"));
+    EXPECT_EQ(ChmFuncType::CompFinishKey, config.GetFunctionKeyMap().Resolve(
+        'Y', false, true, false, ChmEngine::State::Inputing));
+}
+
+TEST(ConfigTest, EscapedSyntaxWorksOnBothSidesAndIsDecodedOnce)
+{
+    ChmConfig config;
+    std::wistringstream ini(LR"ini([ui]
+select-keymap=dk a\; wo\# qp
+text=\#\;\=\\#comment
+equals=a=b\=c
+path=C:\temp\FILE.txt
+trailing=abc\
+slash=\\\#\;\\;comment
+[key-table]
+\#=＃#comment
+\;=；;comment
+\==＝
+\\=＼
+/q=\#\;\=\\
+/\==等号
+)ini");
+    ASSERT_TRUE(config.InitConfig(ini)) << config.DumpErrors();
+    EXPECT_EQ(L"dk a; wo# qp", config.GetString(L"ui", L"select-keymap"));
+    EXPECT_EQ(L"#;=\\", config.GetString(L"ui", L"text"));
+    EXPECT_EQ(L"a=b=c", config.GetString(L"ui", L"equals"));
+    EXPECT_EQ(L"C:\\temp\\FILE.txt", config.GetString(L"ui", L"path"));
+    EXPECT_EQ(L"abc\\", config.GetString(L"ui", L"trailing"));
+    EXPECT_EQ(L"\\#;\\", config.GetString(L"ui", L"slash"));
+    EXPECT_EQ(L"＃:", ConvertWithPendingForConfigTest(L"#"));
+    EXPECT_EQ(L"；:", ConvertWithPendingForConfigTest(L";"));
+    EXPECT_EQ(L"＝:", ConvertWithPendingForConfigTest(L"="));
+    EXPECT_EQ(L"＼:", ConvertWithPendingForConfigTest(L"\\"));
+    EXPECT_EQ(L"#;=\\:", ConvertWithPendingForConfigTest(L"/q"));
+    EXPECT_EQ(L"等号:", ConvertWithPendingForConfigTest(L"/="));
+}
+
+TEST(ConfigTest, EscapedEqualsDoesNotActAsDelimiter)
+{
+    ChmConfig config;
+    std::wistringstream ini(L"[key-table]\n/q\\=記号\n");
+    EXPECT_FALSE(config.InitConfig(ini));
+    EXPECT_NE(std::wstring::npos, config.DumpErrors().find(L"missing '='"));
+}
+
+TEST(ConfigTest, IncludeSupportsEscapedFileNamesAndTrailingComments)
+{
+    TempConfigDir dir;
+    dir.WriteFile(L"sub#;=.ini", L"/q=記号#comment\n");
+    dir.WriteFile(L"main.ini", L"[key-table]\n@include sub\\#\\;\\=.ini;comment\n");
+    ChmConfig config;
+    config.SetBasePath(dir.BaseDir());
+    ASSERT_TRUE(config.LoadFile(L"main.ini")) << config.DumpErrors();
+    EXPECT_EQ(L"記号:", ConvertWithPendingForConfigTest(L"/q"));
+}

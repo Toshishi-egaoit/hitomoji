@@ -30,6 +30,38 @@ std::wstring Canonize(const std::wstring& s)
 
 namespace ChmConfigParse {
 
+namespace {
+bool IsEscape(const std::wstring& s, size_t pos)
+{
+    return s[pos] == L'\\' && pos + 1 < s.size() &&
+        std::wstring(L"\\#;=").find(s[pos + 1]) != std::wstring::npos;
+}
+}
+
+size_t FindUnescaped(const std::wstring& s, const std::wstring& characters)
+{
+    for (size_t i = 0; i < s.size(); ++i) {
+        if (IsEscape(s, i)) {
+            ++i;
+        }
+        else if (characters.find(s[i]) != std::wstring::npos) {
+            return i;
+        }
+    }
+    return std::wstring::npos;
+}
+
+std::wstring Unescape(const std::wstring& s)
+{
+    std::wstring result;
+    result.reserve(s.size());
+    for (size_t i = 0; i < s.size(); ++i) {
+        if (IsEscape(s, i)) ++i;
+        result += s[i];
+    }
+    return result;
+}
+
 void SetError(Result& r, const std::wstring& msg)
 {
     r.level = Level::Error;

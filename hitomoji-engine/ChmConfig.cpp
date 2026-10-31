@@ -72,12 +72,11 @@ BOOL ChmConfig::_LoadStreamInternal(std::wistream& is,
 		ParseResult errorMsg;
 		bool bRet = true;
 
-		std::wstring rawTrim = Trim(rawLine);
+		// Find syntax before unescaping so escaped comment markers stay literal.
+		std::wstring rawTrim = Trim(rawLine.substr(0,
+			ChmConfigParse::FindUnescaped(rawLine, L"#;")));
 
 		if (rawTrim.empty())
-			continue;
-
-		if (rawTrim[0] == L';' || rawTrim[0] == L'#')
 			continue;
 
 		// --- @include 対応 ---
@@ -91,7 +90,7 @@ BOOL ChmConfig::_LoadStreamInternal(std::wistream& is,
 				continue;
 			}
 
-			std::wstring incFile = Trim(rawTrim.substr(8));
+			std::wstring incFile = ChmConfigParse::Unescape(Trim(rawTrim.substr(8)));
 
 			if (incFile.empty())
 			{
@@ -481,7 +480,7 @@ BOOL ChmConfig::_divideRawTrim(const std::wstring& rawTrim,
 				               std::wstring& value,
 				              ParseResult& errorMsg)
 {
-	size_t pos = rawTrim.find(L'=');
+	size_t pos = ChmConfigParse::FindUnescaped(rawTrim, L"=");
 	if (pos == std::wstring::npos)
 	{
 		SetError(errorMsg, L"missing '=' in key-value pair");
@@ -489,7 +488,7 @@ BOOL ChmConfig::_divideRawTrim(const std::wstring& rawTrim,
 	}
 
 	// ここではぶんかつだけをおこなう。canonizeはしない
-	key = Trim(rawTrim.substr(0, pos));
+	key = ChmConfigParse::Unescape(Trim(rawTrim.substr(0, pos)));
 
 	if (key.empty())
 	{
@@ -497,7 +496,7 @@ BOOL ChmConfig::_divideRawTrim(const std::wstring& rawTrim,
 		return FALSE;
 	}
 
-	value = Trim(rawTrim.substr(pos + 1));
+	value = ChmConfigParse::Unescape(Trim(rawTrim.substr(pos + 1)));
 	return TRUE;
 }
 
