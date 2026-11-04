@@ -56,6 +56,31 @@ protected:
 
 } // namespace
 
+TEST_F(EngineConfigTest, CandidateStyleErrorsKeepEntirePreviousConfig)
+{
+    ChmEngine engine([]() -> std::unique_ptr<std::wistream> {
+        return std::make_unique<std::wistringstream>(
+            L"[ui]\ncandidate-font=Yu Gothic UI\ncandidate-color-left-index=0x204070\ncandidate-delay=500\n");
+    });
+    WriteConfig(L"[ui]\ncandidate-font=__Hitomoji_missing_font__\ncandidate-delay=999\n");
+    std::istringstream dictionary;
+    ASSERT_TRUE(engine.Activate(dictionary));
+    EXPECT_EQ(engine.GetConfig()->GetLong(L"ui", L"candidate-delay"), 500);
+    EXPECT_EQ(engine.GetConfig()->GetCandidateStyle().font, L"Yu Gothic UI");
+
+    WriteConfig(L"[ui]\ncandidate-color-left-index=0x123456\ncandidate-delay=321\n");
+    ASSERT_TRUE(engine.InitConfig());
+    auto previous = engine.GetConfig();
+    for (const auto& bad : {L"candidate-font=__Hitomoji_missing_font__", L"candidate-color-left-index=0xGG0000"}) {
+        WriteConfig(std::wstring(L"[ui]\ncandidate-delay=777\n") + bad + L"\n");
+        EXPECT_FALSE(engine.InitConfig());
+        EXPECT_EQ(engine.GetConfig(), previous);
+        EXPECT_EQ(engine.GetConfig()->GetLong(L"ui", L"candidate-delay"), 321);
+        EXPECT_EQ(engine.GetConfig()->GetCandidateStyle().colors[3], RGB(0x12,0x34,0x56));
+    }
+    engine.Deactivate();
+}
+
 TEST_F(EngineConfigTest, ActivateLoadsConfigFromEnvironmentBasePath)
 {
     WriteConfig(

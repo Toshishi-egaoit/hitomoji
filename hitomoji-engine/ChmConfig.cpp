@@ -15,6 +15,30 @@
 
 #define MAX_ERROR_COUNT 100
 
+namespace {
+struct FontSearch { const wchar_t* name; bool found = false; };
+int CALLBACK FindCandidateFont(const LOGFONTW* font, const TEXTMETRICW*, DWORD, LPARAM data)
+{
+    auto& search = *reinterpret_cast<FontSearch*>(data);
+    if (_wcsicmp(font->lfFaceName, search.name) != 0) return 1;
+    search.found = true;
+    return 0;
+}
+bool IsInstalledCandidateFont(const std::wstring& name)
+{
+    if (name.empty() || name.size() >= LF_FACESIZE) return false;
+    LOGFONTW query{};
+    query.lfCharSet = DEFAULT_CHARSET;
+    wcscpy_s(query.lfFaceName, name.c_str());
+    FontSearch search{name.c_str()};
+    HDC dc = GetDC(nullptr);
+    if (!dc) return false;
+    EnumFontFamiliesExW(dc, &query, FindCandidateFont, reinterpret_cast<LPARAM>(&search), 0);
+    ReleaseDC(nullptr, dc);
+    return search.found;
+}
+}
+
 
 ChmConfig::ChmConfig()
 {
@@ -25,6 +49,7 @@ ChmConfig::ChmConfig()
 BOOL ChmConfig::InitConfig()
 {
 	m_config.clear();
+	m_candidateStyle = ChmCandidateStyle{};
 	m_errors.clear();
 	m_infos.clear();
 	// function-key テーブルを読み込み用の一時状態へ初期化
@@ -537,6 +562,49 @@ BOOL ChmConfig::_parseValue(const std::wstring& keyTrim,
 			L"duplicate key overwritten: " + currentSection + L"." + key);
 		// 重複はエラーではないのでReturnはしない
 	}
+
+    if (currentSection == L"ui") {
+        static const wchar_t* colorKeys[] = {
+            L"candidate-color-left-little", L"candidate-color-left-ring",
+            L"candidate-color-left-middle", L"candidate-color-left-index",
+            L"candidate-color-right-index", L"candidate-color-right-middle",
+            L"candidate-color-right-ring", L"candidate-color-right-little"
+        };
+        bool recognized = key == L"candidate-font";
+        bool valid = true;
+        if (recognized) {
+            valid = IsInstalledCandidateFont(valueTrim);
+            if (valid) m_candidateStyle.font = valueTrim;
+            m_config[currentSection][key] = m_candidateStyle.font;
+        } else {
+            for (int finger = 0; finger < 8; ++finger) {
+                if (key != colorKeys[finger]) continue;
+                recognized = true;
+                unsigned rgb = 0;
+                valid = valueTrim.size() == 8 && valueTrim[0] == L'0'
+                    && (valueTrim[1] == L'x' || valueTrim[1] == L'X');
+                for (size_t j = 2; valid && j < valueTrim.size(); ++j) {
+                    wchar_t c = valueTrim[j];
+                    int digit = c >= L'0' && c <= L'9' ? c - L'0'
+                        : c >= L'a' && c <= L'f' ? c - L'a' + 10
+                        : c >= L'A' && c <= L'F' ? c - L'A' + 10 : -1;
+                    if (digit < 0) valid = false;
+                    else rgb = (rgb << 4) | digit;
+                }
+                if (valid) {
+                    m_candidateStyle.colors[finger] = RGB((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255);
+                }
+                m_config[currentSection][key] = static_cast<long>(m_candidateStyle.colors[finger]);
+                break;
+            }
+        }
+        if (recognized) {
+            if (!valid) {
+                SetError(errorMsg, L"invalid " + key + L": " + valueTrim);
+            }
+            return valid ? TRUE : FALSE;
+        }
+    }
 
 	// --- value の型判定（bool → long → string の順で試す）
 	bool bValue = true;

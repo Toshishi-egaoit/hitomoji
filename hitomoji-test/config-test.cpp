@@ -9,6 +9,51 @@
 
 namespace {
 
+TEST(CandidateStyleTest, ValidColorsAndInstalledFont)
+{
+    TempConfigDir dir;
+    dir.WriteFile(L"Hitomoji.ini", L"[ui]\ncandidate-font=Arial\ncandidate-color-left-index=0x12AbEF\ncandidate-color-right-index=0x000000\n");
+    ChmConfig config;
+    config.SetBasePath(dir.BaseDir());
+    ASSERT_TRUE(config.LoadFile());
+    EXPECT_FALSE(config.HasErrors());
+    EXPECT_EQ(config.GetCandidateStyle().font, L"Arial");
+    EXPECT_EQ(config.GetCandidateStyle().colors[3], RGB(0x12,0xAB,0xEF));
+    EXPECT_EQ(config.GetCandidateStyle().colors[4], RGB(0,0,0));
+}
+
+TEST(CandidateStyleTest, InvalidItemsAreRecordedAndFailLoad)
+{
+    TempConfigDir dir;
+    dir.WriteFile(L"Hitomoji.ini", L"[ui]\ncandidate-font=__Hitomoji_missing_font__\ncandidate-color-left-index=0x12345G\ncandidate-color-right-index=0x1234567\ncandidate-color-left-ring=0x123456\ncandidate-delay=777\n");
+    ChmConfig config;
+    config.SetBasePath(dir.BaseDir());
+    ASSERT_FALSE(config.LoadFile());
+    EXPECT_TRUE(config.HasErrors());
+    EXPECT_EQ(config.GetCandidateStyle().font, ChmCandidateStyle{}.font);
+    EXPECT_EQ(config.GetCandidateStyle().colors[3], ChmCandidateStyle{}.colors[3]);
+    EXPECT_EQ(config.GetCandidateStyle().colors[4], ChmCandidateStyle{}.colors[4]);
+    EXPECT_EQ(config.GetCandidateStyle().colors[1], RGB(0x12,0x34,0x56));
+    EXPECT_EQ(config.GetLong(L"ui", L"candidate-delay"), 777);
+    EXPECT_NE(config.DumpErrors().find(L"Hitomoji.ini(2)"), std::wstring::npos);
+    dir.WriteFile(L"fatal.ini", L"[ui]\ninvalid line\n");
+    EXPECT_FALSE(config.LoadFile(L"fatal.ini"));
+}
+
+TEST(CandidateStyleTest, InvalidOverrideFailsLoad)
+{
+    ChmConfig config;
+    std::wistringstream defaults(L"[ui]\ncandidate-color-left-index=0x112233\n");
+    ASSERT_TRUE(config.InitConfig(defaults));
+    TempConfigDir dir;
+    dir.WriteFile(L"Hitomoji.ini", L"[ui]\ncandidate-color-left-index=\ncandidate-font=\n");
+    config.SetBasePath(dir.BaseDir());
+    ASSERT_FALSE(config.LoadFile());
+    EXPECT_TRUE(config.HasErrors());
+    EXPECT_EQ(config.GetCandidateStyle().colors[3], RGB(0x11,0x22,0x33));
+    EXPECT_EQ(config.GetCandidateStyle().font, ChmCandidateStyle{}.font);
+}
+
 TEST(LoggerTest, UsesCurrentBasePathAfterEarlyLoggingAndPathChanges)
 {
     struct RestoreBasePath {

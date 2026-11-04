@@ -332,8 +332,8 @@ https://github.com/toshishi-egaoit/hitomoji
 - `@include` のファイル名にも同じエスケープと行末コメントを適用する。
 - 行末のコメントをサポート。
 - iniファイルで候補ウィンドウ情報を指定可とする。(候補ウィンドウでのフォント、サイズ、色)
-- 入力時の記号類の全角化(configでON/OFF)
-- JIS X0208の非漢字をhikanji.iniに追加。(NEC特殊文字を含む)
+- 入力時の記号類の全角化(hitomoji.iniのkey-tableセクションで定義可能)
+- JIS X0208の非漢字をhikanji.iniに追加。(13区のNEC特殊文字を含む)
 
 ### v0.6.2
 

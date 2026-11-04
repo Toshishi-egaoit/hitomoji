@@ -335,6 +335,7 @@ STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, B
 		if (_pCandidateWindowThread) {
 			if (hasCandidatePage && _pEngine->GetState() == ChmEngine::State::Selecting) {
 				DWORD delayMs = _pEngine->GetConfig()->GetLong(L"ui", L"candidate-delay", 500);
+				page.style = _pEngine->GetConfig()->GetCandidateStyle();
 				_pCandidateWindowThread->ScheduleShow(page, delayMs);
 			} else if (_pEngine->GetState() != ChmEngine::State::Selecting) {
 				_pCandidateWindowThread->Hide();

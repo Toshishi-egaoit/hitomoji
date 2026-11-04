@@ -52,7 +52,16 @@ struct ChmKanjiInfo {
 
 // Owns all display data so a copied page can be passed to the window thread.
 // The window formats code points as U+xxxx and renders variant glyphs.
+struct ChmCandidateStyle {
+    std::wstring font = L"Yu Gothic UI";
+    COLORREF colors[8] = {
+        RGB(64,64,64), RGB(34,100,64), RGB(64,64,64), RGB(32,64,112),
+        RGB(128,72,40), RGB(64,64,64), RGB(34,100,64), RGB(64,64,64)
+    };
+};
+
 struct ChmCandidatePage {
+    ChmCandidateStyle style;
     UINT page = 0;
     UINT totalPages = 0;
     UINT totalCount = 0;

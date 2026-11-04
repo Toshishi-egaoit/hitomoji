@@ -30,18 +30,6 @@ HFONT TooltipFont(HDC hdc, int points)
         DEFAULT_PITCH | FF_DONTCARE, L"Yu Gothic UI");
 }
 
-// Keyboard order: left little/ring/middle/index, right index/middle/ring/little.
-// Keep separate entries for all eight fingers for future configuration support.
-constexpr COLORREF CHM_CANDIDATE_FINGER_COLORS[8] = {
-    RGB(64, 64, 64), // Left little
-    RGB(34, 100, 64),   // Left ring: dark green
-    RGB(64, 64, 64), // Left middle
-    RGB(32, 64, 112),   // Left index: navy
-    RGB(128, 72, 40),   // Right index: brown
-    RGB(64, 64, 64), // Right middle
-    RGB(34, 100, 64),   // Right ring: dark green
-    RGB(64, 64, 64), // Right little
-};
 // Each index finger covers two columns (R/T and Y/U, F/G and H/J, V/B and N/M).
 constexpr int CHM_CANDIDATE_COLUMN_FINGERS[CHM_CANDIDATE_COLS] = {
     0, 1, 2, 3, 3, 4, 4, 5, 6, 7
@@ -87,7 +75,7 @@ void DrawCandidates(HDC hdc, const ChmCandidatePage* page)
         CLIP_DEFAULT_PRECIS,
         CLEARTYPE_QUALITY,
         DEFAULT_PITCH | FF_DONTCARE,
-        L"Yu Gothic UI");
+        page->style.font.c_str());
     HFONT oldFont = font ? static_cast<HFONT>(SelectObject(hdc, font)) : nullptr;
     HFONT variantFont = TooltipFont(hdc, 10);
     SetBkMode(hdc, TRANSPARENT);
@@ -95,7 +83,7 @@ void DrawCandidates(HDC hdc, const ChmCandidatePage* page)
 
     HBRUSH markerBrushes[8]{};
     for (int finger = 0; finger < 8; ++finger) {
-        markerBrushes[finger] = CreateSolidBrush(CHM_CANDIDATE_FINGER_COLORS[finger]);
+        markerBrushes[finger] = CreateSolidBrush(page->style.colors[finger]);
     }
 
     for (int i = 0; i < static_cast<int>(CHM_CANDIDATE_MAX); ++i) {
@@ -124,7 +112,7 @@ void DrawCandidates(HDC hdc, const ChmCandidatePage* page)
         wchar_t text[3];
         if (Utf32ToUtf16(cp, text) == 0) continue;
 
-        SetTextColor(hdc, CHM_CANDIDATE_FINGER_COLORS[CHM_CANDIDATE_COLUMN_FINGERS[col]]);
+        SetTextColor(hdc, page->style.colors[CHM_CANDIDATE_COLUMN_FINGERS[col]]);
         DrawTextW(hdc, text, -1, &cell, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
         const bool hasVariants = std::any_of(page->kanjiInfo.begin(), page->kanjiInfo.end(),
             [i, cp](const ChmKanjiInfo& info) {

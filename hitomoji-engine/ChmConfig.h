@@ -8,6 +8,7 @@
 #include <vector>
 #include <windows.h>
 #include "ChmConfigUtils.h"
+#include "ChmCandidatePage.h"
 #include "ChmFunctionKeyMap.h"
 
 class ChmConfig
@@ -54,6 +55,7 @@ public:
 	std::wstring Dump() const;
 	std::wstring DumpErrors() const;
 	std::wstring DumpInfos() const;
+	const ChmCandidateStyle& GetCandidateStyle() const { return m_candidateStyle; }
 	BOOL HasErrors() const { return !m_errors.empty(); }
 	BOOL HasInfos() const { return !m_infos.empty(); }
 	const ChmFunctionKeyMap& GetFunctionKeyMap() const { return m_functionKeyMap; }
@@ -96,6 +98,7 @@ private:
 	bool _isDuplicateKey(const std::wstring& section, const std::wstring & canonizedKey) ;
 	bool _addErrorOrInfo(ParseResult& errorMsg, size_t lineNo);
 
+	ChmCandidateStyle m_candidateStyle;
 	std::wstring m_currentFile;
 	std::wstring m_basePath;
 	ConfigMap m_config;
