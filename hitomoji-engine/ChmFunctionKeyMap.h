@@ -2,6 +2,7 @@
 // Copyright (C) 2026 by Hitomoji Project. All rights reserved.
 #include <windows.h>
 #include <map>
+#include <optional>
 #include <string>
 #include "hitomoji.h"
 #include "ChmEngine.h"
@@ -9,6 +10,13 @@
 
 class ChmFunctionKeyMap {
 public:
+    struct KeyChord {
+        UINT vk;
+        bool shift;
+        bool ctrl;
+        bool alt;
+    };
+
     using ParseLevel = ChmConfigParse::Level;
     using ParseResult = ChmConfigParse::Result;
 
@@ -31,6 +39,7 @@ public:
                        bool ctrl,
                        bool alt) const;
     std::wstring Dump() const;
+    KeyChord GetImeToggleKey() const { return _imeToggleKey.value_or(KeyChord{VK_SPACE, false, true, false}); }
 
 private:
     struct KeySignature {
@@ -44,6 +53,8 @@ private:
     };
     static bool ResolveActionName(const std::wstring& name, ChmFuncType& outType);
     static bool ResolveKeyName(const std::wstring& name, UINT& outVk);
+    void SetBinding(const KeySignature& key, ChmFuncType type);
 
     std::map<KeySignature, ChmFuncType> _keyTable;
+    std::optional<KeyChord> _imeToggleKey;
 };

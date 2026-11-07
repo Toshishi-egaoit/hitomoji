@@ -109,7 +109,7 @@ HRESULT CEditSessionBase::_GetOrStartComposition(TfEditCookie ec, ITfRange** ppR
 	return S_OK;
 }
 
-HRESULT CEditSessionBase::_ApplyDisplayAttribute(TfEditCookie ec, ITfRange* pRange) {
+HRESULT CEditSessionBase::_ApplyDisplayAttribute(TfEditCookie ec, ITfRange* pRange, bool provisional) {
 	ITfProperty* pProp = nullptr;
 	HRESULT hr;
 	hr = _pic->GetProperty(GUID_PROP_ATTRIBUTE, &pProp);
@@ -118,12 +118,11 @@ HRESULT CEditSessionBase::_ApplyDisplayAttribute(TfEditCookie ec, ITfRange* pRan
 	VARIANT var;
 	VariantInit(&var);
 	var.vt = VT_I4;
-	var.lVal = (LONG)CDisplayAttributeInfo::GetAtom();
+	var.lVal = (LONG)CDisplayAttributeInfo::GetAtom(provisional);
 	hr = pProp->SetValue(ec, pRange, &var);
-	OUTPUT_HR_n_RETURN_ON_ERROR(L"SetValue", hr);
 	pProp->Release();
-
-	return S_OK;
+	OUTPUT_HR_ON_ERROR(L"   > SetValue", hr);
+	return hr;
 }
 
 void CEditSessionBase::_MoveCaretToRangeEnd(TfEditCookie ec, ITfRange* pRange) {
@@ -149,8 +148,10 @@ CEditSession::CEditSession(
 	TfClientId tid,
 	ChmTsfInterface* pTsfIf,
 	std::wstring compositionStr,
-	BOOL fEnd)
-	: CEditSessionBase(pic, tid, pTsfIf), _compositionStr(compositionStr), _fEnd(fEnd) {
+	BOOL fEnd,
+	LONG provisionalLength)
+	: CEditSessionBase(pic, tid, pTsfIf), _compositionStr(compositionStr), _fEnd(fEnd),
+	  _provisionalLength(provisionalLength) {
 }
 
 STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
@@ -159,16 +160,45 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
 
 	if (FAILED(_GetOrStartComposition(ec, &pRange))) return S_OK;
 
-	pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
+	HRESULT hr = pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
+	if (FAILED(hr)) {
+		pRange->Release();
+		OUTPUT_HR_ON_ERROR(L"   > SetText", hr);
+		return hr;
+	}
+
+	ITfRange* pCompositionRange = nullptr;
+	ITfComposition* pComposition = _pTsfIf->GetComposition();
+	if (pComposition && SUCCEEDED(pComposition->GetRange(&pCompositionRange)) && pCompositionRange) {
+		pRange->Release();
+		pRange = pCompositionRange;
+	}
 
 	if (_fEnd) {
+		if (_provisionalLength > 0 && !_compositionStr.empty()) {
+			ITfProperty* pProp = nullptr;
+			if (SUCCEEDED(_pic->GetProperty(GUID_PROP_ATTRIBUTE, &pProp))) {
+				pProp->Clear(ec, pRange);
+				pProp->Release();
+			}
+		}
 		_MoveCaretToRangeEnd(ec, pRange);
 		_TerminateComposition(ec);
 	} else {
 		LONG cch = (LONG)_compositionStr.length();
-		LONG shifted = 0;
-		pRange->ShiftEnd(ec, cch, &shifted, nullptr);
 		_ApplyDisplayAttribute(ec, pRange);
+		if (_provisionalLength > 0 && _provisionalLength <= cch) {
+			ITfRange* pPrefix = nullptr;
+			if (SUCCEEDED(pRange->Clone(&pPrefix))) {
+				LONG prefixShifted = 0;
+				if (SUCCEEDED(pPrefix->Collapse(ec, TF_ANCHOR_START))
+					&& SUCCEEDED(pPrefix->ShiftEnd(ec, _provisionalLength, &prefixShifted, nullptr))
+					&& prefixShifted == _provisionalLength) {
+					_ApplyDisplayAttribute(ec, pPrefix, true);
+				}
+				pPrefix->Release();
+			}
+		}
 
 		ITfContextView* pContextView = nullptr;
 		HRESULT hrView = _pic->GetActiveView(&pContextView);

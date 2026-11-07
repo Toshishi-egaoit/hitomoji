@@ -1034,6 +1034,37 @@ TEST_F(Layer3Test, SelectInputPreservesLeadingSymbolsInCommittedComposition)
     engine.Deactivate();
 }
 
+TEST_F(Layer3Test, RightArrowExcludesOneMoreCharacterFromYomi)
+{
+    ChmEngine engine([]() -> std::unique_ptr<std::wistream> {
+        return std::make_unique<std::wistringstream>(L"[function-key]\nRIGHT=finish-1char\n");
+    });
+    EngineActivate(engine);
+    EXPECT_FALSE(engine.IsKeyEaten(VK_RIGHT));
+    InputKeys(engine, "NIHAA", L"にはあ");
+
+    bool endComposition = true;
+    for (LONG length = 1; length <= 2; ++length) {
+        ChmKeyEvent key = MakeKey(VK_RIGHT, engine.GetState());
+        ASSERT_EQ(ChmFuncType::ProvisionalFinish, key.GetType());
+        ASSERT_TRUE(engine.UpdateComposition(key, endComposition));
+        EXPECT_FALSE(endComposition);
+        EXPECT_EQ(length, engine.GetProvisionalLength());
+        EXPECT_EQ(L"にはあ", engine.GetCompositionStr());
+    }
+    InputKeys(engine, "I", L"にはあい");
+
+    ChmCandidatePage page;
+    StartSelection(engine, page);
+    CancelSelection(engine, L"にはあい");
+    EXPECT_EQ(2, engine.GetProvisionalLength());
+    StartSelection(engine, page);
+    SelectCandidate(engine, 'D', L"には会");
+    engine.PostUpdateComposition();
+    EXPECT_EQ(0, engine.GetProvisionalLength());
+    engine.Deactivate();
+}
+
 TEST_F(Layer3Test, SelectInputKeepsSelectingAndRequestsErrorForEmptySlot)
 {
     ChmEngine engine;

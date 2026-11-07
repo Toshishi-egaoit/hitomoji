@@ -23,7 +23,7 @@ protected:
 
 	HRESULT _StartComposition(TfEditCookie ec, ITfRange* pRange);
 	HRESULT _GetOrStartComposition(TfEditCookie ec, ITfRange** ppRange);
-	HRESULT _ApplyDisplayAttribute(TfEditCookie ec, ITfRange* pRange);
+	HRESULT _ApplyDisplayAttribute(TfEditCookie ec, ITfRange* pRange, bool provisional = false);
 	void _MoveCaretToRangeEnd(TfEditCookie ec, ITfRange* pRange);
 	void _TerminateComposition(TfEditCookie ec);
 
@@ -42,13 +42,15 @@ public:
 		TfClientId tid,
 		ChmTsfInterface* pTsfIf,
 		std::wstring compositionStr,
-		BOOL fEnd);
+		BOOL fEnd,
+		LONG provisionalLength);
 
 	STDMETHODIMP DoEditSession(TfEditCookie ec);
 
 private:
 	std::wstring _compositionStr;
 	BOOL _fEnd;
+	LONG _provisionalLength;
 };
 
 class CUndoEditSession : public CEditSessionBase {

@@ -47,6 +47,7 @@ const FuncKeyDef g_functionKeyTable[] = {
 const std::map<std::wstring, ChmFuncType> s_actionNameMap = {
     { L"finish",             ChmFuncType::CompFinish },
     { L"finish-hiragana",    ChmFuncType::CompFinishHiragana },
+    { L"finish-1char",       ChmFuncType::ProvisionalFinish },
     { L"finish-katakana",    ChmFuncType::CompFinishKatakana },
     { L"finish-raw",         ChmFuncType::CompFinishKey },
     { L"finish-raw-wide",    ChmFuncType::CompFinishKeyWide },
@@ -54,6 +55,7 @@ const std::map<std::wstring, ChmFuncType> s_actionNameMap = {
     { L"cancel",             ChmFuncType::Cancel },
     { L"cancel-finish",      ChmFuncType::UnFinish },
     { L"select-start",       ChmFuncType::CompSelect },
+    { L"ime-toggle",         ChmFuncType::ImeToggle },
     { L"next-page" ,         ChmFuncType::SelectNextPage },
     { L"prev-page" ,         ChmFuncType::SelectPrevPage },
     { L"cancel-select" ,     ChmFuncType::SelectCancel },
@@ -108,6 +110,7 @@ ChmFunctionKeyMap::ChmFunctionKeyMap()
 void ChmFunctionKeyMap::Clear()
 {
     _keyTable.clear();
+    _imeToggleKey.reset();
 }
 
 void ChmFunctionKeyMap::InitDefault()
@@ -124,8 +127,23 @@ void ChmFunctionKeyMap::MergeFrom(const ChmFunctionKeyMap& definitions)
 {
     for (const auto& entry : definitions._keyTable)
     {
-        _keyTable[entry.first] = entry.second;
+        SetBinding(entry.first, entry.second);
     }
+    if (definitions._imeToggleKey) _imeToggleKey = definitions._imeToggleKey;
+}
+
+void ChmFunctionKeyMap::SetBinding(const KeySignature& key, ChmFuncType type)
+{
+    if (type == ChmFuncType::CompSelect || type == ChmFuncType::UnFinish) {
+        for (auto it = _keyTable.begin(); it != _keyTable.end();) {
+            if (it->second == type) {
+                it = _keyTable.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+    _keyTable[key] = type;
 }
 
 bool ChmFunctionKeyMap::ResolveActionName(const std::wstring& name, ChmFuncType& outType)
@@ -248,6 +266,14 @@ BOOL ChmFunctionKeyMap::ParseFunctionKey(const std::wstring& key,
         return FALSE;
     }
 
+    if (actionType == ChmFuncType::ImeToggle) {
+        if (_imeToggleKey) {
+            ChmConfigParse::SetInfo(result, L"duplicate ime-toggle definition: " + keySpec);
+        }
+        _imeToggleKey = KeyChord{vk, needShift, needCtrl, needAlt};
+        return TRUE;
+    }
+
     ChmEngine::State state = actionType == ChmFuncType::UnFinish
         ? ChmEngine::State::None
         : ChmEngine::State::Inputing;
@@ -259,7 +285,7 @@ BOOL ChmFunctionKeyMap::ParseFunctionKey(const std::wstring& key,
         ChmConfigParse::SetInfo(result, L"duplicate function-key definition: " + keySpec);
     }
 
-    _keyTable[sig] = actionType;
+    SetBinding(sig, actionType);
 
     return TRUE;
 }

@@ -9,6 +9,7 @@
 #include <climits>
 #include <initguid.h> // GUIDの実体定義用
 #include <objbase.h>
+#include <olectl.h>
 #include <inputscope.h>
 #include <shellapi.h>
 #include "TsfIf.h"
@@ -331,6 +332,9 @@ STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, B
 		} else {
 			if (!_pEngine->UpdateOther(kEv, fEnd)) return S_OK;
 		}
+		if (type == ChmFuncType::ReloadIni) {
+			_InitPreservedKey();
+		}
 
 		_InvokeEditSession(pic, fEnd);
 		_pEngine->PostUpdateComposition();
@@ -415,21 +419,61 @@ void ChmTsfInterface::_UninitKeyEventSink() {
 }
 
 HRESULT ChmTsfInterface::_InitPreservedKey() {
+	const auto chord = _pEngine->GetConfig()->GetFunctionKeyMap().GetImeToggleKey();
+	const TF_PRESERVEDKEY requested{chord.vk, static_cast<UINT>(
+		(chord.shift ? TF_MOD_SHIFT : 0) | (chord.ctrl ? TF_MOD_CONTROL : 0)
+		| (chord.alt ? TF_MOD_ALT : 0))};
+	const auto previous = _registeredToggleKey;
+	const bool hadPrevious = _hasRegisteredToggleKey;
+	if (hadPrevious && previous.uVKey == requested.uVKey && previous.uModifiers == requested.uModifiers) {
+		return S_OK;
+	}
+
 	ITfKeystrokeMgr* pKeystrokeMgr = nullptr;
 	HRESULT hr = _pThreadMgr->QueryInterface(IID_ITfKeystrokeMgr, (void**)&pKeystrokeMgr);
-	if (SUCCEEDED(hr)) {
-		hr = pKeystrokeMgr->PreserveKey(_tfClientId, GUID_PreservedKey_OpenClose, &c_presKeyOpenClose, L"ひともじ ON/OFF", (ULONG)wcslen(L"ひともじ ON/OFF"));
-		pKeystrokeMgr->Release();
+	if (FAILED(hr)) return hr;
+
+	if (hadPrevious) {
+		hr = pKeystrokeMgr->UnpreserveKey(GUID_PreservedKey_OpenClose, &previous);
+		if (FAILED(hr) && hr != CONNECT_E_NOCONNECTION) {
+			pKeystrokeMgr->Release();
+			OUTPUT_HR_ON_ERROR(L"Unpreserve IME toggle key", hr);
+			return hr;
+		}
+		_hasRegisteredToggleKey = false;
 	}
+
+	auto registerKey = [&](const TF_PRESERVEDKEY& key) {
+		constexpr wchar_t description[] = L"ひともじ ON/OFF";
+		HRESULT result = pKeystrokeMgr->PreserveKey(_tfClientId, GUID_PreservedKey_OpenClose,
+			&key, description, ARRAYSIZE(description) - 1);
+		if (SUCCEEDED(result)) {
+			_registeredToggleKey = key;
+			_hasRegisteredToggleKey = true;
+		}
+		return result;
+	};
+	hr = registerKey(requested);
+	if (FAILED(hr)) {
+		OUTPUT_HR_ON_ERROR(L"Register configured IME toggle key", hr);
+		const TF_PRESERVEDKEY fallback = hadPrevious ? previous : TF_PRESERVEDKEY{VK_SPACE, TF_MOD_CONTROL};
+		if (fallback.uVKey != requested.uVKey || fallback.uModifiers != requested.uModifiers) {
+			hr = registerKey(fallback);
+			OUTPUT_HR_ON_ERROR(L"Register fallback IME toggle key", hr);
+		}
+	}
+	pKeystrokeMgr->Release();
 	return hr;
 }
 
 void ChmTsfInterface::_UninitPreservedKey() {
+	if (!_hasRegisteredToggleKey) return;
 	ITfKeystrokeMgr* pKeystrokeMgr = nullptr;
 	if (SUCCEEDED(_pThreadMgr->QueryInterface(IID_ITfKeystrokeMgr, (void**)&pKeystrokeMgr))) {
-		pKeystrokeMgr->UnpreserveKey(GUID_PreservedKey_OpenClose, &c_presKeyOpenClose);
+		pKeystrokeMgr->UnpreserveKey(GUID_PreservedKey_OpenClose, &_registeredToggleKey);
 		pKeystrokeMgr->Release();
 	}
+	_hasRegisteredToggleKey = false;
 }
 
 void ChmTsfInterface::_AbortUnFinish() {
@@ -470,7 +514,8 @@ HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
 	if (undo) {
 		pES = new CUndoEditSession(pic, _tfClientId, this, _pEngine->GetCompositionStr(), _pEngine->GetUndoDeleteLength());
 	} else {
-		pES = new CEditSession(pic, _tfClientId, this, _pEngine->GetCompositionStr(), fEnd);
+		pES = new CEditSession(pic, _tfClientId, this, _pEngine->GetCompositionStr(), fEnd,
+			_pEngine->GetProvisionalLength());
 	}
 	if (!pES) return E_OUTOFMEMORY;
 	HRESULT hrSession = pic->RequestEditSession(_tfClientId, pES, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hr);
@@ -507,8 +552,11 @@ HRESULT ChmTsfInterface::_CommitComposition(ITfContext* pic) {
 // -----
 
 STDMETHODIMP ChmTsfInterface::GetDisplayAttributeInfo(REFGUID guid, ITfDisplayAttributeInfo **ppInfo) {
-	if (CDisplayAttributeInfo::IsMyGuid(guid)) {
-		*ppInfo = new CDisplayAttributeInfo(); // さっき作ったクラスを投げる
+	if (!ppInfo) return E_INVALIDARG;
+	*ppInfo = nullptr;
+	const bool provisional = CDisplayAttributeInfo::IsProvisionalGuid(guid);
+	if (provisional || CDisplayAttributeInfo::IsMyGuid(guid)) {
+		*ppInfo = new CDisplayAttributeInfo(provisional);
 		return S_OK;
 	}
 	return E_INVALIDARG;
@@ -518,9 +566,7 @@ STDMETHODIMP ChmTsfInterface::EnumDisplayAttributeInfo(IEnumTfDisplayAttributeIn
 	if (ppEnum == nullptr) return E_INVALIDARG;
 	*ppEnum = nullptr;
 	
-	// TODO: 将来的に複数属性をサポートする場合はここを実装する。
-	// v0.1 では一旦「未実装」でOK。
-	// エディタは GetDisplayAttributeInfo さえ呼べれば描画できます。
+	// 属性は GetDisplayAttributeInfo で GUID ごとに返す。
 	return E_NOTIMPL; 
 }
 
@@ -1043,8 +1089,9 @@ void ChmTsfInterface::OpenConfig()
 }
 
 void ChmTsfInterface::ReloadConfig() {
-	_pEngine->InitConfig();
-	return;
+	if (_pEngine->InitConfig() && _pThreadMgr) {
+		_InitPreservedKey();
+	}
 }
 
 void ChmTsfInterface::OpenFolder()

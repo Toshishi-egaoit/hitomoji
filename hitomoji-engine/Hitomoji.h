@@ -8,6 +8,7 @@ enum class ChmFuncType {
 	CharInputSpace,     // 空白文字の入力(Compositionがない場合用)
 	CompFinish,         // 見たまま確定(ENTER)
 	CompFinishHiragana, // ひらがな確定(Alt+Enter)
+	ProvisionalFinish,  // 読みの先頭から1文字を変換対象外にする
 	CompFinishKatakana, // カタカナ確定(Shift+Enter)
 	CompFinishKey,      // キーどおり確定(TAB)
 	CompFinishKeyWide,  // キーどおり確定ワイド(Shift+TAB)
@@ -20,6 +21,7 @@ enum class ChmFuncType {
 	Cancel,             // キャンセル(ESC)
 	Backspace,          // 後退(BS)
 	UnFinish,           // 確定取消（将来）(CTRL+Z)
+	ImeToggle,          // TSF に登録する IME オン／オフキー
 	VersionInfo,        // バージョン表示
 	ReloadIni,          // iniファイルのリロード
 };

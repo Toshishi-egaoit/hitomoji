@@ -60,6 +60,7 @@ public:
 	BOOL IsDirectInput(ChmFuncType tp) { return (tp == ChmFuncType::CharInputSpace) ; }
 	State GetState() { return _state ;}
 	std::wstring GetCompositionStr() ;
+	LONG GetProvisionalLength() const { return static_cast<LONG>(_provisionalLength); }
 	BOOL GetCandidatePage(ChmCandidatePage& page) const;
 
 	BOOL UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition);
@@ -100,6 +101,7 @@ private:
 	ChmL3Helper* _pL3Helper; // かな漢字変換の選択キー定義
 
 	std::wstring _converted; // かな変換できた部分
+	size_t _provisionalLength = 0; // 変換対象外にした先頭の UTF-16 長
 	std::wstring _pending; // かなに変換できていない部分（残り）
 	BOOL _useUndoEditSession;
 	LONG _undoDeleteLength;

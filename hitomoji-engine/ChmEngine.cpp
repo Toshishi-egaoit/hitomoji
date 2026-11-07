@@ -278,6 +278,7 @@ BOOL ChmEngine::IsLayer2Function(ChmFuncType type) {
 		case ChmFuncType::CharInputSpace:
 		case ChmFuncType::CharInput:
 		case ChmFuncType::Backspace:
+		case ChmFuncType::ProvisionalFinish:
 		case ChmFuncType::Cancel:
 			return TRUE;
 		default:
@@ -330,6 +331,15 @@ BOOL ChmEngine::UpdateLayer2(const ChmKeyEvent& keyEvent, bool& pEndComposition)
 			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
 				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
 			break;
+		case ChmFuncType::ProvisionalFinish:
+			if (_provisionalLength < _converted.size()) {
+				const wchar_t first = _converted[_provisionalLength++];
+				if (IS_HIGH_SURROGATE(first) && _provisionalLength < _converted.size()
+					&& IS_LOW_SURROGATE(_converted[_provisionalLength])) {
+					++_provisionalLength;
+				}
+			}
+			break;
 		case ChmFuncType::Backspace: {
 			if (!HasComposition()) break;
 			size_t len = _pRawInputStore->get().size();
@@ -352,6 +362,9 @@ BOOL ChmEngine::UpdateLayer2(const ChmKeyEvent& keyEvent, bool& pEndComposition)
 			} else {
 				ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
 					_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
+			}
+			if (_provisionalLength > _converted.size()) {
+				_provisionalLength = _converted.size();
 			}
 			break;
 		}
@@ -401,7 +414,8 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 				delete _pL3KanjiSelect;
 				_pL3KanjiSelect = nullptr;
 				_state = State::Inputing;
-			} else if ( _pL3KanjiSelect->Start(_converted) == FALSE ) {
+			} else if (_provisionalLength >= _converted.size()
+				|| !_pL3KanjiSelect->Start(_converted.substr(_provisionalLength))) {
 				Debug(Format(L"   > yomi not found:%s", _converted.c_str()));
 				SetError();
 				delete _pL3KanjiSelect;
@@ -478,7 +492,8 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 						SetError();
 					}
 					else {
-						_converted = _pL3KanjiSelect->GetLeadingChars() + ChmL3Helper::Utf32ToWString(selected);
+						_converted.resize(_provisionalLength);
+						_converted += _pL3KanjiSelect->GetLeadingChars() + ChmL3Helper::Utf32ToWString(selected);
 						_pending = L"";
 						_PrepareUnFinish();
 						_state = State::None;
@@ -603,6 +618,7 @@ void ChmEngine::ResetStatus() {
 	_pRawInputStore->clear();
 	_converted = L"";
 	_pending = L"";
+	_provisionalLength = 0;
 	delete _pL3KanjiSelect;
 	_pL3KanjiSelect = nullptr;
 	return;

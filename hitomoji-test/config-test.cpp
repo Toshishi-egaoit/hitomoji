@@ -467,6 +467,33 @@ TEST(ConfigTest, InitializesDefaultValuesSymbolsAndFunctionKeysFromStream)
         'Y', false, true, false, ChmEngine::State::Inputing));
 }
 
+TEST(ConfigTest, RemapsConversionUndoAndImeToggle)
+{
+    TempConfigDir dir;
+    dir.WriteFile(L"Hitomoji.ini",
+        L"[function-key]\nF6=select-start\nCTRL+Y=cancel-finish\nCTRL+SHIFT+F12=ime-toggle\n");
+    ChmConfig config;
+    config.SetBasePath(dir.BaseDir());
+    std::wistringstream defaults(
+        L"[function-key]\nSPACE=select-start\nCTRL+Z=cancel-finish\nCTRL+SPACE=ime-toggle\n");
+    ASSERT_TRUE(config.InitConfig(defaults)) << config.DumpErrors();
+    ASSERT_TRUE(config.LoadFile()) << config.DumpErrors();
+
+    const auto& keys = config.GetFunctionKeyMap();
+    using State = ChmEngine::State;
+    EXPECT_EQ(ChmFuncType::CompSelect, keys.Resolve(VK_F6, false, false, false, State::Inputing));
+    EXPECT_EQ(ChmFuncType::None, keys.Resolve(VK_SPACE, false, false, false, State::Inputing));
+    EXPECT_EQ(ChmFuncType::SelectNextPage, keys.Resolve(VK_SPACE, false, false, false, State::Selecting));
+    EXPECT_TRUE(keys.IsUnFinishKey('Y', false, true, false));
+    EXPECT_FALSE(keys.IsUnFinishKey('Z', false, true, false));
+    const auto toggle = keys.GetImeToggleKey();
+    EXPECT_EQ(static_cast<UINT>(VK_F12), toggle.vk);
+    EXPECT_TRUE(toggle.ctrl);
+    EXPECT_TRUE(toggle.shift);
+    EXPECT_FALSE(toggle.alt);
+    EXPECT_EQ(ChmFuncType::None, keys.Resolve(VK_F12, true, true, false, State::None));
+}
+
 TEST(ConfigTest, InitializationConsumesFreshStreamAndUserFileOnlyOverlays)
 {
     TempConfigDir dir;

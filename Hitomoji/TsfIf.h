@@ -28,7 +28,6 @@ DEFINE_GUID(GUID_HmLangBar, 0x722e3a38, 0x3c76, 0x40cc, 0xaa, 0x9d, 0xd0, 0xf2, 
 // DEFINE_GUID(GUID_PROP_ATTRIBUTE, 0x60a54235, 0xd053, 0x4b61, 0x9c, 0x59, 0x55, 0x64, 0x8c, 0x99, 0x71, 0x20);
     
 // Ctrl + Space の定義
-const TF_PRESERVEDKEY c_presKeyOpenClose = { VK_SPACE, TF_MOD_CONTROL };
 const GUID GUID_PreservedKey_OpenClose = { 0x6e9f9050, 0x05f8, 0x479c, { 0x82, 0x6e, 0x16, 0x93, 0x4e, 0x62, 0xe1, 0x01 } };
 
 class ChmTsfInterface : public ITfTextInputProcessor,
@@ -197,6 +196,8 @@ private:
 
     ITfThreadMgr* _pThreadMgr;
     TfClientId _tfClientId;
+    TF_PRESERVEDKEY _registeredToggleKey{};
+    bool _hasRegisteredToggleKey = false;
     LONG _cRef;
 
     DWORD _dwThreadFocusSinkCookie; 
