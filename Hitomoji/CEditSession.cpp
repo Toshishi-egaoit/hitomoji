@@ -205,39 +205,38 @@ STDMETHODIMP CUndoEditSession::DoEditSession(TfEditCookie ec) {
 	Debug(Format(L"UndoEditSession:del=%d str=>>%s<<", _deleteLength, _compositionStr.c_str()));
 
 	ITfRange* pRange = nullptr;
-	if (FAILED(_GetDeleteRange(ec, &pRange))) return S_OK;
+	HRESULT hr = _GetDeleteRange(ec, &pRange);
+	if (FAILED(hr)) {
+		_pTsfIf->_AbortUnFinish();
+		return hr;
+	}
 
-	HRESULT hr = pRange->SetText(ec, TF_ST_CORRECTION, L"", 0);
-	OUTPUT_HR_ON_ERROR(L"SetText", hr);
+	// 確定済みの範囲を Composition にしてから、復元した文字列で置き換える。
+	hr = _StartComposition(ec, pRange);
+	OUTPUT_HR_ON_ERROR(L"Undo StartComposition", hr);
 	if (FAILED(hr)) {
 		pRange->Release();
-		return S_OK;
-	}
-	pRange->Collapse(ec, TF_ANCHOR_START);
-
-	TF_SELECTION sel;
-	sel.range = pRange;
-	sel.style.ase = TF_AE_NONE;
-	sel.style.fInterimChar = FALSE;
-	_pic->SetSelection(ec, 1, &sel);
-	pRange->Release();
-	pRange = nullptr;
-
-	if (FAILED(_GetOrStartComposition(ec, &pRange))) {
-		return S_OK;
+		_pTsfIf->_AbortUnFinish();
+		return hr;
 	}
 
 	hr = pRange->SetText(ec, TF_ST_CORRECTION, _compositionStr.c_str(), (LONG)_compositionStr.length());
+	OUTPUT_HR_ON_ERROR(L"Undo SetText", hr);
 	if (FAILED(hr)) {
 		pRange->Release();
-		return S_OK;
+		_TerminateComposition(ec);
+		_pTsfIf->_AbortUnFinish();
+		return hr;
 	}
-	LONG cch = (LONG)_compositionStr.length();
-	LONG shifted = 0;
-	pRange->ShiftEnd(ec, cch, &shifted, nullptr);
-	_ApplyDisplayAttribute(ec, pRange);
 
 	pRange->Release();
+	pRange = nullptr;
+	ITfComposition* pComposition = _pTsfIf->GetComposition();
+	if (pComposition && SUCCEEDED(pComposition->GetRange(&pRange)) && pRange) {
+		_ApplyDisplayAttribute(ec, pRange);
+		_MoveCaretToRangeEnd(ec, pRange);
+		pRange->Release();
+	}
 	_pTsfIf->SetMyEditSessionTick();
 	return S_OK;
 }
@@ -264,23 +263,29 @@ HRESULT CUndoEditSession::_GetDeleteRange(TfEditCookie ec, ITfRange** ppRange) {
 
     // 3. この pFullRange の終端(End)を、今のカーソル位置にぶつける
     // これにより、pFullRange は「文書の最初から今の位置まで」を完全にカバーする
-    pFullRange->ShiftEndToRange(ec, sel.range, TF_ANCHOR_END);
+    BOOL isCaret = FALSE;
+    hr = sel.range->IsEmpty(ec, &isCaret);
+    if (SUCCEEDED(hr) && isCaret) {
+        hr = pFullRange->ShiftEndToRange(ec, sel.range, TF_ANCHOR_END);
+    }
     sel.range->Release();
 
     // 4. End 位置で Collapse する（この時点では見た目上 GetSelection と同じ位置）
-    pFullRange->Collapse(ec, TF_ANCHOR_END);
+    if (FAILED(hr) || !isCaret || FAILED(pFullRange->Collapse(ec, TF_ANCHOR_END))) {
+        pFullRange->Release();
+        return E_FAIL;
+    }
 
     // 5. 左へ ShiftStart
     // 起点から繋がっている Range なので、壁を越えて左へ ShiftStart できる可能性が高い
     LONG shifted = 0;
-    pFullRange->ShiftStart(ec, -_deleteLength, &shifted, nullptr);
-    Debug(Format(L"Absolute Range ShiftStart: %d / Required: %d", shifted, -_deleteLength));
+    hr = pFullRange->ShiftStart(ec, -_deleteLength, &shifted, nullptr);
+    Debug(Format(L"Absolute Range ShiftStart: %d / Required: %d / HRESULT: 0x%08lX",
+        shifted, -_deleteLength, static_cast<unsigned long>(hr)));
 
-	// TODO: shifted == 0 の場合、Range が壁にぶつかった可能性がある。(標準エディットボックスで発生することを確認済み)
-	// SendInput(VK_BACK) で物理的に削除する？
-
-    if (shifted == 0) {
+    if (FAILED(hr) || shifted != -_deleteLength) {
         pFullRange->Release();
+        _pTsfIf->_NotifyInputError(_pic);
         return E_FAIL;
     }
 

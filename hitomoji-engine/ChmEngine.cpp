@@ -599,6 +599,7 @@ void ChmEngine::PostUpdateComposition(){
 
 void ChmEngine::ResetStatus() {
 	_state = State::None;
+	_useUndoEditSession = FALSE;
 	_pRawInputStore->clear();
 	_converted = L"";
 	_pending = L"";

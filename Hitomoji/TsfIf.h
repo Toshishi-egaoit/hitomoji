@@ -155,6 +155,8 @@ public:
 	);
 
 private:
+	friend class CUndoEditSession;
+	void _AbortUnFinish();
 	void _SetImeOpenState(BOOL fOpen, ITfContext* pic, BOOL fNotifyOs);
 	void _SetImeOpenClose(BOOL fOpen);
 	HRESULT _InitThreadMgrEventSink();
@@ -181,6 +183,7 @@ private:
 	HRESULT _InvokeEditSession(ITfContext* pic, BOOL fEnd) ;
 	HRESULT _CommitComposition(ITfContext* pic);
 	void _HandleEngineError(ITfContext* pic);
+	void _NotifyInputError(ITfContext* pic);
 	void _TriggerVisualBell(ITfContext* pic);
 	static BOOL _GetCandidateWindowPositionCallback(void* context, POINT& pt);
 

@@ -352,7 +352,11 @@ STDMETHODIMP ChmTsfInterface::OnKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, B
 void ChmTsfInterface::_HandleEngineError(ITfContext* pic)
 {
 	if (!_pEngine->ConsumeErrorRequest()) return;
+	_NotifyInputError(pic);
+}
 
+void ChmTsfInterface::_NotifyInputError(ITfContext* pic)
+{
 	if (_pEngine->GetConfig()->GetBool(L"ui", L"error-beep", TRUE)) {
 		MessageBeep(MB_OK);
 	} else {
@@ -428,6 +432,12 @@ void ChmTsfInterface::_UninitPreservedKey() {
 	}
 }
 
+void ChmTsfInterface::_AbortUnFinish() {
+	if (_pEngine->UseUndoEditSession()) {
+		_pEngine->ResetStatus();
+	}
+}
+
 HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
 	// ---- pre-check: composition / context validity ----
 	if (_pComposition) {
@@ -454,9 +464,10 @@ HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
 	}
 
 	// ---- edit session request ----
-	HRESULT hr;
+	HRESULT hr = E_FAIL;
 	CEditSessionBase* pES = nullptr;
-	if (_pEngine->UseUndoEditSession()) {
+	const BOOL undo = _pEngine->UseUndoEditSession();
+	if (undo) {
 		pES = new CUndoEditSession(pic, _tfClientId, this, _pEngine->GetCompositionStr(), _pEngine->GetUndoDeleteLength());
 	} else {
 		pES = new CEditSession(pic, _tfClientId, this, _pEngine->GetCompositionStr(), fEnd);
@@ -464,6 +475,9 @@ HRESULT ChmTsfInterface::_InvokeEditSession(ITfContext* pic, BOOL fEnd) {
 	if (!pES) return E_OUTOFMEMORY;
 	HRESULT hrSession = pic->RequestEditSession(_tfClientId, pES, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hr);
 	OUTPUT_HR_ON_ERROR("_InvokeEditSession/RequestEditSession", hrSession);
+	if (undo && (FAILED(hrSession) || FAILED(hr))) {
+		_AbortUnFinish();
+	}
 	pES->Release();
 	return hrSession;
 }
