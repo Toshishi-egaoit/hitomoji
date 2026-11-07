@@ -296,6 +296,10 @@ STDMETHODIMP ChmTsfInterface::OnSetFocus(BOOL fFocus)
 
 // ITfKeyEventSink Implementation
 STDMETHODIMP ChmTsfInterface::OnTestKeyDown(ITfContext* pic, WPARAM wp, LPARAM lp, BOOL* pfEaten) {
+	if (ChmKeyEvent::IsIgnoredKey(wp)) {
+		*pfEaten = FALSE;
+		return S_OK;
+	}
 	*pfEaten = _pEngine->IsKeyEaten(wp);
 	if (!*pfEaten) {
 		_pEngine->InvalidateUnFinishByKey(wp);

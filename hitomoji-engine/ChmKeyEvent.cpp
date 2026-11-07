@@ -81,6 +81,24 @@ private:
     };
 };
 
+BOOL ChmKeyEvent::IsIgnoredKey(WPARAM wp)
+{
+	// 現在のLayer1では、修飾キー自身の押下は処理しない。
+	switch (wp) {
+		case VK_SHIFT:
+		case VK_LSHIFT:
+		case VK_RSHIFT:
+		case VK_CONTROL:
+		case VK_LCONTROL:
+		case VK_RCONTROL:
+		case VK_MENU:
+		case VK_LMENU:
+		case VK_RMENU:
+			return TRUE;
+	}
+	return FALSE;
+}
+
 // ---- FunctionKeyTableのていぎとしょきかしょり ----
 static ChmFunctionKeyMap s_functionKeyMap;
 

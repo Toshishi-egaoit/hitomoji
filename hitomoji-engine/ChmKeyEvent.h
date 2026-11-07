@@ -33,6 +33,7 @@ public:
 
 
     // --- utility ---
+	static BOOL IsIgnoredKey(WPARAM wp);
 	const std::wstring toString() const { 
 		wchar_t buff[80];
 		unsigned char ch = GetChar();

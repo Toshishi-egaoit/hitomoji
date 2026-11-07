@@ -159,6 +159,50 @@ protected:
 
 } // namespace
 
+TEST_F(Layer2Test, AppEditingKeysInvalidateCommittedUnFinish)
+{
+    const WPARAM keys[] = { VK_BACK, VK_DELETE, 'X', 'V', 'C', VK_LEFT };
+    for (WPARAM key : keys) {
+        ChmEngine engine;
+        EngineActivate(engine);
+        InputChar(engine, 'A', L"あ");
+        FinishComposition(engine, VK_RETURN, ChmFuncType::CompFinish, L"あ");
+        ASSERT_TRUE(engine.CanUnFinish());
+
+        TestKeyEventHelper::SetState(false, key == 'X' || key == 'V' || key == 'C');
+        EXPECT_FALSE(engine.IsKeyEaten(key));
+        engine.InvalidateUnFinishByKey(key);
+        EXPECT_FALSE(engine.CanUnFinish());
+        EXPECT_EQ(0, engine.GetUndoDeleteLength());
+        TestKeyEventHelper::ResetState();
+        engine.Deactivate();
+    }
+}
+
+TEST_F(Layer2Test, ModifiersAndUnFinishKeyPreserveCommittedUnFinish)
+{
+    ChmEngine engine;
+    EngineActivate(engine);
+    InputChar(engine, 'A', L"あ");
+    FinishComposition(engine, VK_RETURN, ChmFuncType::CompFinish, L"あ");
+    ASSERT_TRUE(engine.CanUnFinish());
+
+    const WPARAM modifiers[] = {
+        VK_SHIFT, VK_LSHIFT, VK_RSHIFT,
+        VK_CONTROL, VK_LCONTROL, VK_RCONTROL,
+        VK_MENU, VK_LMENU, VK_RMENU
+    };
+    for (WPARAM key : modifiers) {
+        engine.InvalidateUnFinishByKey(key);
+        EXPECT_TRUE(engine.CanUnFinish());
+    }
+    TestKeyEventHelper::SetState(false, true);
+    engine.InvalidateUnFinishByKey('Z');
+    EXPECT_TRUE(engine.CanUnFinish());
+    UnFinishComposition(engine, L"あ");
+    engine.Deactivate();
+}
+
 TEST_F(Layer2Test, CharInputStartsComposition)
 {
     ChmEngine engine;

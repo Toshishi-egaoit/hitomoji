@@ -156,6 +156,8 @@ void ChmEngine::_initL3Dict(std::istream& stream) {
 }
 
 BOOL ChmEngine::IsKeyEaten(WPARAM wp) {
+	if (ChmKeyEvent::IsIgnoredKey(wp)) return FALSE;
+
 	// IMEがOFFなら全てfalse
 	if (!_isON) return FALSE;
 
@@ -192,11 +194,12 @@ BOOL ChmEngine::CanUnFinish() const {
 
 void ChmEngine::InvalidateUnFinishByKey(WPARAM wp) {
 	if (_state != State::None || !CanUnFinish()) return;
+	if (ChmKeyEvent::IsIgnoredKey(wp)) return;
 
 	ChmKeyEvent ev(wp, 0, _state);
-	if (ev.IsNavigationKey()) {
-		_ClearUnFinish();
-	}
+	if (ev.IsUnFinishKey()) return;
+
+	_ClearUnFinish();
 }
 
 LONG ChmEngine::CountUndoDeleteLength(const std::wstring& src) {
