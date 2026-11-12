@@ -91,7 +91,7 @@ constexpr ChmL3HelperRadical::Entry radicals[] = {
     { 82, 0x6BDB, L"け" }, // 毛
     { 83, 0x6C0F, L"うじ" }, // 氏
     { 84, 0x6C14, L"きがまえ" }, // 气
-    { 85, 0x6C34, L"さんずい" }, // 水
+    { 85, 0x6C34, L"みず" }, // 水
     { 86, 0x706B, L"ひ" }, // 火
     { 87, 0x722A, L"つめ" }, // 爪
     { 88, 0x7236, L"ちち" }, // 父
@@ -224,6 +224,38 @@ constexpr ChmL3HelperRadical::Entry radicals[] = {
 };
 static_assert(sizeof(radicals) / sizeof(radicals[0]) == ChmL3HelperRadical::Count,
     "All 214 radicals must be present");
+
+struct RadicalAlias {
+    uint32_t number;
+    std::wstring_view reading;
+};
+
+constexpr RadicalAlias radicalAliases[] = {
+    { 9, L"にんべん" },       // 人
+    { 18, L"りっとう" },      // 刀
+    { 61, L"りっしんべん" },  // 心
+    { 61, L"したごころ" },    // 心
+    { 85, L"さんずい" },          // 水
+    { 86, L"れんが" }, // 火
+    { 86, L"れっか" }, // 火
+    { 94, L"けもの" },    // 犬
+    { 113, L"ねへん" },       // 示
+};
+
+constexpr std::wstring_view radicalSuffixes[] = {
+    L"へん", L"べん", L"かんむり", L"がまえ", L"つくり", L"づくり"
+};
+
+const ChmL3HelperRadical::Entry* FindExactReading(std::wstring_view reading)
+{
+    for (const auto& entry : radicals) {
+        if (entry.reading == reading) return &entry;
+    }
+    for (const auto& alias : radicalAliases) {
+        if (alias.reading == reading) return ChmL3HelperRadical::FindByNumber(alias.number);
+    }
+    return nullptr;
+}
 }
 
 const ChmL3HelperRadical::Entry* ChmL3HelperRadical::FindByNumber(uint32_t number)
@@ -235,8 +267,24 @@ const ChmL3HelperRadical::Entry* ChmL3HelperRadical::FindByNumber(uint32_t numbe
 const ChmL3HelperRadical::Entry* ChmL3HelperRadical::FindByReading(std::wstring_view reading)
 {
     if (reading.empty()) return nullptr;
-    for (const auto& entry : radicals) {
-        if (entry.reading == reading) return &entry;
+    if (const auto* entry = FindExactReading(reading)) return entry;
+
+    for (auto suffix : radicalSuffixes) {
+        for (const auto& entry : radicals) {
+            if (entry.reading.size() > reading.size() &&
+                entry.reading.substr(0, reading.size()) == reading &&
+                entry.reading.substr(reading.size()) == suffix) {
+                return &entry;
+            }
+        }
+    }
+
+    for (auto suffix : radicalSuffixes) {
+        if (reading.size() <= suffix.size()) continue;
+        const auto baseLength = reading.size() - suffix.size();
+        if (reading.substr(baseLength) == suffix) {
+            return FindExactReading(reading.substr(0, baseLength));
+        }
     }
     return nullptr;
 }

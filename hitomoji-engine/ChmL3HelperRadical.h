@@ -2,8 +2,8 @@
 #include <cstdint>
 #include <string_view>
 
-// Fixed Kangxi radical catalog. One exact hiragana reading per radical;
-// aliases, normalization, and attribute-query parsing are deliberately separate.
+// Fixed Kangxi radical catalog with one display name per radical.
+// Lookup tries exact names and aliases first, then adds or removes one known suffix.
 class ChmL3HelperRadical {
 public:
     struct Entry {

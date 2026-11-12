@@ -47,13 +47,51 @@ TEST(RadicalTest, FindsRepresentativeRadicalsAndDistinctSimilarNames)
     }
 }
 
-TEST(RadicalTest, UnknownNumbersAndNonCanonicalReadingsAreNotMatched)
+TEST(RadicalTest, AliasesResolveToCanonicalEntries)
+{
+    EXPECT_EQ(ChmL3HelperRadical::FindByNumber(9), ChmL3HelperRadical::FindByReading(L"にんべん"));
+    EXPECT_EQ(ChmL3HelperRadical::FindByNumber(60), ChmL3HelperRadical::FindByReading(L"ぎょうにんべん"));
+    EXPECT_EQ(ChmL3HelperRadical::FindByNumber(61), ChmL3HelperRadical::FindByReading(L"りっしんべん"));
+    EXPECT_EQ(ChmL3HelperRadical::FindByNumber(61), ChmL3HelperRadical::FindByReading(L"したごころ"));
+    EXPECT_EQ(ChmL3HelperRadical::FindByReading(L"さんずい"), ChmL3HelperRadical::FindByReading(L"みず"));
+}
+
+TEST(RadicalTest, RecognizesSuffixesAfterTryingTheFullReading)
+{
+    struct Example { uint32_t number; const wchar_t* reading; };
+    const Example examples[] = {
+        {113, L"しめすへん"},
+        {69, L"おのつくり"},
+        {69, L"おのづくり"},
+        {140, L"くさかんむり"},
+        {169, L"もんがまえ"},
+        {153, L"むじな"},
+        {60, L"ぎょうにん"},
+        {94, L"けものへん"},
+        {72, L"ひへん"},
+        {86, L"ひ"},
+        {201, L"き"},
+        {163, L"おおざとへん"},
+        {170, L"こざとへん"},
+    };
+    for (const auto& example : examples) {
+        EXPECT_EQ(ChmL3HelperRadical::FindByNumber(example.number),
+                  ChmL3HelperRadical::FindByReading(example.reading));
+    }
+    EXPECT_EQ(nullptr, ChmL3HelperRadical::FindByReading(L"もんがまえへん"));
+    EXPECT_EQ(nullptr, ChmL3HelperRadical::FindByReading(L"もんかまえ"));
+    EXPECT_EQ(nullptr, ChmL3HelperRadical::FindByReading(L"にん"));
+    EXPECT_EQ(nullptr, ChmL3HelperRadical::FindByReading(L"しかぼね"));
+    EXPECT_EQ(nullptr, ChmL3HelperRadical::FindByReading(L"へん"));
+}
+
+TEST(RadicalTest, UnknownNumbersAndReadingsAreNotMatched)
 {
     for (uint32_t number : {0u, 215u, 0xFFFFFFFFu}) {
         EXPECT_EQ(nullptr, ChmL3HelperRadical::FindByNumber(number));
     }
     for (const auto reading : {L"", L"unknown", L"\u4EBA", L"\u30D2\u30C8",
-        L" \u3072\u3068", L"\u3072\u3068 ", L"\u306B\u3093\u3079\u3093"}) {
+        L" \u3072\u3068", L"\u3072\u3068 "}) {
         EXPECT_EQ(nullptr, ChmL3HelperRadical::FindByReading(reading));
     }
 }

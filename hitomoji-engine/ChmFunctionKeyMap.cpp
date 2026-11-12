@@ -32,6 +32,10 @@ const FuncKeyDef g_functionKeyTable[] = {
     { VK_BACK,     false, false, false, ChmEngine::State::Selecting, ChmFuncType::SelectPrevPage },
     { VK_ESCAPE,   false, false, false, ChmEngine::State::Selecting, ChmFuncType::SelectCancel   },
     { VK_OEM_1,    true,  false, false, ChmEngine::State::Selecting, ChmFuncType::SelectCancelAndInput },
+    { '8',         true,  false, false, ChmEngine::State::Selecting, ChmFuncType::SelectCancelAndInput }, // *
+    { VK_OEM_COMMA, true, false, false, ChmEngine::State::Selecting, ChmFuncType::SelectCancelAndInput }, // <
+    { VK_OEM_PERIOD,true, false, false, ChmEngine::State::Selecting, ChmFuncType::SelectCancelAndInput }, // >
+    { VK_OEM_PLUS, false, false, false, ChmEngine::State::Selecting, ChmFuncType::SelectCancelAndInput }, // =
     // CTRL+*
     { 'Z',         false, true,  false, ChmEngine::State::None,      ChmFuncType::UnFinish       },
     { 'H',         false, true,  false, ChmEngine::State::Selecting, ChmFuncType::Backspace      },

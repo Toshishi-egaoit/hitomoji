@@ -232,8 +232,31 @@ public:
 	// 変換開始
 	BOOL Start(const std::wstring& composition)
 	{
-		_leadingChars.clear();
+		Cancel();
 		std::wstring dictYomi = _makeDictYomi(composition);
+
+		StrokeFilter strokes;
+		const size_t strokePos = dictYomi.find_first_of(L"<=>");
+		if (strokePos != std::wstring::npos) {
+			strokes.op = dictYomi[strokePos];
+			const auto digits = std::wstring_view(dictYomi).substr(strokePos + 1);
+			if (digits.empty()) return FALSE;
+			for (wchar_t digit : digits) {
+				if (digit < L'0' || digit > L'9') return FALSE;
+				// All thresholds above the dictionary's byte range compare alike.
+				strokes.count = std::min<unsigned int>(256, strokes.count * 10 + (digit - L'0'));
+			}
+			dictYomi.resize(strokePos);
+		}
+
+		const ChmL3HelperRadical::Entry* radical = nullptr;
+		const size_t radicalPos = dictYomi.find(L'*');
+		if (radicalPos != std::wstring::npos) {
+			radical = ChmL3HelperRadical::FindByReading(
+				std::wstring_view(dictYomi).substr(radicalPos + 1));
+			if (!radical) return FALSE;
+			dictYomi.resize(radicalPos);
+		}
 
 		std::vector<std::wstring> yomis;
 		if (!_parseSearchQuery(dictYomi, yomis)) {
@@ -249,15 +272,13 @@ public:
 		}
 		Debug(Format(L"   > found yomi: %s, count: %d", yomis[0].c_str(), first->count));
 
-		_ownedList.clear();
-		if (yomis.size() == 1) {
-			_list = &_pDict->kanjiList[first->offset];
+		if (yomis.size() == 1 && !radical && !strokes.op) {
+			_list = first->count ? &_pDict->kanjiList[first->offset] : nullptr;
 			_count = first->count;
 		}
-		else if (!_buildAndList(yomis, *first)) {
+		else if (!_buildAndList(yomis, *first, radical, strokes)) {
 			return FALSE;
 		}
-		_page = 0;
 		return TRUE;
 	}
 	void Cancel()
@@ -309,10 +330,27 @@ public:
 
 private:
 
+	struct StrokeFilter {
+		wchar_t op = 0;
+		unsigned int count = 0;
+
+		bool Matches(uint8_t strokes) const
+		{
+			if (!op) return true;
+			if (!strokes) return false; // Dictionary has no stroke count.
+			switch (op) {
+			case L'<': return strokes <= count;
+			case L'>': return strokes >= count;
+			default: return strokes == count;
+			}
+		}
+	};
+
 	std::wstring _makeDictYomi(const std::wstring& composition)
 	{
 		size_t start = 0;
-		while (start < composition.length() && !_isYomiChar(composition[start])) {
+		while (start < composition.length() && !_isYomiChar(composition[start]) &&
+			composition[start] != L'*') {
 			++start;
 		}
 
@@ -415,10 +453,12 @@ private:
 		return nullptr;
 	}
 
-	BOOL _buildAndList(const std::vector<std::wstring>& yomis, const ChmL3KanjiDict::YomiEntry& first)
+	BOOL _buildAndList(const std::vector<std::wstring>& yomis,
+		const ChmL3KanjiDict::YomiEntry& first, const ChmL3HelperRadical::Entry* radical,
+		const StrokeFilter& strokes)
 	{
 		std::vector<std::unordered_set<uint32_t>> filters;
-		filters.reserve(yomis.size() - 1);
+		filters.reserve(yomis.size() - 1 + (radical || strokes.op ? 1 : 0));
 
 		for (size_t i = 1; i < yomis.size(); ++i) {
 			const ChmL3KanjiDict::YomiEntry* e = _findYomi(yomis[i]);
@@ -433,8 +473,17 @@ private:
 			filters.push_back(std::move(slots));
 		}
 
+		if (radical || strokes.op) {
+			auto& slots = filters.emplace_back();
+			for (const auto& kanji : _pDict->DictKanji) {
+				if ((!radical || kanji.radical == radical->number) && strokes.Matches(kanji.strokes)) {
+					slots.insert(kanji.codepoint);
+				}
+			}
+		}
+
 		_ownedList.assign(first.count, 0);
-		bool matchedAny = false;
+		size_t lastMatchEnd = 0;
 
 		for (uint16_t i = 0; i < first.count; ++i) {
 			uint32_t slot = _pDict->kanjiList[first.offset + i];
@@ -449,14 +498,15 @@ private:
 			}
 			if (foundInAll) {
 				_ownedList[i] = slot;
-				matchedAny = true;
+				lastMatchEnd = i + 1;
 			}
 		}
 
-		if (!matchedAny) return FALSE;
+		if (lastMatchEnd == 0) return FALSE;
 
+		_ownedList.resize(lastMatchEnd);
 		_list = _ownedList.data();
-		_count = first.count;
+		_count = static_cast<uint16_t>(lastMatchEnd);
 		return TRUE;
 	}
 

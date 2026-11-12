@@ -69,6 +69,20 @@ TEST(DictionaryFormatTest, LoadsBothVersionsWithoutMetadataAsCandidates)
         EXPECT_EQ(0x7A81u, select.SelectByIndex(0));
         EXPECT_EQ(v2 ? 0xFA55u : 0x7A81u, select.SelectByIndex(0, 1));
         EXPECT_EQ(0x7A81u, select.SelectByIndex(0, 2));
+        ASSERT_TRUE(select.Start(L"と:と*あな"));
+        EXPECT_EQ(0x7A81u, select.SelectByIndex(0));
+        EXPECT_EQ(v2 ? 0xFA55u : 0x7A81u, select.SelectByIndex(0, 1));
+        for (const auto* query : {L"と<9", L"と>9", L"と=9", L"と:と*あな>9"}) {
+            ASSERT_TRUE(select.Start(query));
+            EXPECT_EQ(0x7A81u, select.SelectByIndex(0));
+        }
+        for (const auto* query : {L"と<8", L"と>10", L"と=10", L"と>", L"と>=9"}) {
+            EXPECT_FALSE(select.Start(query));
+        }
+        for (const auto* query : {L"と*きへん", L"と*", L"と*あな*あな", L"*あな"}) {
+            EXPECT_FALSE(select.Start(query));
+            EXPECT_EQ(0u, select.SelectByIndex(0));
+        }
         select.Cancel();
         EXPECT_EQ(0u, select.SelectByIndex(0, 1));
     }
@@ -219,6 +233,45 @@ TEST(DictionaryFormatTest, PageTotalsIncludeEmptyPagesAndRespectPageSize)
     ChmCandidatePage page;
     ASSERT_TRUE(select.BuildCandidatePage(page, helper));
     EXPECT_EQ(81u, page.totalPages);
+}
+
+TEST(DictionaryFormatTest, FilteredPagesEndAtLastMatchAndPreserveInteriorEmptyPages)
+{
+    ChmL3KanjiDict dict;
+    dict.DictYomi = { { {u'あ', 0}, 100, 0 }, { {u'い', 0}, 2, 100 } };
+    dict.kanjiList.assign(102, 0);
+    dict.kanjiList[0] = dict.kanjiList[100] = 0x7A81; // 突
+    dict.kanjiList[32] = 0x7A7A; // 空
+    dict.kanjiList[99] = 0x7A93; // 窓
+    dict.DictKanji = { {0x7A81, 0, 0, 116}, {0x7A7A, 0, 0, 116}, {0x7A93, 0, 0, 116} };
+
+    ChmConfig config;
+    ChmL3Helper helper(&config);
+    ChmL3KanjiSelect select(&dict, 34);
+    ChmCandidatePage page;
+
+    dict.kanjiList[101] = 0x7A93;
+    ASSERT_TRUE(select.Start(L"あ:い"));
+    ASSERT_TRUE(select.BuildCandidatePage(page, helper));
+    EXPECT_EQ(3u, page.totalPages);
+    EXPECT_EQ(0x7A81u, select.SelectByIndex(0));
+    select.NextPage();
+    ASSERT_TRUE(select.BuildCandidatePage(page, helper));
+    EXPECT_EQ(1u, page.page);
+    EXPECT_TRUE(page.kanjiInfo.empty());
+    select.NextPage();
+    EXPECT_EQ(0x7A93u, select.SelectByIndex(31));
+
+    dict.kanjiList[101] = 0x7A7A;
+    ASSERT_TRUE(select.Start(L"あ:い*あな"));
+    ASSERT_TRUE(select.BuildCandidatePage(page, helper));
+    EXPECT_EQ(1u, page.totalPages);
+    EXPECT_EQ(33u, page.totalCount);
+    EXPECT_EQ(0x7A7Au, select.SelectByIndex(32));
+    select.NextPage();
+    EXPECT_EQ(0u, select.GetPage());
+    select.PrevPage();
+    EXPECT_EQ(0u, select.GetPage());
 }
 
 TEST(DictionaryFormatTest, SupportsAbsentOptionalBlocks)
@@ -508,8 +561,9 @@ TEST_F(Layer3Test, ConvertKeyFiltersKanjiSelectionByAdditionalYomiOperator)
     StartSelection(engine, page);
     EXPECT_EQ(L"\x3053\x3046:\x304D", engine.GetCompositionStr());
 
-    EXPECT_GT(page.totalCount, 20u);
-    EXPECT_EQ(40u, page.candidateCount);
+    EXPECT_EQ(1u, page.totalPages);
+    EXPECT_EQ(32u, page.totalCount);
+    EXPECT_EQ(32u, page.candidateCount);
 
     bool hasKouKi = false;
     bool hasFilteredSlot = false;
@@ -523,6 +577,25 @@ TEST_F(Layer3Test, ConvertKeyFiltersKanjiSelectionByAdditionalYomiOperator)
     }
     EXPECT_TRUE(hasKouKi);
     EXPECT_TRUE(hasFilteredSlot);
+
+    engine.Deactivate();
+}
+
+TEST_F(Layer3Test, ConvertKeyFiltersKanjiSelectionByRadical)
+{
+    ChmEngine engine;
+    EngineActivate(engine);
+
+    InputKeys(engine, "KOU", L"こう");
+    InputKey(engine, '8', L"こう*", true);
+    InputKeys(engine, "SANZUI", L"こう*さんずい");
+
+    ChmCandidatePage page;
+    StartSelection(engine, page);
+    ASSERT_EQ(1u, page.kanjiInfo.size());
+    EXPECT_EQ(85u, page.kanjiInfo[0].radical.number);
+    EXPECT_EQ(0x6E2Fu, page.candidates[35]); // N: 港
+    SelectCandidate(engine, 'N', L"港");
 
     engine.Deactivate();
 }
@@ -873,30 +946,34 @@ TEST_F(Layer3Test, EscapeCancelsSelectionAfterSokuonPendingAndRestoresRawPending
     engine.Deactivate();
 }
 
-TEST_F(Layer3Test, ColonDuringSelectionCancelsSelectionAndAppendsFilterSeparator)
+TEST_F(Layer3Test, FilterOperatorsDuringSelectionCancelSelectionAndAppendOperator)
 {
-    ChmEngine engine;
-	EngineActivate(engine);
+    struct Example { WPARAM key; bool shift; const wchar_t* composition; };
+    const Example examples[] = {
+        {VK_OEM_1, true, L"あ:"},
+        {'8', true, L"あ*"},
+        {VK_OEM_PERIOD, true, L"あ>"},
+        {VK_OEM_COMMA, true, L"あ<"},
+        {VK_OEM_PLUS, false, L"あ="},
+    };
+    for (const auto& example : examples) {
+        ChmEngine engine;
+        EngineActivate(engine);
+        InputKeys(engine, "A", L"あ");
 
-
-    InputKeys(engine, "A", L"\x3042");
-
-    ChmCandidatePage page;
-    StartSelection(engine, page);
-    EXPECT_EQ(L"\x3042", engine.GetCompositionStr());
-
-    bool endComposition = true;
-    ChmKeyEvent colonKey = MakeKey(VK_OEM_1, engine.GetState(), true);
-
-    EXPECT_EQ(ChmFuncType::SelectCancelAndInput, colonKey.GetType());
-    EXPECT_TRUE(engine.UpdateComposition(colonKey, endComposition));
-    EXPECT_FALSE(endComposition);
-    EXPECT_EQ(ChmEngine::State::Inputing, engine.GetState());
-    EXPECT_TRUE(engine.HasComposition());
-    EXPECT_EQ(L"\x3042:", engine.GetCompositionStr());
-    EXPECT_FALSE(engine.GetCandidatePage(page));
-
-    engine.Deactivate();
+        ChmCandidatePage page;
+        StartSelection(engine, page);
+        bool endComposition = true;
+        auto key = MakeKey(example.key, engine.GetState(), example.shift);
+        EXPECT_EQ(ChmFuncType::SelectCancelAndInput, key.GetType());
+        EXPECT_TRUE(engine.UpdateComposition(key, endComposition));
+        EXPECT_FALSE(endComposition);
+        EXPECT_EQ(ChmEngine::State::Inputing, engine.GetState());
+        EXPECT_TRUE(engine.HasComposition());
+        EXPECT_EQ(example.composition, engine.GetCompositionStr());
+        EXPECT_FALSE(engine.GetCandidatePage(page));
+        engine.Deactivate();
+    }
 }
 
 TEST_F(Layer3Test, CustomSelectKeymapControlsCandidatePageSizeAndCells)
