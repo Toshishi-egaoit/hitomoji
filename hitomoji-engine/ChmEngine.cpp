@@ -279,6 +279,7 @@ BOOL ChmEngine::IsLayer2Function(ChmFuncType type) {
 		case ChmFuncType::CharInput:
 		case ChmFuncType::Backspace:
 		case ChmFuncType::ProvisionalFinish:
+		case ChmFuncType::CancelProvisionalFinish:
 		case ChmFuncType::Cancel:
 			return TRUE;
 		default:
@@ -328,21 +329,20 @@ BOOL ChmEngine::UpdateLayer2(const ChmKeyEvent& keyEvent, bool& pEndComposition)
 		case ChmFuncType::CharInput:
 			_state = State::Inputing;
 			_pRawInputStore->push(keyEvent.GetChar());
-			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+			ChmRomajiConverter::convert(_pRawInputStore->GetAllStr(), _converted, _pending,
 				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
 			break;
 		case ChmFuncType::ProvisionalFinish:
-			if (_provisionalLength < _converted.size()) {
-				const wchar_t first = _converted[_provisionalLength++];
-				if (IS_HIGH_SURROGATE(first) && _provisionalLength < _converted.size()
-					&& IS_LOW_SURROGATE(_converted[_provisionalLength])) {
-					++_provisionalLength;
-				}
+			if (!_pRawInputStore->get().empty() && !_pRawInputStore->AddProvisionalOne()) {
+				SetError();
 			}
+			break;
+		case ChmFuncType::CancelProvisionalFinish:
+			_pRawInputStore->RemoveProvisionalOne();
 			break;
 		case ChmFuncType::Backspace: {
 			if (!HasComposition()) break;
-			size_t len = _pRawInputStore->get().size();
+			size_t len = _pRawInputStore->GetAllStr().size();
 			size_t del = ChmRomajiConverter::GetLastRawUnitLength();
 
 			if (!_pConfig->GetBool(L"ui",L"backspace-unit-symbol")) {
@@ -354,17 +354,14 @@ BOOL ChmEngine::UpdateLayer2(const ChmKeyEvent& keyEvent, bool& pEndComposition)
 			_pRawInputStore->pop(del);
 			Debug(Format(L"   > Backspace %d chars",(ULONG)del));
 
-			if (_pRawInputStore->get().empty()) {
+			if (_pRawInputStore->GetAllStr().empty()) {
 				_converted = L"";
 				_pending = L"";
 				_ClearUnFinish();
 				_state = State::None;
 			} else {
-				ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+				ChmRomajiConverter::convert(_pRawInputStore->GetAllStr(), _converted, _pending,
 					_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
-			}
-			if (_provisionalLength > _converted.size()) {
-				_provisionalLength = _converted.size();
 			}
 			break;
 		}
@@ -414,8 +411,8 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 				delete _pL3KanjiSelect;
 				_pL3KanjiSelect = nullptr;
 				_state = State::Inputing;
-			} else if (_provisionalLength >= _converted.size()
-				|| !_pL3KanjiSelect->Start(_converted.substr(_provisionalLength))) {
+			} else if (_pRawInputStore->GetProvisionalLength() >= _converted.size()
+				|| !_pL3KanjiSelect->Start(_converted.substr(_pRawInputStore->GetProvisionalLength()))) {
 				Debug(Format(L"   > yomi not found:%s", _converted.c_str()));
 				SetError();
 				delete _pL3KanjiSelect;
@@ -436,20 +433,20 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 			break;
 		case ChmFuncType::SelectPrevPage:
 			if (_pL3KanjiSelect) {
-				const std::wstring& rawInput = _pRawInputStore->get();
+				const std::wstring& rawInput = _pRawInputStore->GetAllStr();
 				if (_state == State::Selecting
 					&& !_converted.empty()
 					&& _converted.back() == L'っ'
 					&& !rawInput.empty()
 					&& IsSokuonPendingChar(rawInput.back())) {
 					_pRawInputStore->pop(1);
-					if (_pRawInputStore->get().empty()) {
+					if (_pRawInputStore->GetAllStr().empty()) {
 						_converted = L"";
 						_pending = L"";
 						_ClearUnFinish();
 						_state = State::None;
 					} else {
-						ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+						ChmRomajiConverter::convert(_pRawInputStore->GetAllStr(), _converted, _pending,
 							_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
 						_state = State::Inputing;
 					}
@@ -465,7 +462,7 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 			break;
 		case ChmFuncType::SelectCancel:
 			_state = State::Inputing;
-			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+			ChmRomajiConverter::convert(_pRawInputStore->GetAllStr(), _converted, _pending,
 				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
 			delete _pL3KanjiSelect;
 			_pL3KanjiSelect = nullptr;
@@ -475,7 +472,7 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 			delete _pL3KanjiSelect;
 			_pL3KanjiSelect = nullptr;
 			_pRawInputStore->push(keyEvent.GetChar());
-			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+			ChmRomajiConverter::convert(_pRawInputStore->GetAllStr(), _converted, _pending,
 				_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
 			break;
 		case ChmFuncType::SelectInput:
@@ -492,7 +489,7 @@ BOOL ChmEngine::UpdateLayer3(const ChmKeyEvent& keyEvent, bool& pEndComposition,
 						SetError();
 					}
 					else {
-						_converted.resize(_provisionalLength);
+						_converted.resize(_pRawInputStore->GetProvisionalLength());
 						_converted += _pL3KanjiSelect->GetLeadingChars() + ChmL3Helper::Utf32ToWString(selected);
 						_pending = L"";
 						_PrepareUnFinish();
@@ -532,7 +529,7 @@ BOOL ChmEngine::UpdateOther(const ChmKeyEvent& keyEvent, bool& pEndComposition){
 	// UnFinish(確定取けし)
 	if (_type == ChmFuncType::UnFinish && CanUnFinish()) {
 		_pRawInputStore->restore();
-		ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+		ChmRomajiConverter::convert(_pRawInputStore->GetAllStr(), _converted, _pending,
 			_pConfig->GetBool(L"ui",L"backspace-unit-symbol"));
 		_state = State::Inputing;
 		_useUndoEditSession = TRUE;
@@ -546,20 +543,24 @@ BOOL ChmEngine::UpdateOther(const ChmKeyEvent& keyEvent, bool& pEndComposition){
 
 	switch (_type) {
 		case ChmFuncType::CompFinishHiragana:
-			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+			ChmRomajiConverter::convert(_pRawInputStore->GetAllStr(), _converted, _pending,
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
 			_PrepareUnFinish();
 			_state = State::None;
 			break ;
 		case ChmFuncType::CompFinishKatakana:
-			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+			ChmRomajiConverter::convert(_pRawInputStore->GetAllStr(), _converted, _pending,
 			_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
-			_converted = ChmRomajiConverter::HiraganaToKatakana(_converted);
+			if (_pRawInputStore->GetProvisionalLength() < _converted.size()) {
+				const auto suffix = _converted.substr(_pRawInputStore->GetProvisionalLength());
+				_converted.replace(_pRawInputStore->GetProvisionalLength(), suffix.size(),
+					ChmRomajiConverter::HiraganaToKatakana(suffix));
+			}
 			_PrepareUnFinish();
 			_state = State::None;
 			break ;
 		case ChmFuncType::CompFinish:
-			ChmRomajiConverter::convert(_pRawInputStore->get(), _converted, _pending,
+			ChmRomajiConverter::convert(_pRawInputStore->GetAllStr(), _converted, _pending,
 				_pConfig->GetBool(L"ui",L"Backspace-unit-symbol"));
 			if (keyEvent.IsNavigationFinish()) {
 				_ClearUnFinish();
@@ -569,14 +570,12 @@ BOOL ChmEngine::UpdateOther(const ChmKeyEvent& keyEvent, bool& pEndComposition){
 			_state = State::None;
 			break;
 		case ChmFuncType::CompFinishKey:
-			_converted = _pRawInputStore->get();
-			_pending = L"";
+			_FinishRaw(false);
 			_PrepareUnFinish();
 			_state = State::None;
 			break;
 		case ChmFuncType::CompFinishKeyWide:
-			_converted = AsciiToWide(_pRawInputStore->get());
-			_pending = L"";
+			_FinishRaw(true);
 			_PrepareUnFinish();
 			_state = State::None;
 			break;
@@ -618,10 +617,22 @@ void ChmEngine::ResetStatus() {
 	_pRawInputStore->clear();
 	_converted = L"";
 	_pending = L"";
-	_provisionalLength = 0;
 	delete _pL3KanjiSelect;
 	_pL3KanjiSelect = nullptr;
 	return;
+}
+
+LONG ChmEngine::GetProvisionalLength() const
+{
+	return static_cast<LONG>(_pRawInputStore->GetProvisionalLength());
+}
+
+void ChmEngine::_FinishRaw(bool wide)
+{
+	const auto suffix = _pRawInputStore->get();
+	_converted = _pRawInputStore->GetProvisionalStr();
+	_converted += wide ? AsciiToWide(suffix) : suffix;
+	_pending.clear();
 }
 
 std::wstring ChmEngine::AsciiToWide(const std::wstring& src)

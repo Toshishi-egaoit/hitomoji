@@ -138,6 +138,28 @@ bool ChmRomajiConverter::TryConvertOne(const std::wstring& rawInput,
     return false;
 }
 
+bool ChmRomajiConverter::TryConvertOneForProvisionalFinish(const std::wstring& rawInput,
+                                                          size_t pos,
+                                                          Unit& out)
+{
+    if (!TryConvertOne(rawInput, pos, out)) return false;
+
+    auto isGeneratedSokuon = [&](size_t offset, const Unit& unit) {
+        if (unit.output != L"っ" || unit.rawLength != 1) return false;
+        const auto key = rawInput.substr(offset, 1);
+        const std::wstring lowerKey(1, static_cast<wchar_t>(std::towlower(key[0])));
+        return !FindEntry(key, lowerKey);
+    };
+
+    // 補った促音が続く場合は、その後の単位まで完成していることを確認する。
+    Unit next = out;
+    while (isGeneratedSokuon(pos, next)) {
+        pos += next.rawLength;
+        if (!TryConvertOne(rawInput, pos, next)) return false;
+    }
+    return true;
+}
+
 std::wstring ChmRomajiConverter::HiraganaToKatakana(const std::wstring& hira)
 {
     std::wstring result;

@@ -60,7 +60,7 @@ public:
 	BOOL IsDirectInput(ChmFuncType tp) { return (tp == ChmFuncType::CharInputSpace) ; }
 	State GetState() { return _state ;}
 	std::wstring GetCompositionStr() ;
-	LONG GetProvisionalLength() const { return static_cast<LONG>(_provisionalLength); }
+	LONG GetProvisionalLength() const;
 	BOOL GetCandidatePage(ChmCandidatePage& page) const;
 
 	BOOL UpdateComposition(const ChmKeyEvent& keyEvent, bool& pEndComposition);
@@ -81,6 +81,7 @@ private:
 
 	// ASCII -> 全角 変換（v0.1.3 簡易実装）
 	static std::wstring AsciiToWide(const std::wstring& src);
+	void _FinishRaw(bool wide);
 	static LONG CountUndoDeleteLength(const std::wstring& src);
 	static BOOL IsLayer3LeadingSymbol(wchar_t ch);
 	static size_t CountLayer3LeadingSymbols(const std::wstring& src);
@@ -101,7 +102,6 @@ private:
 	ChmL3Helper* _pL3Helper; // かな漢字変換の選択キー定義
 
 	std::wstring _converted; // かな変換できた部分
-	size_t _provisionalLength = 0; // 変換対象外にした先頭の UTF-16 長
 	std::wstring _pending; // かなに変換できていない部分（残り）
 	BOOL _useUndoEditSession;
 	LONG _undoDeleteLength;

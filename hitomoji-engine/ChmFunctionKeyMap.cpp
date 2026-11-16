@@ -52,6 +52,7 @@ const std::map<std::wstring, ChmFuncType> s_actionNameMap = {
     { L"finish",             ChmFuncType::CompFinish },
     { L"finish-hiragana",    ChmFuncType::CompFinishHiragana },
     { L"finish-1char",       ChmFuncType::ProvisionalFinish },
+    { L"cancel-finish-1char", ChmFuncType::CancelProvisionalFinish },
     { L"finish-katakana",    ChmFuncType::CompFinishKatakana },
     { L"finish-raw",         ChmFuncType::CompFinishKey },
     { L"finish-raw-wide",    ChmFuncType::CompFinishKeyWide },

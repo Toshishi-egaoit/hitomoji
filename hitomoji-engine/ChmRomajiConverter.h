@@ -26,6 +26,10 @@ public:
                               size_t pos,
                               Unit& out);
 
+    static bool TryConvertOneForProvisionalFinish(const std::wstring& rawInput,
+                                                  size_t pos,
+                                                  Unit& out);
+
     static size_t GetLastRawUnitLength();
 
     static std::wstring HiraganaToKatakana(const std::wstring& hira);

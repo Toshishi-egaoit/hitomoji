@@ -484,6 +484,76 @@ TEST_F(Layer2Test, KatakanaFinishCommitsConvertedAndPendingText)
     engine.Deactivate();
 }
 
+TEST_F(Layer2Test, FinishPreservesProvisionalPrefix)
+{
+    WriteMainConfig(L"[function-key]\nRIGHT=finish-1char\n");
+    ChmEngine engine;
+    EngineActivate(engine);
+
+    const auto input = [&](const wchar_t* suffix) {
+        InputChar(engine, 'W', L"w");
+        InputChar(engine, 'O', L"を");
+        bool endComposition = true;
+        ASSERT_TRUE(engine.UpdateComposition(MakeKey(VK_RIGHT), endComposition));
+        EXPECT_FALSE(endComposition);
+        EXPECT_EQ(1, engine.GetProvisionalLength());
+        InputChar(engine, 'K', L"をk");
+        InputChar(engine, 'A', suffix);
+    };
+
+    input(L"をか");
+    FinishComposition(engine, VK_RETURN, ChmFuncType::CompFinishKatakana, L"をカ", true);
+    input(L"をか");
+    FinishComposition(engine, VK_TAB, ChmFuncType::CompFinishKey, L"をka");
+    input(L"をか");
+    FinishComposition(engine, VK_TAB, ChmFuncType::CompFinishKeyWide, L"をｋａ", true);
+    engine.Deactivate();
+}
+
+TEST_F(Layer2Test, RightArrowWaitsForCompleteConversionUnits)
+{
+    WriteMainConfig(L"[function-key]\nRIGHT=finish-1char\nLEFT=cancel-finish-1char\nLEFT=cancel-finish\n");
+    ChmEngine engine;
+    EngineActivate(engine);
+
+    const auto right = [&](LONG expectedLength, const wchar_t* composition) {
+        bool endComposition = true;
+        EXPECT_TRUE(engine.UpdateComposition(MakeKey(VK_RIGHT), endComposition));
+        EXPECT_FALSE(endComposition);
+        EXPECT_EQ(expectedLength, engine.GetProvisionalLength());
+        EXPECT_EQ(composition, engine.GetCompositionStr());
+    };
+    InputChar(engine, 'C', L"c");
+    InputChar(engine, 'H', L"ch");
+    right(0, L"ch");
+    EXPECT_TRUE(engine.ConsumeErrorRequest());
+    InputChar(engine, 'E', L"ちぇ");
+    right(2, L"ちぇ");
+    EXPECT_FALSE(engine.ConsumeErrorRequest());
+    bool endComposition = true;
+    auto left = MakeKey(VK_LEFT, engine.GetState());
+    EXPECT_EQ(ChmFuncType::CancelProvisionalFinish, left.GetType());
+    EXPECT_TRUE(engine.UpdateComposition(left, endComposition));
+    EXPECT_FALSE(endComposition);
+    EXPECT_EQ(0, engine.GetProvisionalLength());
+    EXPECT_EQ(L"ちぇ", engine.GetCompositionStr());
+    FinishComposition(engine, VK_RETURN, ChmFuncType::CompFinish, L"ちぇ");
+    EXPECT_EQ(ChmFuncType::UnFinish, MakeKey(VK_LEFT, engine.GetState()).GetType());
+
+    InputChar(engine, 'K', L"k");
+    InputChar(engine, 'K', L"っk");
+    right(0, L"っk");
+    EXPECT_TRUE(engine.ConsumeErrorRequest());
+    InputChar(engine, 'A', L"っか");
+    right(1, L"っか");
+    right(2, L"っか");
+    EXPECT_TRUE(engine.UpdateComposition(MakeKey(VK_BACK), endComposition));
+    EXPECT_FALSE(endComposition);
+    EXPECT_EQ(L"k", engine.GetCompositionStr());
+    EXPECT_EQ(0, engine.GetProvisionalLength());
+    engine.Deactivate();
+}
+
 TEST_F(Layer2Test, FinishKeysAreIgnoredWhenThereIsNoComposition)
 {
     ChmEngine engine;

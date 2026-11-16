@@ -24,4 +24,5 @@ enum class ChmFuncType {
 	ImeToggle,          // TSF に登録する IME オン／オフキー
 	VersionInfo,        // バージョン表示
 	ReloadIni,          // iniファイルのリロード
+	CancelProvisionalFinish, // 最後の仮確定を1単位戻す
 };
